@@ -60,7 +60,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-    g_gui = new GUI(g_parameter_store, g_window, g_gpu_device);
+    g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
 
     g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets);
 
@@ -92,17 +92,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     // data aq hopefully is being done on another thread, if not do it here
+    g_spinning_cube->update();
 
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
 
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     // event data needs to sync with the gpu, all points + images needs to be ready to go
     // event_data.sync_to_gpu(...)
+    SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
     // 3dvisualizer->update(...) either cpu or gpu depending on how y'all structure this
     // digital_shutter->update(...) the data is already ready from the event_data sync, so compute shader stuff now
 
-    // 
+    // call all functions that may render to a texture, and not the window itself.
+    g_spinning_cube->render(command_buffer);
 
 
     SDL_GPUTexture *swapchain_texture;
@@ -130,6 +134,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // Submit the command buffer
     SDL_SubmitGPUCommandBuffer(command_buffer);
+
+    // render all of the other mini windows made by imgui
+    g_gui->render_viewports();
 
     return SDL_APP_CONTINUE;
 }
