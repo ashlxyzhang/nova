@@ -41,7 +41,7 @@ class EventData
         EventData()
             : evt_data{}, frame_data{}, evt_data_lock{}, frame_data_lock{}, evt_data_vector_absolute{},
               evt_data_vector_relative{}, frame_data_vector_absolute{}, frame_data_vector_relative{},
-              evt_data_vector_lock{}, frame_data_vector_lock{}, evt_data_vector_need_update{false},
+              evt_data_vector_lock{}, frame_data_vector_lock{}, evt_data_vector_need_update{false}, frame_data_vector_need_update{false},
               max_element_percentage{0.8f}, cull_element_percentage{0.5f}
             
             //changed_evt_thread_map{}, changed_evt_thread_map_lock{}, changed_frame_thread_map{}, changed_frame_thread_map_lock{}
@@ -50,9 +50,26 @@ class EventData
 		}
 
         /**
+         * @brief Clears everything 
+         */
+        void clear()
+        {
+            std::unique_lock<std::recursive_mutex> evt_data_lock_ul{evt_data_lock};
+            std::unique_lock<std::recursive_mutex> frame_data_lock_ul{frame_data_lock};
+
+            evt_data.clear();
+            frame_data.clear();
+            evt_data_vector_need_update = true;
+            frame_data_vector_need_update = true;
+
+            frame_data_lock_ul.unlock();
+            evt_data_lock_ul.unlock();
+        }
+
+        /**
          * @brief Locks event data vectors.
          */
-        void lock_evt_data_vector()
+        void lock_evt_data_vectors()
         {
             evt_data_vector_lock.lock();
         }
@@ -60,7 +77,7 @@ class EventData
         /**
          * @brief Unlocks event data vectors.
          */
-        void unlock_evt_data_vector()
+        void unlock_evt_data_vectors()
         {
             evt_data_vector_lock.unlock();
         }
@@ -90,6 +107,7 @@ class EventData
             evt_data.insert(raw_evt_data);
             
 
+            // If this condition is met, then we only need to push back event data since it is ordered
             if (!evt_data_vector_need_update && 
                 raw_evt_data.timestamp >= (*(--evt_data.end())).timestamp && 
                 !cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage) && 
@@ -131,6 +149,7 @@ class EventData
                 !cull_elements(frame_data_vector_relative, frame_data, max_element_percentage, cull_element_percentage) &&
                 !cull_elements(frame_data_vector_absolute, frame_data, max_element_percentage, cull_element_percentage))
             {
+                
                 std::unique_lock<std::recursive_mutex> frame_data_vector_ul{frame_data_vector_lock};
                 float timestamp_absolute{static_cast<float>(raw_frame_data.timestamp)};
                 float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - get_earliest_frame_timestamp())};
@@ -177,7 +196,7 @@ class EventData
          * @brief Exposes frame data with absolute or relative timestamp as a vector of pairs containing image data and timestamp. 
          *        Caller must have called lock_frame_data_vectors().
          */
-        const std::vector<std::pair<cv::Mat, float>>& get_frame_vectors(bool relative)
+        const std::vector<std::pair<cv::Mat, float>>& get_frame_vector_ref(bool relative)
         {
             // Update changed_thread_map to indicate this thread has up-to-date data
             /*std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
@@ -340,7 +359,10 @@ class EventData
             cull_elements(frame_data_vector_relative, frame_data, 0.8f, 0.5f);
             for (const FrameDatum &frame_el : frame_data)
             {
-                
+                float timestamp_absolute{static_cast<float>(frame_el.timestamp)};
+                float timestamp_relative{static_cast<float>(frame_el.timestamp - get_earliest_frame_timestamp())};
+                frame_data_vector_absolute.push_back(std::make_pair(frame_el.frameData, timestamp_absolute));
+                frame_data_vector_relative.push_back(std::make_pair(frame_el.frameData, timestamp_relative));
             }
 
             frame_data_vector_need_update = false;
