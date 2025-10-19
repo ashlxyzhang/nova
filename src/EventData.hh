@@ -12,24 +12,28 @@
 #include <set>
 
 
+
+
 class EventData
 {
-	// Represents single event data
-	struct EventDatum
-	{
-            int32_t x;
-            int32_t y;
-            int64_t timestamp;
-            uint8_t polarity;
-	};
-
-	struct FrameDatum
-	{
-            cv::Mat frameData;
-            int64_t timestamp;
-	};
+	
 
 	public:
+
+        // Represents single event data
+	    struct EventDatum
+	    {
+                int32_t x;
+                int32_t y;
+                int64_t timestamp;
+                uint8_t polarity;
+	    };
+
+	    struct FrameDatum
+	    {
+                cv::Mat frameData;
+                int64_t timestamp;
+	    };
 
 		/**
 		 * @brief Default constructor for event data.
@@ -63,7 +67,7 @@ class EventData
         {
             std::vector<glm::vec4> evt_vector{};
             cull_elements(evt_vector, evt_data, 0.8f, 0.5f);
-            for (EventDatum evt_el : evt_data)
+            for (const EventDatum &evt_el : evt_data)
             {
                 float x{static_cast<float>(evt_el.x)};
                 float y{static_cast<float>(evt_el.y)};
@@ -82,7 +86,7 @@ class EventData
         {
             std::vector<glm::vec4> evt_vector{};
             cull_elements(evt_vector, evt_data, 0.8f, 0.5f);
-            for (EventDatum evt_el : evt_data)
+            for (const EventDatum &evt_el : evt_data)
             {
                 float x{static_cast<float>(evt_el.x)};
                 float y{static_cast<float>(evt_el.y)};
@@ -101,7 +105,7 @@ class EventData
         {
             std::vector<std::pair<cv::Mat, float>> frame_vector{};
             cull_elements(frame_vector, frame_data, 0.8f, 0.5f);
-            for (FrameDatum frame_el : frame_data)
+            for (const FrameDatum &frame_el : frame_data)
             {
                 float timestamp{static_cast<float>(frame_el.timestamp)};
                 frame_vector.push_back(std::make_pair(frame_el.frameData, timestamp));
@@ -117,13 +121,33 @@ class EventData
         {
             std::vector<std::pair<cv::Mat, float>> frame_vector{};
             cull_elements(frame_vector, frame_data, 0.8f, 0.5f);
-            for (FrameDatum frame_el : frame_data)
+            for (const FrameDatum &frame_el : frame_data)
             {
                 float timestamp{static_cast<float>(frame_el.timestamp - (*frame_data.begin()).timestamp)};
                 frame_vector.push_back(std::make_pair(frame_el.frameData, timestamp));
             }
 
             return frame_vector;
+        }
+
+        uint64_t get_earliest_evt_timestamp()
+        {
+            if (evt_data.empty())
+            {
+                return -1; // No evt data
+            }
+
+            return (*evt_data.begin()).timestamp;
+        }
+
+        uint64_t get_earliest_frame_timestamp()
+        {
+            if (frame_data.empty())
+            {
+                return -1; // No frame data
+            }
+
+            return (*frame_data.begin()).timestamp;
         }
 
 	private:
@@ -143,10 +167,23 @@ class EventData
                 // Ensures upper bound is met no matter the condition
                 while (data.size() > static_cast<size_t>(cull_percentage * maxElements))
                 {
-                    data.erase(data.begin(), data.begin() + static_cast<size_t>((max_percentage - cull_percentage) * evtMaxElements)); // Should bring number of elements down to cull_percentage of max elements
+                    data.erase(data.begin(), std::next(data.begin(), static_cast<size_t>((max_percentage - cull_percentage) * maxElements))); // Should bring number of elements down to cull_percentage of max elements
                 }
             }
 		}	
 };
+
+// Operator overloads necessary to use Datum internal structs as keys to multiset
+// Define < operator for EventDatum
+inline bool operator<(const EventData::EventDatum &left, const EventData::EventDatum &right)
+{
+    return left.timestamp < right.timestamp;
+}
+
+// Define < operator for FrameDatum
+inline bool operator<(const EventData::FrameDatum& left, const EventData::FrameDatum& right)
+{
+    return left.timestamp < right.timestamp;
+}
 
 #endif // EVENTDATA_HH
