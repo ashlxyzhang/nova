@@ -138,12 +138,12 @@ class EventData
 		void cull_elements(std::vector<T> &vector_data, std::multiset<V> &data, float max_percentage, float cull_percentage)
 		{
             size_t maxElements{std::min(vector_data.max_size(), data.max_size())};
-            if (data.size() >= static_cast<size_t>(max_percentage * maxElements)) // If there are more than 90% max number of events
+            if (data.size() >= static_cast<size_t>(max_percentage * maxElements)) // If there are more than max_percentage max number of events
             {
                 // Ensures upper bound is met no matter the condition
                 while (data.size() > static_cast<size_t>(cull_percentage * maxElements))
                 {
-                    data.erase(data.begin(), data.begin() + static_cast<size_t>((max_percentage - cull_percentage) * evtMaxElements)); // Should bring number of elements down to 50% of max elements
+                    data.erase(data.begin(), data.begin() + static_cast<size_t>((max_percentage - cull_percentage) * evtMaxElements)); // Should bring number of elements down to cull_percentage of max elements
                 }
             }
 		}	
