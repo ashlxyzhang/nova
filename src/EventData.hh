@@ -38,7 +38,9 @@ class EventData
 		/**
 		 * @brief Default constructor for event data.
 		 */
-        EventData() : evt_data{}, frame_data{}
+        EventData()
+            : evt_data{}, frame_data{}, evt_data_lock{}, frame_data_lock{}, changed_evt_thread_map{},
+              changed_evt_thread_map_lock{}, changed_frame_thread_map{}, changed_frame_thread_map_lock{}
 		{
 
 		}
@@ -48,7 +50,13 @@ class EventData
          */
         void write_evt_data(EventDatum raw_evt_data)
         {
+            std::unique_lock<std::recursive_mutex> evt_data_ul{evt_data_lock};
             evt_data.insert(raw_evt_data);
+            evt_data_ul.unlock();
+
+            std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
+            changed_evt_thread_map.clear();
+            changed_evt_map_ul.unlock();
         }
 
         /**
@@ -56,98 +64,148 @@ class EventData
          */
         void write_frame_data(FrameDatum raw_frame_data)
         {
+            std::unique_lock<std::recursive_mutex> frame_data_ul{frame_data_lock};
             frame_data.insert(raw_frame_data);
+            frame_data_ul.unlock();
+
+            std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
+            changed_frame_thread_map.clear();
+            changed_frame_map_ul.unlock();
 
         }
 
         /**
-         * @brief Exposes event data with absolute timestamp as a vector of glm::vec4.
+         * @brief Exposes event data with absolute or relative timestamp as a vector of glm::vec4.
          */
-        std::vector<glm::vec4> get_evt_vector_absolute()
+        std::pair<std::vector<glm::vec4>, std::vector<glm::vec4>> get_evt_vectors(std::thread::id tid)
         {
-            std::vector<glm::vec4> evt_vector{};
-            cull_elements(evt_vector, evt_data, 0.8f, 0.5f);
+            std::unique_lock<std::recursive_mutex> evt_data_ul{evt_data_lock};
+
+            std::vector<glm::vec4> evt_vector_absolute{};
+            std::vector<glm::vec4> evt_vector_relative{};
+            cull_elements(evt_vector_absolute, evt_data, 0.8f, 0.5f);
+            cull_elements(evt_vector_relative, evt_data, 0.8f, 0.5f);
             for (const EventDatum &evt_el : evt_data)
             {
                 float x{static_cast<float>(evt_el.x)};
                 float y{static_cast<float>(evt_el.y)};
-                float timestamp{static_cast<float>(evt_el.timestamp)};
+                float timestamp_absolute{static_cast<float>(evt_el.timestamp)};
+                float timestamp_relative{static_cast<float>(evt_el.timestamp - get_earliest_evt_timestamp())};
                 float polarity{static_cast<float>(evt_el.polarity)};
-                evt_vector.push_back(glm::vec4{x, y, timestamp, polarity});
+                evt_vector_absolute.push_back(glm::vec4{x, y, timestamp_absolute, polarity});
+                evt_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
             }
 
-            return evt_vector;
+            evt_data_ul.unlock();
+
+            // Update changed_thread_map to indicate this thread has up-to-date data
+            std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
+            changed_evt_thread_map[tid] = false;
+            changed_evt_map_ul.unlock();
+
+            return std::make_pair(evt_vector_absolute, evt_vector_relative);
         }
 
         /**
-         * @brief Exposes event data with relative timestamp as a vector of glm::vec4.
+         * @brief Exposes frame data with absolute or relative timestamp as a vector of pairs containing image data and timestamp. 
          */
-        std::vector<glm::vec4> get_evt_vector_relative()
+        std::pair<std::vector<std::pair<cv::Mat, float>>, std::vector<std::pair<cv::Mat, float>>> get_frame_vectors(
+            std::thread::id tid)
         {
-            std::vector<glm::vec4> evt_vector{};
-            cull_elements(evt_vector, evt_data, 0.8f, 0.5f);
-            for (const EventDatum &evt_el : evt_data)
-            {
-                float x{static_cast<float>(evt_el.x)};
-                float y{static_cast<float>(evt_el.y)};
-                float timestamp{static_cast<float>(evt_el.timestamp - (*evt_data.begin()).timestamp)}; // Relative timestamp
-                float polarity{static_cast<float>(evt_el.polarity)};
-                evt_vector.push_back(glm::vec4{x, y, timestamp, polarity});
-            }
+            std::unique_lock<std::recursive_mutex> frame_data_ul{frame_data_lock};
 
-            return evt_vector;
-        }
-
-        /**
-         * @brief Exposes frame data with absolute timestamp as a vector of pairs containing image data and timestamp. 
-         */
-        std::vector<std::pair<cv::Mat, float>> get_frame_vector_absolute()
-        {
-            std::vector<std::pair<cv::Mat, float>> frame_vector{};
-            cull_elements(frame_vector, frame_data, 0.8f, 0.5f);
+            std::vector<std::pair<cv::Mat, float>> frame_vector_absolute{};
+            std::vector<std::pair<cv::Mat, float>> frame_vector_relative{};
+            cull_elements(frame_vector_absolute, frame_data, 0.8f, 0.5f);
+            cull_elements(frame_vector_relative, frame_data, 0.8f, 0.5f);
             for (const FrameDatum &frame_el : frame_data)
             {
-                float timestamp{static_cast<float>(frame_el.timestamp)};
-                frame_vector.push_back(std::make_pair(frame_el.frameData, timestamp));
+                float timestamp_absolute{static_cast<float>(frame_el.timestamp)};
+                float timestamp_relative{static_cast<float>(frame_el.timestamp - get_earliest_frame_timestamp())};
+                frame_vector_absolute.push_back(std::make_pair(frame_el.frameData, timestamp_absolute));
+                frame_vector_relative.push_back(std::make_pair(frame_el.frameData, timestamp_relative));
             }
 
-            return frame_vector;
+            frame_data_ul.unlock();
+
+            // Update changed_thread_map to indicate this thread has up-to-date data
+            std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
+            changed_frame_thread_map[tid] = false;
+            changed_frame_map_ul.unlock();
+
+            return std::make_pair(frame_vector_absolute, frame_vector_relative);
         }
 
         /**
-         * @brief Exposes frame data with relative timestamp as a vector of pairs containing image data and timestamp.
+         * @brief For a given thread, determine if event data changed since last call to get_*_vectors
          */
-        std::vector<std::pair<cv::Mat, float>> get_frame_vector_relative()
+        bool is_evt_data_changed(std::thread::id tid)
         {
-            std::vector<std::pair<cv::Mat, float>> frame_vector{};
-            cull_elements(frame_vector, frame_data, 0.8f, 0.5f);
-            for (const FrameDatum &frame_el : frame_data)
+            std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
+            if (!changed_evt_thread_map.contains(tid))
             {
-                float timestamp{static_cast<float>(frame_el.timestamp - (*frame_data.begin()).timestamp)};
-                frame_vector.push_back(std::make_pair(frame_el.frameData, timestamp));
+                changed_evt_map_ul.unlock();
+                return true;
             }
 
-            return frame_vector;
+            changed_evt_map_ul.unlock();
+            return changed_evt_thread_map.at(tid);
         }
 
-        uint64_t get_earliest_evt_timestamp()
+        /**
+         * @brief For a given thread, determine if frame data changed since last call to get_*_vectors
+         */
+        bool is_frame_data_changed(std::thread::id tid)
         {
+            std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
+            if (!changed_frame_thread_map.contains(tid))
+            {
+                changed_frame_map_ul.unlock();
+                return true;
+            }
+
+            changed_frame_map_ul.unlock();
+            return changed_frame_thread_map.at(tid);
+        }
+
+        /**
+         * @brief Gets the earliest event timestamp.
+         */
+        int64_t get_earliest_evt_timestamp()
+        {
+            std::unique_lock<std::recursive_mutex> evt_data_ul{evt_data_lock};
+
             if (evt_data.empty())
             {
+                evt_data_ul.unlock();
                 return -1; // No evt data
             }
 
-            return (*evt_data.begin()).timestamp;
+            int64_t earliest_timestamp{(*evt_data.begin()).timestamp};
+
+            evt_data_ul.unlock();
+
+            return earliest_timestamp;
         }
 
-        uint64_t get_earliest_frame_timestamp()
+        /**
+         * @brief Gets the earliest frame timestamp.
+         */
+        int64_t get_earliest_frame_timestamp()
         {
+            std::unique_lock<std::recursive_mutex> frame_data_ul{frame_data_lock};
+
             if (frame_data.empty())
             {
+                frame_data_ul.unlock();
                 return -1; // No frame data
             }
 
-            return (*frame_data.begin()).timestamp;
+            int64_t timestamp{(*frame_data.begin()).timestamp};
+
+            frame_data_ul.unlock();
+            
+            return timestamp;
         }
 
 	private:
@@ -155,8 +213,21 @@ class EventData
 
 		std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
 
+        std::recursive_mutex evt_data_lock;
+        std::recursive_mutex frame_data_lock;
+
+        // Hashmaps contains thread id mapped to boolean that indicates if new data was read
+        // since the thread called the get_*_vectors functions. This was added because
+        // calling these functions is expensive and should only be done
+        // if the data was updated.
+        std::unordered_map<std::thread::id, bool> changed_evt_thread_map;
+        std::mutex changed_evt_thread_map_lock;
+
+        std::unordered_map<std::thread::id, bool> changed_frame_thread_map;
+        std::mutex changed_frame_thread_map_lock;
+
 		/**
-		  * @brief Memory management code.
+		  * @brief Memory management code. Must be called with appropriate locks.
 		  */
 		template<typename T, typename V>
 		void cull_elements(std::vector<T> &vector_data, std::multiset<V> &data, float max_percentage, float cull_percentage)
