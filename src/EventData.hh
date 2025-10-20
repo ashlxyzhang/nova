@@ -148,7 +148,8 @@ class EventData
 
         /**
          * @brief Exposes event data with absolute or relative timestamp as a vector of glm::vec4.
-         *        Caller must have called lock_evt_data_vectors().
+         *        IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors()
+         *        when done working with the data vectors.
          */
         const std::vector<glm::vec4>& get_evt_vector_ref(bool relative)
         {
@@ -170,7 +171,8 @@ class EventData
 
         /**
          * @brief Exposes frame data with absolute or relative timestamp as a vector of pairs containing image data and timestamp. 
-         *        Caller must have called lock_frame_data_vectors().
+         *        IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors()
+         *        when done working with the data vectors.
          */
         const std::vector<std::pair<cv::Mat, float>>& get_frame_vector_ref(bool relative)
         {
