@@ -39,10 +39,10 @@ class EventData
 		 * @brief Default constructor for event data.
 		 */
         EventData()
-            : evt_data{}, frame_data{}, evt_data_lock{}, frame_data_lock{}, evt_data_vector_absolute{},
+            : evt_data{}, frame_data{}, evt_data_vector_absolute{},
               evt_data_vector_relative{}, frame_data_vector_absolute{}, frame_data_vector_relative{},
-              evt_data_vector_lock{}, frame_data_vector_lock{}, evt_data_vector_need_update{false}, frame_data_vector_need_update{false},
-              max_element_percentage{0.8f}, cull_element_percentage{0.5f}
+              evt_data_vector_need_update{false}, frame_data_vector_need_update{false}, max_element_percentage{0.8f}, cull_element_percentage{0.5f},
+              evt_lock{}
             
             //changed_evt_thread_map{}, changed_evt_thread_map_lock{}, changed_frame_thread_map{}, changed_frame_thread_map_lock{}
 		{
@@ -54,48 +54,30 @@ class EventData
          */
         void clear()
         {
-            std::unique_lock<std::recursive_mutex> evt_data_lock_ul{evt_data_lock};
-            std::unique_lock<std::recursive_mutex> frame_data_lock_ul{frame_data_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
             evt_data.clear();
             frame_data.clear();
-            evt_data_vector_need_update = true;
-            frame_data_vector_need_update = true;
+            evt_data_vector_need_update = false;
+            frame_data_vector_need_update = false;
 
-            frame_data_lock_ul.unlock();
-            evt_data_lock_ul.unlock();
+            evt_lock_ul.unlock();
         }
 
         /**
          * @brief Locks event data vectors.
          */
-        void lock_evt_data_vectors()
+        void lock_data_vectors()
         {
-            evt_data_vector_lock.lock();
+            evt_lock.lock();
         }
 
         /**
          * @brief Unlocks event data vectors.
          */
-        void unlock_evt_data_vectors()
+        void unlock_data_vectors()
         {
-            evt_data_vector_lock.unlock();
-        }
-
-        /**
-         * @brief Locks frame data vectors.
-         */
-        void lock_frame_data_vectors()
-        {
-            frame_data_vector_lock.lock();
-        }
-
-        /**
-         * @brief Unlocks frame data vectors. 
-         */
-        void unlock_frame_data_vectors()
-        {
-            frame_data_vector_lock.unlock();
+            evt_lock.unlock();
         }
 
         /**
@@ -103,7 +85,7 @@ class EventData
          */
         void write_evt_data(EventDatum raw_evt_data)
         {
-            std::unique_lock<std::recursive_mutex> evt_data_ul{evt_data_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
             evt_data.insert(raw_evt_data);
             
 
@@ -113,7 +95,6 @@ class EventData
                 !cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage) && 
                 !cull_elements(evt_data_vector_absolute, evt_data, max_element_percentage, cull_element_percentage))
             {
-                std::unique_lock<std::recursive_mutex> evt_data_vector_ul{evt_data_vector_lock};
 
                 float x{static_cast<float>(raw_evt_data.x)};
                 float y{static_cast<float>(raw_evt_data.y)};
@@ -122,15 +103,13 @@ class EventData
                 float polarity{static_cast<float>(raw_evt_data.polarity)};
                 evt_data_vector_absolute.push_back(glm::vec4{x, y, timestamp_absolute, polarity});
                 evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
-
-                evt_data_vector_ul.unlock();
                 
             }
             else
             {
                 evt_data_vector_need_update = true;
             }
-            evt_data_ul.unlock();
+            evt_lock_ul.unlock();
             /*std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
             changed_evt_thread_map.clear();
             changed_evt_map_ul.unlock();*/
@@ -141,7 +120,7 @@ class EventData
          */
         void write_frame_data(FrameDatum raw_frame_data)
         {
-            std::unique_lock<std::recursive_mutex> frame_data_ul{frame_data_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
             frame_data.insert(raw_frame_data);
 
             if (!frame_data_vector_need_update &&
@@ -149,20 +128,17 @@ class EventData
                 !cull_elements(frame_data_vector_relative, frame_data, max_element_percentage, cull_element_percentage) &&
                 !cull_elements(frame_data_vector_absolute, frame_data, max_element_percentage, cull_element_percentage))
             {
-                
-                std::unique_lock<std::recursive_mutex> frame_data_vector_ul{frame_data_vector_lock};
                 float timestamp_absolute{static_cast<float>(raw_frame_data.timestamp)};
                 float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - get_earliest_frame_timestamp())};
                 frame_data_vector_absolute.push_back(std::make_pair(raw_frame_data.frameData, timestamp_absolute));
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
-                frame_data_vector_ul.unlock();
             }
             else
             {
                 frame_data_vector_need_update = true;
             }
 
-            frame_data_ul.unlock();
+            evt_lock_ul.unlock();
 
             /*std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
             changed_frame_thread_map.clear();
@@ -250,17 +226,17 @@ class EventData
          */
         int64_t get_earliest_evt_timestamp()
         {
-            std::unique_lock<std::recursive_mutex> evt_data_ul{evt_data_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
             if (evt_data.empty())
             {
-                evt_data_ul.unlock();
+                evt_lock_ul.unlock();
                 return -1; // No evt data
             }
 
             int64_t earliest_timestamp{(*evt_data.begin()).timestamp};
 
-            evt_data_ul.unlock();
+            evt_lock_ul.unlock();
 
             return earliest_timestamp;
         }
@@ -270,17 +246,17 @@ class EventData
          */
         int64_t get_earliest_frame_timestamp()
         {
-            std::unique_lock<std::recursive_mutex> frame_data_ul{frame_data_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
             if (frame_data.empty())
             {
-                frame_data_ul.unlock();
+                evt_lock_ul.unlock();
                 return -1; // No frame data
             }
 
             int64_t timestamp{(*frame_data.begin()).timestamp};
 
-            frame_data_ul.unlock();
+            evt_lock_ul.unlock();
             
             return timestamp;
         }
@@ -290,23 +266,19 @@ class EventData
 
 		std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
 
-        std::recursive_mutex evt_data_lock;
-        std::recursive_mutex frame_data_lock;
-
         std::vector<glm::vec4> evt_data_vector_absolute;
         std::vector<glm::vec4> evt_data_vector_relative;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_absolute;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
 
-        std::recursive_mutex evt_data_vector_lock;
-        std::recursive_mutex frame_data_vector_lock;
+      
 
         bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
         bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are exposed.
 
         float max_element_percentage; // What percentage of max size of vector should number of elements populate
         float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they exceed max_element_percentage
-
+        std::recursive_mutex evt_lock;
         // Hashmaps contains thread id mapped to boolean that indicates if new data was read
         // since the thread called the get_*_vectors functions. This was added because
         // calling these functions is expensive and should only be done
@@ -323,8 +295,7 @@ class EventData
          */
         void update_evt_data_vectors()
         {
-            std::unique_lock<std::recursive_mutex> evt_data_ul{evt_data_lock};
-            std::unique_lock<std::recursive_mutex> evt_data_vector_ul{evt_data_vector_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
             evt_data_vector_absolute.clear();
             evt_data_vector_relative.clear();
             cull_elements(evt_data_vector_absolute, evt_data, max_element_percentage, cull_element_percentage);
@@ -342,8 +313,7 @@ class EventData
 
             evt_data_vector_need_update = false;
 
-            evt_data_vector_ul.unlock();
-            evt_data_ul.unlock();
+            evt_lock_ul.unlock();
         }
 
         /**
@@ -351,8 +321,7 @@ class EventData
          */
         void update_frame_data_vectors()
         {
-            std::unique_lock<std::recursive_mutex> frame_data_ul{frame_data_lock};
-            std::unique_lock<std::recursive_mutex> frame_data_vector_ul{frame_data_vector_lock};
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
             frame_data_vector_absolute.clear();
             frame_data_vector_relative.clear();
             cull_elements(frame_data_vector_absolute, frame_data, max_element_percentage, cull_element_percentage);
@@ -367,8 +336,7 @@ class EventData
 
             frame_data_vector_need_update = false;
 
-            frame_data_vector_ul.unlock();
-            frame_data_ul.unlock();
+            evt_lock_ul.unlock();
         }
 
 		/**
