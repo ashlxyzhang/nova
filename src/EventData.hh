@@ -20,7 +20,7 @@ class EventData
 
 	public:
 
-        // Represents single event data
+        // Represents single event datum
 	    struct EventDatum
 	    {
                 int32_t x;
@@ -29,6 +29,7 @@ class EventData
                 uint8_t polarity;
 	    };
 
+        // Represents a single frame datum
 	    struct FrameDatum
 	    {
                 cv::Mat frameData;
@@ -65,7 +66,9 @@ class EventData
         }
 
         /**
-         * @brief Locks event data vectors.
+         * @brief Locks event data vectors. If a thread calls get_*_vector_ref functions and uses the returned
+         *        reference to vectors, the thread must call this. Any use of the reference vector must be inside a
+         *        critical section for thread-safety.
          */
         void lock_data_vectors()
         {
@@ -73,7 +76,9 @@ class EventData
         }
 
         /**
-         * @brief Unlocks event data vectors.
+         * @brief Unlocks event data vectors. If a thread calls get_*_vector_ref functions and uses the returned
+         *        reference to vectors, the thread must call this after it is done using the data vectors. 
+         *        Any use of the reference vector must be inside a critical section for thread-safety.
          */
         void unlock_data_vectors()
         {
@@ -81,7 +86,13 @@ class EventData
         }
 
         /**
-         * @brief Inserts event data into internel ordered set of event data.
+         * @brief Inserts event data into internel ordered set of event data. Data will be added to an internel ordered multiset.
+         *        The cost will be log(n) for insertion into the ordered multiset. If the program detects data is inserted out of order,
+         *        on the next call of get_*_vector_ref, the returned internal data vectors will be repopulated with data in order of timestamp from the 
+         *        multiset at the cost of nlog(n). 
+         *        Otherwise, data is also appended to the internal data vector and the next call of get_*_vector_ref will just return the
+         *        reference to the internal data vector without updating.
+         * @param raw_evt_data Raw event data to add.
          */
         void write_evt_data(EventDatum raw_evt_data)
         {
@@ -116,7 +127,14 @@ class EventData
         }
 
         /**
-         * @brief Inserts frame data into internal ordered set of frame data.
+         * @brief Inserts frame data into internal ordered set of frame data. Data will be added to an internel ordered multiset.
+         *        The cost will be log(n) for insertion into the ordered multiset. If the program detects data is inserted out of order,
+         *        on the next call of get_*_vector_ref, the returned internal data vectors will be repopulated with data in order of timestamp from the 
+         *        multiset at the cost of nlog(n).
+         *        Otherwise, data is also appended to the internal data vector and the next call of get_*_vector_ref will just return the
+         *        reference to the internal data vector without updating.
+         * @param raw_frame_data Raw frame data to add.
+         * 
          */
         void write_frame_data(FrameDatum raw_frame_data)
         {
@@ -150,6 +168,8 @@ class EventData
          * @brief Exposes event data with absolute or relative timestamp as a vector of glm::vec4.
          *        IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors()
          *        when done working with the data vectors.
+         * @param relative If true, returns data with relative timestamps (earliest timestamp subtracted from all timestamps). Otherwise regular timestamps.
+         * @return const reference to internal event data vector.
          */
         const std::vector<glm::vec4>& get_evt_vector_ref(bool relative)
         {
@@ -173,6 +193,8 @@ class EventData
          * @brief Exposes frame data with absolute or relative timestamp as a vector of pairs containing image data and timestamp. 
          *        IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors()
          *        when done working with the data vectors.
+         * @param relative If true, returns data with relative timestamps (earliest timestamp subtracted from all timestamps). Otherwise regular timestamps.
+         * @return const reference to internal frame data vector.
          */
         const std::vector<std::pair<cv::Mat, float>>& get_frame_vector_ref(bool relative)
         {
@@ -225,6 +247,7 @@ class EventData
 
         /**
          * @brief Gets the earliest event timestamp.
+         * @return earliest event data timestamp.
          */
         int64_t get_earliest_evt_timestamp()
         {
@@ -245,6 +268,7 @@ class EventData
 
         /**
          * @brief Gets the earliest frame timestamp.
+         * @return earliest frame data timestamp.
          */
         int64_t get_earliest_frame_timestamp()
         {
