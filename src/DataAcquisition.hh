@@ -12,7 +12,6 @@ class DataAcquisition
             : data_reader{filename}, camera_width{data_reader.getEventResolution().value().width},
               camera_height{data_reader.getEventResolution().value().width}
         {
-
         }
 
         bool get_evt_batch_data(EventData &evt_data)
@@ -23,7 +22,7 @@ class DataAcquisition
             {
                 if (const auto events = data_reader.getNextEventBatch(); events.has_value())
                 {
-                    for (auto& evt : events.value())
+                    for (auto &evt : events.value())
                     {
 
                         EventData::EventDatum evt_datum{
@@ -61,12 +60,10 @@ class DataAcquisition
             return data_read;
         }
 
-	private:
+    private:
         dv::io::MonoCameraRecording data_reader;
         int32_t camera_width;
         int32_t camera_height;
-
-
 };
 
 #endif // DATA_ACQUISITION_HH
