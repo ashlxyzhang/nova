@@ -3,8 +3,8 @@
 #include "GUI.hh"
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
-#include "UploadBuffer.hh"
 #include "SpinningCube.hh"
+#include "UploadBuffer.hh"
 
 ParameterStore *g_parameter_store = nullptr;
 
@@ -16,6 +16,8 @@ GUI *g_gui = nullptr;
 SpinningCube *g_spinning_cube = nullptr;
 
 std::unordered_map<std::string, RenderTarget> g_render_targets;
+
+float g_last_frame_render_time{0.0f};
 
 // This function runs once at startup.
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -51,8 +53,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_Log("Couldn't claim window for GPU device: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    SDL_SetGPUSwapchainParameters(g_gpu_device, g_window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-                                  SDL_GPU_PRESENTMODE_VSYNC);
+    SDL_SetGPUSwapchainParameters(g_gpu_device, g_window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_VSYNC);
 
     g_upload_buffer = new UploadBuffer(g_gpu_device);
 
@@ -108,13 +109,17 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // call all functions that may render to a texture, and not the window itself.
     g_spinning_cube->render(command_buffer);
 
-
     SDL_GPUTexture *swapchain_texture;
     SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, g_window, &swapchain_texture, nullptr, nullptr);
 
     if (swapchain_texture != nullptr) // if this is nullptr, can't really render anything
     {
-        g_gui->prepare_to_render(command_buffer);
+        // Calculate FPS like old NOVA source code
+        float frame_render_time = static_cast<float>(SDL_GetTicks());
+        float fps = 1.0f / ((frame_render_time - g_last_frame_render_time) / 1000.0f);
+        g_last_frame_render_time = frame_render_time;
+        // Send fps data so that GUI can display it
+        g_gui->prepare_to_render(command_buffer, fps);
 
         // Setup and start a render pass
         SDL_GPUColorTargetInfo target_info = {};
@@ -126,7 +131,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         target_info.layer_or_depth_plane = 0;
         target_info.cycle = false;
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
-
 
         g_gui->render(command_buffer, render_pass);
         SDL_EndGPURenderPass(render_pass);
