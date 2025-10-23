@@ -10,6 +10,7 @@
 
 #include "RenderTarget.hh"
 #include "UploadBuffer.hh"
+#include "Camera.hh"
 
 #include "shaders/spinning_cube_frag.h"
 #include "shaders/spinning_cube_vert.h"
@@ -69,6 +70,7 @@ class SpinningCube
 
         glm::mat4 mvp;
         float rotation_time = 0.0f;
+        Camera camera;
 
         SDL_GPUDevice *gpu_device = nullptr;
         SDL_GPUBuffer *vertex_buffer = nullptr;
@@ -76,10 +78,16 @@ class SpinningCube
 
         std::unordered_map<std::string, RenderTarget> &render_targets;
 
+        // Mouse state for camera orbiting
+        bool is_mouse_dragging = false;
+        float last_mouse_x = 0.0f;
+        float last_mouse_y = 0.0f;
+
     public:
         SpinningCube(SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass,
                      std::unordered_map<std::string, RenderTarget> &render_targets)
-            : gpu_device(gpu_device), render_targets(render_targets)
+            : gpu_device(gpu_device), render_targets(render_targets),
+              camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 45.0f, 1920.0f / 1080.0f, 0.1f, 100.0f)
         {
             SDL_GPUShaderCreateInfo vs_create_info = {.code_size = sizeof spinning_cube_vert,
                                                       .code = (const unsigned char *)spinning_cube_vert,
@@ -169,11 +177,50 @@ class SpinningCube
             SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
         }
 
-        void event_handler(SDL_Event *event)
+        // if an event was handled, return true, otherwise return false
+        bool event_handler(SDL_Event *event)
         {
-            // from the ImGui io, we can use the window name to figure out
-            // if this "window" is being selected
-            ImGuiIO &io = ImGui::GetIO();
+            if (render_targets["SpinningCubeColor"].is_focused)
+            {
+                switch (event->type)
+                {
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    if (event->button.button == SDL_BUTTON_LEFT)
+                    {
+                        is_mouse_dragging = true;
+                        last_mouse_x = event->button.x;
+                        last_mouse_y = event->button.y;
+                    }
+                    break;
+                    
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    if (event->button.button == SDL_BUTTON_LEFT)
+                    {
+                        is_mouse_dragging = false;
+                    }
+                    break;
+                    
+                case SDL_EVENT_MOUSE_MOTION:
+                    if (is_mouse_dragging)
+                    {
+                        float current_mouse_x = event->motion.x;
+                        float current_mouse_y = event->motion.y;
+                        
+                        float x_offset = current_mouse_x - last_mouse_x;
+                        float y_offset = last_mouse_y - current_mouse_y; // Reversed since y-coordinates go from bottom to top
+                        
+                        // Update camera rotation based on mouse movement
+                        camera.processMouseMovement(x_offset, y_offset);
+                        
+                        last_mouse_x = current_mouse_x;
+                        last_mouse_y = current_mouse_y;
+                    }
+                    break;
+                }
+                render_targets["SpinningCubeColor"].is_focused = false;
+                return true;
+            }
+            return false;
         }
 
         void update()
@@ -185,20 +232,9 @@ class SpinningCube
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::rotate(model, rotation_time, glm::vec3(1.0f, 1.0f, 0.0f)); // Rotate around X+Y axis
             
-            // Create view matrix (camera positioned at (0, 0, 3) looking at origin)
-            glm::mat4 view = glm::lookAt(
-                glm::vec3(0.0f, 0.0f, 3.0f), // Camera position
-                glm::vec3(0.0f, 0.0f, 0.0f), // Look at origin
-                glm::vec3(0.0f, 1.0f, 0.0f)  // Up vector
-            );
-            
-            // Create perspective projection matrix
-            glm::mat4 projection = glm::perspective(
-                glm::radians(45.0f), // Field of view
-                1920.0f / 1080.0f,   // Aspect ratio
-                0.1f,                // Near plane
-                100.0f               // Far plane
-            );
+            // Get view and projection matrices from camera
+            glm::mat4 view = camera.getViewMatrix();
+            glm::mat4 projection = camera.getProjectionMatrix();
             
             // Combine matrices: MVP = Projection * View * Model
             mvp = projection * view * model;

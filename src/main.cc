@@ -72,12 +72,26 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 /* This function runs when a new event (mouse input, keypresses, etc) occurs. */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    g_gui->event_handler(event);
-
+    // app quit takes precedence over everything else
     if (event->type == SDL_EVENT_QUIT)
     {
         return SDL_APP_SUCCESS;
     }
+
+    // if the spinning cube handled the event, return continue
+    if (g_spinning_cube->event_handler(event))
+    {
+        return SDL_APP_CONTINUE;
+    }
+
+    // if the gui wants to capture the event, handle it
+    if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard)
+    {
+        g_gui->event_handler(event);
+        return SDL_APP_CONTINUE;
+    }
+
+    // if no one handled the event, return continue
     return SDL_APP_CONTINUE;
 }
 

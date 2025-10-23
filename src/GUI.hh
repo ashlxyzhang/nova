@@ -20,7 +20,8 @@ class GUI
         ImDrawData *draw_data = nullptr;
 
     public:
-        GUI(std::unordered_map<std::string, RenderTarget> &render_targets, ParameterStore *parameter_store, SDL_Window *window, SDL_GPUDevice *gpu_device)
+        GUI(std::unordered_map<std::string, RenderTarget> &render_targets, ParameterStore *parameter_store,
+            SDL_Window *window, SDL_GPUDevice *gpu_device)
             : render_targets(render_targets), parameter_store(parameter_store), window(window), gpu_device(gpu_device)
         {
             // Setup Dear ImGui context
@@ -70,7 +71,6 @@ class GUI
             ImGui_ImplSDL3_ProcessEvent(event);
         }
 
-        // This is mandatory: call ImGui_ImplSDLGPU3_PrepareDrawData() to upload the vertex/index buffer!
         void prepare_to_render(SDL_GPUCommandBuffer *command_buffer)
         {
             // Start the Dear ImGui frame
@@ -83,52 +83,55 @@ class GUI
 
             ImGui::Begin("Spinning Cube Viewport");
 
-            //// Check if the render target map and the specific target exist
+            // Check if the render target map and the specific target exist
             if (render_targets.count("SpinningCubeColor"))
             {
-               SDL_GPUTexture *texture = render_targets.at("SpinningCubeColor").texture;
-               if (texture)
-               {
-                   // Get the available pane size
-                   ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                SDL_GPUTexture *texture = render_targets.at("SpinningCubeColor").texture;
+                if (texture)
+                {
+                    // Get the available pane size
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
 
-                   // Get texture dimensions to calculate aspect ratio
-                   Uint32 tex_w, tex_h;
-                   float tex_aspect = (float)render_targets.at("SpinningCubeColor").width /
-                                      (float)render_targets.at("SpinningCubeColor").height;
+                    // Get texture dimensions to calculate aspect ratio
+                    Uint32 tex_w, tex_h;
+                    float tex_aspect = (float)render_targets.at("SpinningCubeColor").width /
+                                       (float)render_targets.at("SpinningCubeColor").height;
 
-                   // Calculate display size to fit the pane while maintaining aspect ratio
-                   ImVec2 display_size = pane_size;
-                   float pane_aspect = pane_size.x / pane_size.y;
+                    // Calculate display size to fit the pane while maintaining aspect ratio
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
 
-                   if (tex_aspect > pane_aspect)
-                   {
-                       // Texture is wider than pane, fit to width
-                       display_size.y = pane_size.x / tex_aspect;
-                   }
-                   else
-                   {
-                       // Texture is taller than pane (or same aspect), fit to height
-                       display_size.x = pane_size.y * tex_aspect;
-                   }
+                    if (tex_aspect > pane_aspect)
+                    {
+                        // Texture is wider than pane, fit to width
+                        display_size.y = pane_size.x / tex_aspect;
+                    }
+                    else
+                    {
+                        // Texture is taller than pane (or same aspect), fit to height
+                        display_size.x = pane_size.y * tex_aspect;
+                    }
 
-                   // Center the image within the pane
-                   float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                   float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                   ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                    // Center the image within the pane
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
 
-                   // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
-                   ImGui::Image((ImTextureID)texture, display_size);
-               }
-               else
-               {
-                   ImGui::Text("Texture for 'SpinningCubeColor' is null.");
-               }
+                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
+                    ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("SpinningCubeColor").is_focused = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    ImGui::Text("Texture for 'SpinningCubeColor' is null.");
+                }
             }
             else
             {
-               ImGui::Text("Render target 'SpinningCubeColor' not found.");
+                ImGui::Text("Render target 'SpinningCubeColor' not found.");
             }
             ImGui::End();
 
