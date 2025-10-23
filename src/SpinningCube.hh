@@ -89,33 +89,40 @@ class SpinningCube
             : gpu_device(gpu_device), render_targets(render_targets),
               camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 45.0f, 1920.0f / 1080.0f, 0.1f, 100.0f)
         {
-            SDL_GPUShaderCreateInfo vs_create_info = {.code_size = sizeof spinning_cube_vert,
-                                                      .code = (const unsigned char *)spinning_cube_vert,
-                                                      .entrypoint = "main",
-                                                      .format = SDL_GPU_SHADERFORMAT_SPIRV,
-                                                      .stage = SDL_GPU_SHADERSTAGE_VERTEX,
-                                                      .num_samplers = 0,
-                                                      .num_storage_textures = 0,
-                                                      .num_storage_buffers = 0,
-                                                      .num_uniform_buffers = 1};
+            // create the vertex shader, this can in the future be replaced by sdl_shadercross
+            SDL_GPUShaderCreateInfo vs_create_info = {0};
+            vs_create_info.code_size = sizeof spinning_cube_vert;
+            vs_create_info.code = (const unsigned char *)spinning_cube_vert;
+            vs_create_info.entrypoint = "main";
+            vs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+            vs_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+            vs_create_info.num_samplers = 0;
+            vs_create_info.num_storage_textures = 0;
+            vs_create_info.num_storage_buffers = 0;
+            vs_create_info.num_uniform_buffers = 1;
             SDL_GPUShader *vs = SDL_CreateGPUShader(gpu_device, &vs_create_info);
 
-            SDL_GPUShaderCreateInfo fs_create_info = {.code_size = sizeof spinning_cube_frag,
-                                                      .code = (const unsigned char *)spinning_cube_frag,
-                                                      .entrypoint = "main",
-                                                      .format = SDL_GPU_SHADERFORMAT_SPIRV,
-                                                      .stage = SDL_GPU_SHADERSTAGE_FRAGMENT,
-                                                      .num_samplers = 0,
-                                                      .num_storage_textures = 0,
-                                                      .num_storage_buffers = 0,
-                                                      .num_uniform_buffers = 0};
+            // create the fragment shader
+            SDL_GPUShaderCreateInfo fs_create_info = {0};
+            fs_create_info.code_size = sizeof spinning_cube_frag;
+            fs_create_info.code = (const unsigned char *)spinning_cube_frag;
+            fs_create_info.entrypoint = "main";
+            fs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+            fs_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+            fs_create_info.num_samplers = 0;
+            fs_create_info.num_storage_textures = 0;
+            fs_create_info.num_storage_buffers = 0;
+            fs_create_info.num_uniform_buffers = 0;
             SDL_GPUShader *fs = SDL_CreateGPUShader(gpu_device, &fs_create_info);
 
-            SDL_GPUBufferCreateInfo vertex_buffer_create_info = {.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
-                                                                 .size = sizeof(cubeVertices)};
+            // create the vertex buffer, this is the buffer that will store the vertex data
+            SDL_GPUBufferCreateInfo vertex_buffer_create_info = {0};
+            vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+            vertex_buffer_create_info.size = sizeof(cubeVertices);
             vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
             upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, cubeVertices, sizeof(cubeVertices));
 
+            // create the graphics pipeline, this is the pipeline that will be used to render the vertex data
             SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {
                 .vertex_shader = vs,
                 .fragment_shader = fs,
@@ -144,6 +151,7 @@ class SpinningCube
             SDL_ReleaseGPUShader(gpu_device, vs);
             SDL_ReleaseGPUShader(gpu_device, fs);
 
+            // create the color texture, this is the texture that will store the color data
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
                 .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
@@ -156,6 +164,7 @@ class SpinningCube
             };
             render_targets["SpinningCubeColor"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), 1920, 1080};
 
+            // create the depth texture, this is the texture that will store the depth data
             SDL_GPUTextureCreateInfo depth_create_info = {
                 .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
                 .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
@@ -216,6 +225,9 @@ class SpinningCube
                         last_mouse_y = current_mouse_y;
                     }
                     break;
+
+                default:
+                    break;
                 }
                 render_targets["SpinningCubeColor"].is_focused = false;
                 return true;
@@ -223,10 +235,31 @@ class SpinningCube
             return false;
         }
 
-        void update()
+        void cpu_update()
         {
             // Update rotation time (assuming 60 FPS, adjust as needed)
-            rotation_time += 0.0016f; // ~60 FPS
+            rotation_time += 0.016f; // ~60 FPS
+            
+            // Process keyboard input for camera movement
+            float delta_time = 0.016f; // ~60 FPS
+            const bool *key_states = SDL_GetKeyboardState(NULL);
+
+            if (key_states[SDL_SCANCODE_W])
+            {
+                camera.processKeyboard(Camera::MovementType::FORWARD, delta_time);
+            }
+            if (key_states[SDL_SCANCODE_S])
+            {
+                camera.processKeyboard(Camera::MovementType::BACKWARD, delta_time);
+            }
+            if (key_states[SDL_SCANCODE_A])
+            {
+                camera.processKeyboard(Camera::MovementType::LEFT, delta_time);
+            }
+            if (key_states[SDL_SCANCODE_D])
+            {
+                camera.processKeyboard(Camera::MovementType::RIGHT, delta_time);
+            }
             
             // Create model matrix with rotation
             glm::mat4 model = glm::mat4(1.0f);
@@ -240,13 +273,24 @@ class SpinningCube
             mvp = projection * view * model;
         }
 
-        void sync_to_gpu(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+        // copy the data from cpu to gpu, we do this one first so data gets ready before the compute pass,
+        // copy pass is special as we are not requried to pass in dependencies when we create the pass.
+        void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
 
         }
 
-        void render(SDL_GPUCommandBuffer *command_buffer)
+        // do compute stuff here, for the architecture of this app, we can assume
+        // that compute always goes before the render pass
+        void compute_pass(SDL_GPUCommandBuffer *command_buffer)
         {
+
+        }
+
+        // do the actual rendering
+        void render_pass(SDL_GPUCommandBuffer *command_buffer)
+        {
+            // create the color target info, this is the texture that will store the color data
             SDL_GPUColorTargetInfo color_target_info = {0};
             color_target_info.texture = render_targets["SpinningCubeColor"].texture;
             color_target_info.clear_color = (SDL_FColor){1.0f, 1.0f, 1.0f, 1.0f};
@@ -256,16 +300,15 @@ class SpinningCube
             color_target_info.layer_or_depth_plane = 0;
             color_target_info.cycle = false;
 
-            SDL_GPUDepthStencilTargetInfo depth_target_info = {.texture = render_targets["SpinningCubeDepth"].texture,
-                                                               .clear_depth = 1.0f,
-                                                               .load_op = SDL_GPU_LOADOP_CLEAR,
-                                                               .store_op = SDL_GPU_STOREOP_DONT_CARE,
-                                                               .stencil_load_op = SDL_GPU_LOADOP_DONT_CARE,
-                                                               .stencil_store_op = SDL_GPU_STOREOP_DONT_CARE,
-                                                               .cycle = false,
-                                                               .clear_stencil = 0};
-        
+            // create the depth target info, this is the texture that will store the depth data
+            SDL_GPUDepthStencilTargetInfo depth_target_info = {0};
+            depth_target_info.texture = render_targets["SpinningCubeDepth"].texture;
+            depth_target_info.clear_depth = 1.0f;
+            depth_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+            depth_target_info.store_op = SDL_GPU_STOREOP_DONT_CARE;
+            depth_target_info.cycle = false;
 
+            // create the render pass, this is the pass that will be used to render the vertex data
             SDL_GPURenderPass *render_pass =
                 SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
              SDL_BindGPUGraphicsPipeline(render_pass, pipeline);

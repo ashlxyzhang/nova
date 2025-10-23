@@ -78,7 +78,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
     }
 
-    // if the spinning cube handled the event, return continue
+    // if the spinning cube handled the event, return continue, skip imgui from handling it
     if (g_spinning_cube->event_handler(event))
     {
         return SDL_APP_CONTINUE;
@@ -106,21 +106,23 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     // data aq hopefully is being done on another thread, if not do it here
-    g_spinning_cube->update();
 
+    // do the cpu updates here, before we do anything on the gpu
+    g_spinning_cube->cpu_update();
+
+    // acquire a command buffer, this is the main command buffer for the frame
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
 
+    // begin a copy pass, this is used to copy data from the cpu to the gpu
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    // event data needs to sync with the gpu, all points + images needs to be ready to go
-    // event_data.sync_to_gpu(...)
+    g_spinning_cube->copy_pass(g_upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
-    // 3dvisualizer->update(...) either cpu or gpu depending on how y'all structure this
-    // digital_shutter->update(...) the data is already ready from the event_data sync, so compute shader stuff now
+    g_spinning_cube->compute_pass(command_buffer);
 
     // call all functions that may render to a texture, and not the window itself.
-    g_spinning_cube->render(command_buffer);
+    g_spinning_cube->render_pass(command_buffer);
 
 
     SDL_GPUTexture *swapchain_texture;
@@ -140,8 +142,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         target_info.layer_or_depth_plane = 0;
         target_info.cycle = false;
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
-
-
         g_gui->render(command_buffer, render_pass);
         SDL_EndGPURenderPass(render_pass);
     }
