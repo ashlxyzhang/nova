@@ -338,8 +338,8 @@ class GUI
             // }
 
             ImGui::End();
-        } 
-        
+        }
+
         // Draw debug window containing fps data
         void draw_debug_window(float fps)
         {
@@ -347,17 +347,18 @@ class GUI
             // FPS
 
             // Update fps buffer
-                update_fps_buffer(fps);
-                float avg_fps = get_avg_fps();
-                float min_fps = get_min_fps();
-                float max_fps = get_max_fps();
-                ImGui::Text("FPS: %.1f", fps);
-                ImGui::Text("Avg FPS: %.1f", avg_fps);
-                ImGui::Text("Min FPS: %.1f", min_fps);
-                ImGui::Text("Max FPS: %.1f", max_fps);
-                ImGui::Separator();
-                ImGui::PlotLines("##FPS History", fps_history_buf.data(), static_cast<int>(fps_history_buf.size()), static_cast<int>(fps_buf_index), nullptr, 0.0f, max_fps + 10.0f, ImVec2(0, 80));
-                ImGui::Separator();
+            update_fps_buffer(fps);
+            float avg_fps = get_avg_fps();
+            float min_fps = get_min_fps();
+            float max_fps = get_max_fps();
+            ImGui::Text("FPS: %.1f", fps);
+            ImGui::Text("Avg FPS: %.1f", avg_fps);
+            ImGui::Text("Min FPS: %.1f", min_fps);
+            ImGui::Text("Max FPS: %.1f", max_fps);
+            ImGui::Separator();
+            ImGui::PlotLines("##FPS History", fps_history_buf.data(), static_cast<int>(fps_history_buf.size()),
+                             static_cast<int>(fps_buf_index), nullptr, 0.0f, max_fps + 10.0f, ImVec2(0, 80));
+            ImGui::Separator();
             ImGui::End();
         }
 
@@ -427,7 +428,6 @@ class GUI
             ImGui_ImplSDL3_ProcessEvent(event);
         }
 
-       
         // This is mandatory: call ImGui_ImplSDLGPU3_PrepareDrawData() to upload the vertex/index buffer!
         void prepare_to_render(SDL_GPUCommandBuffer *command_buffer, float fps)
         {
