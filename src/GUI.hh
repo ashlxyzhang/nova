@@ -10,6 +10,25 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
+// Callback used with SDL_ShowOpenFileDialog in draw_load_window
+inline void SDLCALL file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
+{
+    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
+    if (data_file_list)
+    {
+        if (*data_file_list)
+        {
+            std::string file_name{*data_file_list};
+            param_store_ptr->add("load_file_name", file_name);
+            param_store_ptr->add("load_file_changed", true);
+        }
+    }
+    else
+    {
+        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
+
 class GUI
 {
     private:
@@ -121,8 +140,7 @@ class GUI
                 parameter_store->add("particle_scale", 3.0f); // Default particle scale
             }
 
-            float particle_scale{parameter_store->get<float>(
-                "particle_scale")}; // Not reference because changing object values via pointer seems like bad practice?
+            float particle_scale{parameter_store->get<float>("particle_scale")};
             ImGui::SliderFloat("Particle Scale", &particle_scale, 0.1f, 6.0f);
             parameter_store->add("particle_scale", particle_scale);
 
@@ -362,6 +380,31 @@ class GUI
             ImGui::End();
         }
 
+        void draw_load_window()
+        {
+            ImGui::Begin("Load");
+            ImGui::Text("File:");
+
+            if (ImGui::Button("Open File"))
+            {
+                SDL_ShowOpenFileDialog(file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
+            }
+
+            if (!parameter_store->exists("event_discard_odds"))
+            {
+                parameter_store->add("event_discard_odds", 1.0f);
+            }
+
+            // The higher this value is, the higher chance events will be discarded
+            float event_discard_odds{parameter_store->get<float>("event_discard_odds")};
+            ImGui::Text("Event Discard Odds");
+            ImGui::SliderFloat("##Frequency Of Discarded Events", &event_discard_odds, 1.0f, 10000, "%f");
+            parameter_store->add("event_discard_odds", event_discard_odds);
+
+            // TODO: Cache recent files and state?
+            ImGui::End();
+        }
+
     public:
         enum class TIME
         {
@@ -445,7 +488,7 @@ class GUI
 
             // Draw debug block
             draw_debug_window(fps);
-
+            draw_load_window();
             // Create a simple demo window
             ImGui::ShowDemoWindow();
 

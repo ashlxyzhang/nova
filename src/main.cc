@@ -1,5 +1,6 @@
 #include "pch.hh"
 
+#include "DataAcquisition.hh"
 #include "GUI.hh"
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
@@ -18,6 +19,9 @@ SpinningCube *g_spinning_cube = nullptr;
 std::unordered_map<std::string, RenderTarget> g_render_targets;
 
 float g_last_frame_render_time{0.0f};
+
+EventData g_event_data{};
+DataAcquisition g_data_acq{};
 
 // This function runs once at startup.
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -93,6 +97,35 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     // data aq hopefully is being done on another thread, if not do it here
+    // Unfortunately, for now, let us do data aq in this thread
+    if (g_parameter_store->exists("load_file_name") && g_parameter_store->exists("load_file_changed"))
+    {
+        if (g_parameter_store->get<bool>("load_file_changed"))
+        {
+            std::string load_file_name{g_parameter_store->get<std::string>("load_file_name")};
+
+            g_event_data.clear();
+
+            g_data_acq.load_file(load_file_name);
+            g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
+
+            g_parameter_store->add("load_file_changed", false);
+
+            // Test to ensure event data was added
+            g_event_data.lock_data_vectors();
+
+            const auto &event_data{g_event_data.get_evt_vector_ref(true)};
+            std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size();
+
+            for (size_t i = 1; i < event_data.size(); ++i)
+            {
+                assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+            }
+
+            g_event_data.unlock_data_vectors();
+        }
+    }
+
     g_spinning_cube->update();
 
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
