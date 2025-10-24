@@ -3,6 +3,7 @@
 #ifndef PARAMETERSTORE_HH
 #define PARAMETERSTORE_HH
 
+#include <mutex>
 #include <stdexcept> // For exceptions
 #include <string>
 #include <unordered_map>
@@ -41,10 +42,12 @@ class ParameterStore
          */
         ~ParameterStore()
         {
+            std::unique_lock<std::mutex> lock_ul{lock};
             for (auto &pair : m_store)
             {
                 delete pair.second;
             }
+            lock_ul.unlock();
         }
 
         // --- Rule of Five: Disable copying and moving ---
@@ -64,6 +67,7 @@ class ParameterStore
          */
         template <typename T> void add(const std::string &key, T value)
         {
+            std::unique_lock<std::mutex> lock_ul{lock};
             // Check if the key already exists to clean up the old value first.
             auto it = m_store.find(key);
             if (it != m_store.end())
@@ -73,21 +77,25 @@ class ParameterStore
 
             // Allocate new memory for the value in its type-erased holder.
             m_store[key] = new ValueHolder<T>(std::move(value));
+
+            lock_ul.unlock();
         }
 
         /**
          * @brief Retrieves a parameter from the store.
          * @tparam T The type of the value to retrieve.
          * @param key The key of the value to retrieve.
-         * @return A mutable reference to the stored value.
+         * @return A copy of the stored value.
          * @throw std::out_of_range if the key does not exist.
          * @throw std::bad_cast if the key exists but is of a different type.
          */
-        template <typename T> T &get(const std::string &key)
+        template <typename T> T get(const std::string &key)
         {
+            std::unique_lock<std::mutex> lock_ul{lock};
             auto it = m_store.find(key);
             if (it == m_store.end())
             {
+                lock_ul.unlock();
                 throw std::out_of_range("Parameter with key '" + key + "' not found.");
             }
 
@@ -95,36 +103,16 @@ class ParameterStore
             ValueHolder<T> *holder = dynamic_cast<ValueHolder<T> *>(it->second);
             if (holder == nullptr)
             {
+                lock_ul.unlock();
                 // This means the key exists, but you requested the wrong type.
                 throw std::bad_cast();
             }
 
-            return holder->m_data;
-        }
+            T ret_val = holder->m_data;
 
-        /**
-         * @brief Retrieves a constant parameter from the store.
-         * @tparam T The type of the value to retrieve.
-         * @param key The key of the value to retrieve.
-         * @return A constant reference to the stored value.
-         * @throw std::out_of_range if the key does not exist.
-         * @throw std::bad_cast if the key exists but is of a different type.
-         */
-        template <typename T> const T &get(const std::string &key) const
-        {
-            auto it = m_store.find(key);
-            if (it == m_store.end())
-            {
-                throw std::out_of_range("Parameter with key '" + key + "' not found.");
-            }
+            lock_ul.unlock();
 
-            const ValueHolder<T> *holder = dynamic_cast<const ValueHolder<T> *>(it->second);
-            if (holder == nullptr)
-            {
-                throw std::bad_cast();
-            }
-
-            return holder->m_data;
+            return ret_val;
         }
 
         /**
@@ -132,9 +120,12 @@ class ParameterStore
          * @param key The key to check.
          * @return True if the key exists, false otherwise.
          */
-        bool exists(const std::string &key) const
+        bool exists(const std::string &key)
         {
-            return m_store.count(key) > 0;
+            std::unique_lock<std::mutex> lock_ul{lock};
+            size_t count = m_store.count(key);
+            lock_ul.unlock();
+            return count > 0;
         }
 
     private:
@@ -166,6 +157,9 @@ class ParameterStore
 
         // The map stores string keys and pointers to the base class.
         std::unordered_map<std::string, ValueBase *> m_store;
+
+        // For thread safety: a mutex
+        std::mutex lock{};
 };
 
 #endif // PARAMETERSTORE_HH
