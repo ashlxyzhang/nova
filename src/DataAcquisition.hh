@@ -17,7 +17,7 @@ class DataAcquisition
          * Loads file to read. Initializes internal reader with filename.
          * @param file_name the name of the data file to read.
          */
-        void load_file(std::string file_name)
+        void init_reader(std::string file_name)
         {
             data_reader_ptr = std::make_shared<dv::io::MonoCameraRecording>(file_name);
             camera_width = data_reader_ptr->getEventResolution().value().width;
@@ -31,7 +31,7 @@ class DataAcquisition
          */
         void get_all_evt_data(EventData &evt_data, ParameterStore &param_store)
         {
-            while (get_evt_batch_data(evt_data, param_store))
+            while (get_batch_evt_data(evt_data, param_store))
             {
             }
         }
@@ -43,7 +43,7 @@ class DataAcquisition
          */
         void get_all_frame_data(EventData &evt_data, ParameterStore &param_store)
         {
-            while (get_frame_batch_data(evt_data, param_store))
+            while (get_batch_frame_data(evt_data, param_store))
             {
             }
         }
@@ -54,7 +54,7 @@ class DataAcquisition
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.
          */
-        bool get_evt_batch_data(EventData &evt_data, ParameterStore &param_store)
+        bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store)
         {
             // If reader is not properly initialized, return immediately
             if (!data_reader_ptr)
@@ -94,7 +94,7 @@ class DataAcquisition
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.
          */
-        bool get_frame_batch_data(EventData &evt_data, ParameterStore &param_store)
+        bool get_batch_frame_data(EventData &evt_data, ParameterStore &param_store)
         {
             // If reader is not initialized, return immediately
             if (!data_reader_ptr)
