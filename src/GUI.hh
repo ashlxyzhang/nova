@@ -31,7 +31,8 @@ class GUI
             (void)io;
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+            // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+            io.ConfigWindowsMoveFromTitleBarOnly = true;
             void *font_memory = malloc(sizeof CascadiaCode_ttf);
             std::memcpy(font_memory, CascadiaCode_ttf, sizeof CascadiaCode_ttf);
             io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
@@ -77,6 +78,7 @@ class GUI
             ImGui_ImplSDLGPU3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
+            ImGui::DockSpaceOverViewport();
 
             // Create a simple demo window
             ImGui::ShowDemoWindow();
@@ -149,13 +151,14 @@ class GUI
 
         void render_viewports()
         {
-            // Update and Render additional Platform Windows
-            ImGuiIO &io = ImGui::GetIO();
-            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-            {
-                ImGui::UpdatePlatformWindows();
-                ImGui::RenderPlatformWindowsDefault();
-            }
+            // multi viewport disabled while weird bug is being investigated
+            // // Update and Render additional Platform Windows
+            // ImGuiIO &io = ImGui::GetIO();
+            // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            // {
+            //     ImGui::UpdatePlatformWindows();
+            //     ImGui::RenderPlatformWindowsDefault();
+            // }
         }
 };
 

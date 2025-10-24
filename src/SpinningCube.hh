@@ -8,9 +8,10 @@
 
 #include "pch.hh"
 
+#include "Camera.hh"
 #include "RenderTarget.hh"
 #include "UploadBuffer.hh"
-#include "Camera.hh"
+
 
 #include "shaders/spinning_cube_frag.h"
 #include "shaders/spinning_cube_vert.h"
@@ -75,6 +76,7 @@ class SpinningCube
         SDL_GPUDevice *gpu_device = nullptr;
         SDL_GPUBuffer *vertex_buffer = nullptr;
         SDL_GPUGraphicsPipeline *pipeline = nullptr;
+        SDL_Window *window = nullptr;
 
         std::unordered_map<std::string, RenderTarget> &render_targets;
 
@@ -82,12 +84,14 @@ class SpinningCube
         bool is_mouse_dragging = false;
         float last_mouse_x = 0.0f;
         float last_mouse_y = 0.0f;
+        bool cursor_captured = false;
 
     public:
         SpinningCube(SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass,
-                     std::unordered_map<std::string, RenderTarget> &render_targets)
-            : gpu_device(gpu_device), render_targets(render_targets),
-              camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 45.0f, 1920.0f / 1080.0f, 0.1f, 100.0f)
+                     std::unordered_map<std::string, RenderTarget> &render_targets, SDL_Window *window)
+            : gpu_device(gpu_device), render_targets(render_targets), window(window),
+              camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 45.0f, 1920.0f / 1080.0f,
+                     0.1f, 100.0f)
         {
             // create the vertex shader, this can in the future be replaced by sdl_shadercross
             SDL_GPUShaderCreateInfo vs_create_info = {0};
@@ -136,11 +140,9 @@ class SpinningCube
                                                        SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3},
                         .num_vertex_attributes = 2},
                 .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
-                .depth_stencil_state = {
-                    .compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
-                    .enable_depth_test = true,
-                    .enable_depth_write = true
-                },
+                .depth_stencil_state = {.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
+                                        .enable_depth_test = true,
+                                        .enable_depth_write = true},
                 .target_info = {.color_target_descriptions =
                                     (SDL_GPUColorTargetDescription[]){SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM},
                                 .num_color_targets = 1,
@@ -189,7 +191,7 @@ class SpinningCube
         // if an event was handled, return true, otherwise return false
         bool event_handler(SDL_Event *event)
         {
-            if (render_targets["SpinningCubeColor"].is_focused)
+            if (render_targets["SpinningCubeColor"].is_focused == true)
             {
                 switch (event->type)
                 {
@@ -199,30 +201,50 @@ class SpinningCube
                         is_mouse_dragging = true;
                         last_mouse_x = event->button.x;
                         last_mouse_y = event->button.y;
+                        
+                        // Hide cursor and enable relative mouse mode for unlimited movement
+                        SDL_HideCursor();
+                        SDL_SetWindowRelativeMouseMode(window, true);
+                        cursor_captured = true;
                     }
                     break;
-                    
+
                 case SDL_EVENT_MOUSE_BUTTON_UP:
                     if (event->button.button == SDL_BUTTON_LEFT)
                     {
                         is_mouse_dragging = false;
+                        
+                        // Restore cursor and disable relative mouse mode
+                        if (cursor_captured)
+                        {
+                            SDL_SetWindowRelativeMouseMode(window, false);
+                            SDL_ShowCursor();
+                            cursor_captured = false;
+                        }
                     }
                     break;
-                    
+
                 case SDL_EVENT_MOUSE_MOTION:
-                    if (is_mouse_dragging)
+                    if (is_mouse_dragging && cursor_captured)
                     {
-                        float current_mouse_x = event->motion.x;
-                        float current_mouse_y = event->motion.y;
-                        
-                        float x_offset = current_mouse_x - last_mouse_x;
-                        float y_offset = last_mouse_y - current_mouse_y; // Reversed since y-coordinates go from bottom to top
-                        
+                        // When relative mouse mode is enabled, motion.x and motion.y contain
+                        // the relative movement from the last motion event
+                        float x_offset = event->motion.xrel;
+                        float y_offset = -event->motion.yrel; // Reversed since y-coordinates go from bottom to top
+
                         // Update camera rotation based on mouse movement
                         camera.processMouseMovement(x_offset, y_offset);
-                        
-                        last_mouse_x = current_mouse_x;
-                        last_mouse_y = current_mouse_y;
+                    }
+                    break;
+
+                case SDL_EVENT_WINDOW_FOCUS_LOST:
+                    // If cursor is captured and window loses focus, restore it
+                    if (cursor_captured)
+                    {
+                        SDL_SetWindowRelativeMouseMode(window, false);
+                        SDL_ShowCursor();
+                        cursor_captured = false;
+                        is_mouse_dragging = false;
                     }
                     break;
 
@@ -239,36 +261,39 @@ class SpinningCube
         {
             // Update rotation time (assuming 60 FPS, adjust as needed)
             rotation_time += 0.016f; // ~60 FPS
-            
-            // Process keyboard input for camera movement
-            float delta_time = 0.016f; // ~60 FPS
-            const bool *key_states = SDL_GetKeyboardState(NULL);
 
-            if (key_states[SDL_SCANCODE_W])
+            if (render_targets["SpinningCubeColor"].is_focused == true)
             {
-                camera.processKeyboard(Camera::MovementType::FORWARD, delta_time);
+                // Process keyboard input for camera movement
+                float delta_time = 0.016f; // ~60 FPS
+                const bool *key_states = SDL_GetKeyboardState(NULL);
+
+                if (key_states[SDL_SCANCODE_W])
+                {
+                    camera.processKeyboard(Camera::MovementType::FORWARD, delta_time);
+                }
+                if (key_states[SDL_SCANCODE_S])
+                {
+                    camera.processKeyboard(Camera::MovementType::BACKWARD, delta_time);
+                }
+                if (key_states[SDL_SCANCODE_A])
+                {
+                    camera.processKeyboard(Camera::MovementType::LEFT, delta_time);
+                }
+                if (key_states[SDL_SCANCODE_D])
+                {
+                    camera.processKeyboard(Camera::MovementType::RIGHT, delta_time);
+                }
             }
-            if (key_states[SDL_SCANCODE_S])
-            {
-                camera.processKeyboard(Camera::MovementType::BACKWARD, delta_time);
-            }
-            if (key_states[SDL_SCANCODE_A])
-            {
-                camera.processKeyboard(Camera::MovementType::LEFT, delta_time);
-            }
-            if (key_states[SDL_SCANCODE_D])
-            {
-                camera.processKeyboard(Camera::MovementType::RIGHT, delta_time);
-            }
-            
+
             // Create model matrix with rotation
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::rotate(model, rotation_time, glm::vec3(1.0f, 1.0f, 0.0f)); // Rotate around X+Y axis
-            
+
             // Get view and projection matrices from camera
             glm::mat4 view = camera.getViewMatrix();
             glm::mat4 projection = camera.getProjectionMatrix();
-            
+
             // Combine matrices: MVP = Projection * View * Model
             mvp = projection * view * model;
         }
@@ -277,14 +302,12 @@ class SpinningCube
         // copy pass is special as we are not requried to pass in dependencies when we create the pass.
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
-
         }
 
         // do compute stuff here, for the architecture of this app, we can assume
         // that compute always goes before the render pass
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
         {
-
         }
 
         // do the actual rendering
@@ -311,11 +334,11 @@ class SpinningCube
             // create the render pass, this is the pass that will be used to render the vertex data
             SDL_GPURenderPass *render_pass =
                 SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
-             SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
-             SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){vertex_buffer, 0}, 1);
-             SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
-             SDL_DrawGPUPrimitives(render_pass, 36, 1, 0, 0);
-             SDL_EndGPURenderPass(render_pass);
+            SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
+            SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){vertex_buffer, 0}, 1);
+            SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
+            SDL_DrawGPUPrimitives(render_pass, 36, 1, 0, 0);
+            SDL_EndGPURenderPass(render_pass);
         }
 };
 

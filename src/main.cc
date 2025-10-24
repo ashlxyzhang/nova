@@ -62,7 +62,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
 
-    g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets);
+    g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets, g_window);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -72,26 +72,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 /* This function runs when a new event (mouse input, keypresses, etc) occurs. */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    // app quit takes precedence over everything else
+    // handle the event for the gui
+    g_gui->event_handler(event);
+
+    // if the event is a quit event, return success
     if (event->type == SDL_EVENT_QUIT)
     {
         return SDL_APP_SUCCESS;
     }
 
-    // if the spinning cube handled the event, return continue, skip imgui from handling it
-    if (g_spinning_cube->event_handler(event))
-    {
-        return SDL_APP_CONTINUE;
-    }
+    // if the spinning cube handled the event
+    g_spinning_cube->event_handler(event);
 
-    // if the gui wants to capture the event, handle it
-    if (ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard)
-    {
-        g_gui->event_handler(event);
-        return SDL_APP_CONTINUE;
-    }
 
-    // if no one handled the event, return continue
     return SDL_APP_CONTINUE;
 }
 
@@ -140,28 +133,29 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         target_info.store_op = SDL_GPU_STOREOP_STORE;
         target_info.mip_level = 0;
         target_info.layer_or_depth_plane = 0;
-        target_info.cycle = false;
+        target_info.cycle = true;
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
         g_gui->render(command_buffer, render_pass);
         SDL_EndGPURenderPass(render_pass);
     }
 
-    // Submit the command buffer
-    SDL_SubmitGPUCommandBuffer(command_buffer);
-
     // render all of the other mini windows made by imgui
     g_gui->render_viewports();
+
+    // Submit the command buffer
+    SDL_SubmitGPUCommandBuffer(command_buffer);
 
     return SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+    SDL_WaitForGPUIdle(g_gpu_device);
+
     delete g_spinning_cube;
     delete g_gui;
     delete g_upload_buffer;
 
-    SDL_WaitForGPUIdle(g_gpu_device);
     SDL_ReleaseWindowFromGPUDevice(g_gpu_device, g_window);
     SDL_DestroyGPUDevice(g_gpu_device);
     SDL_DestroyWindow(g_window);
