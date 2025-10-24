@@ -104,28 +104,80 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // data aq hopefully is being done on another thread, if not do it here
     // Unfortunately, for now, let us do data aq in this thread
-    if (g_parameter_store->exists("load_file_name") && g_parameter_store->exists("load_file_changed"))
+    // DATA ACQUISITION CODE
+    if (g_parameter_store->exists("streaming"))
     {
-        if (g_parameter_store->get<bool>("load_file_changed"))
+        bool streaming{g_parameter_store->get<bool>("streaming")};
+        // Case for not streaming
+        if (!streaming && g_parameter_store->exists("load_file_name") && g_parameter_store->exists("load_file_changed"))
         {
-            std::string load_file_name{g_parameter_store->get<std::string>("load_file_name")};
+            if (g_parameter_store->get<bool>("load_file_changed"))
+            {
+                std::string load_file_name{g_parameter_store->get<std::string>("load_file_name")};
 
-            g_event_data.clear();
+                g_event_data.clear();
 
-            g_data_acq.load_file(load_file_name);
-            g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
+                g_data_acq.init_reader(load_file_name);
+                g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
+                g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store);
+                g_parameter_store->add("load_file_changed", false);
 
-            g_parameter_store->add("load_file_changed", false);
+                // Test to ensure event/frame data was added and is ordered
+                g_event_data.lock_data_vectors();
 
-            // Test to ensure event data was added
+                const auto &event_data{g_event_data.get_evt_vector_ref(true)};
+                std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size() << std::endl;
+
+                for (size_t i = 1; i < event_data.size(); ++i)
+                {
+                    assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                }
+
+                const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
+                std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
+
+                for (size_t i = 1; i < frame_data.size(); ++i)
+                {
+                    assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
+                }
+
+                g_event_data.unlock_data_vectors();
+            }
+        }
+        // case for streaming
+        else if (streaming && g_parameter_store->exists("stream_file_name") &&
+                 g_parameter_store->exists("stream_file_changed"))
+        {
+            // If stream file changed, reset reader to read from new file and clear previously read event data
+            if (g_parameter_store->get<bool>("stream_file_changed"))
+            {
+                std::string stream_file_name{g_parameter_store->get<std::string>("stream_file_name")};
+                g_event_data.clear();
+                g_data_acq.init_reader(stream_file_name);
+            }
+
+            // Get event/frame data in batches every frame
+            g_data_acq.get_batch_evt_data(g_event_data, *g_parameter_store);
+            g_data_acq.get_batch_frame_data(g_event_data, *g_parameter_store);
+            g_parameter_store->add("stream_file_changed", false);
+
+            // Test to ensure event/frame data was added and is ordered
             g_event_data.lock_data_vectors();
 
             const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-            std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size();
+            std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size() << std::endl;
 
             for (size_t i = 1; i < event_data.size(); ++i)
             {
                 assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+            }
+
+            const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
+            std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
+
+            for (size_t i = 1; i < frame_data.size(); ++i)
+            {
+                assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
             }
 
             g_event_data.unlock_data_vectors();
