@@ -431,7 +431,8 @@ class GUI
             (void)io;
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-            io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+            // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+            io.ConfigWindowsMoveFromTitleBarOnly = true;
             void *font_memory = malloc(sizeof CascadiaCode_ttf);
             std::memcpy(font_memory, CascadiaCode_ttf, sizeof CascadiaCode_ttf);
             io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
@@ -479,6 +480,7 @@ class GUI
             ImGui_ImplSDLGPU3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
+            ImGui::DockSpaceOverViewport();
 
             // Draw the dockspace
             draw_GUI_dockspace();
@@ -494,7 +496,7 @@ class GUI
 
             ImGui::Begin("Spinning Cube Viewport");
 
-            //// Check if the render target map and the specific target exist
+            // Check if the render target map and the specific target exist
             if (render_targets.count("SpinningCubeColor"))
             {
                 SDL_GPUTexture *texture = render_targets.at("SpinningCubeColor").texture;
@@ -531,6 +533,9 @@ class GUI
 
                     // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
                     ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("SpinningCubeColor").is_focused = ImGui::IsItemHovered();
                 }
                 else
                 {
@@ -557,13 +562,14 @@ class GUI
 
         void render_viewports()
         {
-            // Update and Render additional Platform Windows
-            ImGuiIO &io = ImGui::GetIO();
-            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-            {
-                ImGui::UpdatePlatformWindows();
-                ImGui::RenderPlatformWindowsDefault();
-            }
+            // multi viewport disabled while weird bug is being investigated
+            // // Update and Render additional Platform Windows
+            // ImGuiIO &io = ImGui::GetIO();
+            // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            // {
+            //     ImGui::UpdatePlatformWindows();
+            //     ImGui::RenderPlatformWindowsDefault();
+            // }
         }
 };
 
