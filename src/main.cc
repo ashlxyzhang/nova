@@ -133,8 +133,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     }
 
-    g_spinning_cube->update();
-
     // do the cpu updates here, before we do anything on the gpu
     g_spinning_cube->cpu_update();
 
