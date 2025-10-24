@@ -93,32 +93,6 @@ class GUI
             return min;
         }
 
-        // https://github.com/ocornut/imgui/wiki/Docking
-        // Creates required dockspace before rendering ImGui windows on top
-        // From old NOVA source code
-        void draw_GUI_dockspace()
-        {
-            static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
-            ImGuiWindowFlags w_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-                                       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
-
-            ImGuiViewport *viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(viewport->Pos);
-            ImGui::SetNextWindowSize(viewport->Size);
-            ImGui::SetNextWindowViewport(viewport->ID);
-
-            w_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
-
-            ImGui::Begin("DockSpace", nullptr, w_flags);
-            ImGuiIO &io = ImGui::GetIO();
-            if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
-            {
-                ImGuiID dockspace_id = ImGui::GetID("DockSpace");
-                ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
-            }
-            ImGui::End();
-        }
-
         // Recreate info window from old NOVA
         void draw_info_window()
         {
@@ -438,7 +412,7 @@ class GUI
             io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
 
             // Setup Dear ImGui style
-            ImGui::StyleColorsDark();
+            // ImGui::StyleColorsDark();
 
             // Setup scaling
             float scaling_factor = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -481,9 +455,6 @@ class GUI
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
             ImGui::DockSpaceOverViewport();
-
-            // Draw the dockspace
-            draw_GUI_dockspace();
 
             // Draw info block
             draw_info_window();

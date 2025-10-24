@@ -12,7 +12,6 @@
 #include "RenderTarget.hh"
 #include "UploadBuffer.hh"
 
-
 #include "shaders/spinning_cube_frag.h"
 #include "shaders/spinning_cube_vert.h"
 
@@ -201,7 +200,7 @@ class SpinningCube
                         is_mouse_dragging = true;
                         last_mouse_x = event->button.x;
                         last_mouse_y = event->button.y;
-                        
+
                         // Hide cursor and enable relative mouse mode for unlimited movement
                         SDL_HideCursor();
                         SDL_SetWindowRelativeMouseMode(window, true);
@@ -213,7 +212,7 @@ class SpinningCube
                     if (event->button.button == SDL_BUTTON_LEFT)
                     {
                         is_mouse_dragging = false;
-                        
+
                         // Restore cursor and disable relative mouse mode
                         if (cursor_captured)
                         {

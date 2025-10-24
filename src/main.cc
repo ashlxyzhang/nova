@@ -89,7 +89,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     // if the spinning cube handled the event
     g_spinning_cube->event_handler(event);
 
-
     return SDL_APP_CONTINUE;
 }
 
