@@ -10,8 +10,8 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
-// Callback used with SDL_ShowOpenFileDialog in draw_load_window
-inline void SDLCALL file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
+// Callback used with SDL_ShowOpenFileDialog in draw_load_file_window
+inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
 {
     ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
     if (data_file_list)
@@ -21,6 +21,27 @@ inline void SDLCALL file_handle_callback(void *param_store, const char *const *d
             std::string file_name{*data_file_list};
             param_store_ptr->add("load_file_name", file_name);
             param_store_ptr->add("load_file_changed", true);
+            param_store_ptr->add("streaming", false); // Determines if program is streaming
+        }
+    }
+    else
+    {
+        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
+
+// Callback used with SDL_ShowOpenFileDialog in draw_stream_file_window
+inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
+{
+    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
+    if (data_file_list)
+    {
+        if (*data_file_list)
+        {
+            std::string file_name{*data_file_list};
+            param_store_ptr->add("stream_file_name", file_name);
+            param_store_ptr->add("stream_file_changed", true);
+            param_store_ptr->add("streaming", true); // Determines if program is streaming
         }
     }
     else
@@ -162,6 +183,15 @@ class GUI
             ImGui::Combo("Time Unit", &unit_type, "s\0ms\0us\0");
             parameter_store->add("unit_time_conversion_factor", units[unit_type]);
             parameter_store->add("unit_type", unit_type);
+
+            // Control if frame data shows up with event data
+            if (!parameter_store->exists("show_frame_data"))
+            {
+                parameter_store->add("show_frame_data", false);
+            }
+            bool show_frame_data{parameter_store->get<bool>("show_frame_data")};
+            ImGui::Checkbox("Show Frame Data", &show_frame_data);
+            parameter_store->add("show_frame_data", show_frame_data);
 
             ImGui::Separator();
 
@@ -354,14 +384,38 @@ class GUI
             ImGui::End();
         }
 
-        void draw_load_window()
+        void draw_stream_file_window()
+        {
+            ImGui::Begin("Streaming");
+            ImGui::Text("Streaming File:");
+            if (ImGui::Button("Open File To Stream"))
+            {
+                SDL_ShowOpenFileDialog(stream_file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
+            }
+
+            if (!parameter_store->exists("stream_paused"))
+            {
+                parameter_store->add("stream_paused", false);
+            }
+
+            bool stream_paused{parameter_store->get<bool>("stream_paused")};
+            // Pause or resume stream
+            if (ImGui::Button(stream_paused ? "Resume" : "Pause"))
+            {
+                parameter_store->add("stream_paused", !stream_paused); // Toggle whether stream is paused
+            }
+
+            ImGui::End();
+        }
+
+        void draw_load_file_window()
         {
             ImGui::Begin("Load");
             ImGui::Text("File:");
 
             if (ImGui::Button("Open File"))
             {
-                SDL_ShowOpenFileDialog(file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
+                SDL_ShowOpenFileDialog(load_file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
             }
 
             if (!parameter_store->exists("event_discard_odds"))
@@ -461,7 +515,8 @@ class GUI
 
             // Draw debug block
             draw_debug_window(fps);
-            draw_load_window();
+            draw_load_file_window();
+            draw_stream_file_window();
             // Create a simple demo window
             ImGui::ShowDemoWindow();
 

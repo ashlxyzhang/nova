@@ -52,8 +52,16 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
+            // Clear raw ordered data
             evt_data.clear();
             frame_data.clear();
+
+            // Clear ref vectors
+            evt_data_vector_absolute.clear();
+            evt_data_vector_relative.clear();
+            frame_data_vector_absolute.clear();
+            frame_data_vector_relative.clear();
+
             evt_data_vector_need_update = false;
             frame_data_vector_need_update = false;
 
@@ -95,11 +103,12 @@ class EventData
             evt_data.insert(raw_evt_data);
 
             // If this condition is met, then we only need to push back event data since it is ordered
+            // New data is latest data and vector is already ordered (due to evt_data_vector_need_update being
+            // false). Just push back to ref vectors in this case.
             if (!evt_data_vector_need_update && raw_evt_data.timestamp >= (*(--evt_data.end())).timestamp &&
                 !cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage) &&
                 !cull_elements(evt_data_vector_absolute, evt_data, max_element_percentage, cull_element_percentage))
             {
-
                 float x{static_cast<float>(raw_evt_data.x)};
                 float y{static_cast<float>(raw_evt_data.y)};
                 float timestamp_absolute{static_cast<float>(raw_evt_data.timestamp)};
