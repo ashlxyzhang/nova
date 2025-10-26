@@ -1,6 +1,6 @@
 #pragma once
-#ifndef DATA_ACQUISITION_HH
-#define DATA_ACQUISITION_HH
+#ifndef DIGITAL_CODED_EXPOSURE_HH
+#define DIGITAL_CODED_EXPOSURE_HH
 
 #include "pch.hh"
 
