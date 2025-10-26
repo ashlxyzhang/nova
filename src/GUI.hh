@@ -59,6 +59,7 @@ class GUI
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
         ImDrawData *draw_data = nullptr;
+        Scrubber *scrubber = nullptr;
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -502,8 +503,8 @@ class GUI
             }
             
             int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
-            const char* scrubber_type_names[] = { "Time", "Event" };
-            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 2))
+            const char* scrubber_type_names[] = { "Event" };
+            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 1))
             {
                 parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
             }
@@ -531,9 +532,20 @@ class GUI
                 parameter_store->add("scrubber.current_index", static_cast<std::size_t>(0));
             }
             int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
-            if (ImGui::InputInt("Current Index", &current_index_int, 1, 100))
+            
+            // Get min/max values from scrubber if available
+            int min_index_int = 0;
+            int max_index_int = 0;
+            if (scrubber)
             {
-                if (current_index_int < 0) current_index_int = 0;
+                min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
+                max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
+            }
+            
+            if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
+            {
+                if (current_index_int < min_index_int) current_index_int = min_index_int;
+                if (current_index_int > max_index_int) current_index_int = max_index_int;
                 parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
             }
 
@@ -543,36 +555,22 @@ class GUI
                 parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
             }
             int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
-            if (ImGui::InputInt("Index Window", &index_window_int, 1, 10))
+            
+            // Calculate maximum window size (half of data size, minimum 1)
+            int max_window_size = 1;
+            if (scrubber)
+            {
+                int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") - parameter_store->get<std::size_t>("scrubber.min_index") + 1);
+                max_window_size = std::max(1, data_size / 2);
+            }
+            
+            if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
             {
                 if (index_window_int < 1) index_window_int = 1;
+                if (index_window_int > max_window_size) index_window_int = max_window_size;
                 parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
             }
 
-            ImGui::Separator();
-
-            // Current Time (for TIME type)
-            if (!parameter_store->exists("scrubber.current_time"))
-            {
-                parameter_store->add("scrubber.current_time", 0.0f);
-            }
-            float current_time = parameter_store->get<float>("scrubber.current_time");
-            if (ImGui::InputFloat("Current Time", &current_time))
-            {
-                parameter_store->add("scrubber.current_time", current_time);
-            }
-
-            // Time Window
-            if (!parameter_store->exists("scrubber.time_window"))
-            {
-                parameter_store->add("scrubber.time_window", 0.0f);
-            }
-            float time_window = parameter_store->get<float>("scrubber.time_window");
-            if (ImGui::InputFloat("Time Window", &time_window))
-            {
-                if (time_window < 0.0f) time_window = 0.0f;
-                parameter_store->add("scrubber.time_window", time_window);
-            }
 
             ImGui::End();
         }
@@ -592,9 +590,9 @@ class GUI
         };
 
         GUI(std::unordered_map<std::string, RenderTarget> &render_targets, ParameterStore *parameter_store,
-            SDL_Window *window, SDL_GPUDevice *gpu_device)
+            SDL_Window *window, SDL_GPUDevice *gpu_device, Scrubber *scrubber)
             : render_targets(render_targets), parameter_store(parameter_store), window(window), gpu_device(gpu_device),
-              fps_history_buf(100, 0.0f), fps_buf_index(0)
+              scrubber(scrubber), fps_history_buf(100, 0.0f), fps_buf_index(0)
         {
             // Setup Dear ImGui context
             IMGUI_CHECKVERSION();

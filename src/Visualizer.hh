@@ -9,6 +9,7 @@
 #include "EventData.hh"
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
+#include "Scrubber.hh"
 #include "UploadBuffer.hh"
 
 #include "shaders/visualizer/grid/grid_frag.h"
@@ -281,78 +282,17 @@ class Visualizer
         class PointsRenderer
         {
             private:
-                std::vector<glm::vec4> points;
-                bool data_changed = false;
-                size_t last_data_size = 0;
-
                 ParameterStore &parameter_store;
+                Scrubber *scrubber = nullptr;
                 EventData &event_data;
                 SDL_GPUDevice *gpu_device = nullptr;
                 SDL_GPUGraphicsPipeline *points_pipeline = nullptr;
-                SDL_GPUBuffer *vertex_buffer = nullptr;
-
-                void generate_points_from_event_data()
-                {
-                    points.clear();
-                    
-                    // Lock the event data to safely access it
-                    event_data.lock_data_vectors();
-                    
-                    // Get the event data vector (using relative timestamps)
-                    const std::vector<glm::vec4> &evt_vector = event_data.get_evt_vector_ref(true);
-                    
-                    if (evt_vector.empty())
-                    {
-                        event_data.unlock_data_vectors();
-                        return;
-                    }
-                    
-                    // Find the bounding box of the event data for normalization
-                    float min_x = evt_vector[0].x, max_x = evt_vector[0].x;
-                    float min_y = evt_vector[0].y, max_y = evt_vector[0].y;
-                    float min_t = evt_vector[0].z, max_t = evt_vector[0].z;
-                    
-                    for (const auto &evt : evt_vector)
-                    {
-                        min_x = std::min(min_x, evt.x);
-                        max_x = std::max(max_x, evt.x);
-                        min_y = std::min(min_y, evt.y);
-                        max_y = std::max(max_y, evt.y);
-                        min_t = std::min(min_t, evt.z);
-                        max_t = std::max(max_t, evt.z);
-                    }
-                    
-                    // Calculate normalization factors to map to [-1, 1] cube
-                    float range_x = max_x - min_x;
-                    float range_y = max_y - min_y;
-                    float range_t = max_t - min_t;
-                    
-                    // Avoid division by zero
-                    if (range_x == 0.0f) range_x = 1.0f;
-                    if (range_y == 0.0f) range_y = 1.0f;
-                    if (range_t == 0.0f) range_t = 1.0f;
-                    
-                    // Generate normalized points
-                    for (const auto &evt : evt_vector)
-                    {
-                        // Normalize x, y coordinates to [-1, 1]
-                        float norm_x = 2.0f * (evt.x - min_x) / range_x - 1.0f;
-                        float norm_y = 2.0f * (evt.y - min_y) / range_y - 1.0f;
-                        float norm_t = 2.0f * (evt.z - min_t) / range_t - 1.0f;
-                        
-                        // Store as vec4: (x, y, t, polarity)
-                        points.push_back(glm::vec4(norm_x, norm_y, norm_t, evt.w));
-                    }
-                    
-                    event_data.unlock_data_vectors();
-                }
 
             public:
-                PointsRenderer(ParameterStore &parameter_store, EventData &event_data, SDL_GPUDevice *gpu_device, 
+                PointsRenderer(ParameterStore &parameter_store, EventData &event_data, Scrubber *scrubber, SDL_GPUDevice *gpu_device, 
                               UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
-                    : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
+                    : parameter_store(parameter_store), event_data(event_data), scrubber(scrubber), gpu_device(gpu_device)
                 {
-                    generate_points_from_event_data();
 
                     SDL_GPUShaderCreateInfo vs_create_info = {0};
                     vs_create_info.code_size = sizeof points_vert;
@@ -377,16 +317,6 @@ class Visualizer
                     fs_create_info.num_storage_buffers = 0;
                     fs_create_info.num_uniform_buffers = 0;
                     SDL_GPUShader *fs = SDL_CreateGPUShader(gpu_device, &fs_create_info);
-
-                    // Create vertex buffer for points
-                    SDL_GPUBufferCreateInfo vertex_buffer_create_info = {0};
-                    vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-                    vertex_buffer_create_info.size = points.size() * sizeof(glm::vec4);
-                    vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
-
-                    // Upload points data to GPU
-                    upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, points.data(),
-                                                 points.size() * sizeof(glm::vec4));
 
                     // Create graphics pipeline for point rendering
                     SDL_GPUVertexBufferDescription vertex_buffer_desc = {0, sizeof(glm::vec4),
@@ -419,10 +349,6 @@ class Visualizer
 
                 ~PointsRenderer()
                 {
-                    if (vertex_buffer)
-                    {
-                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
-                    }
                     if (points_pipeline)
                     {
                         SDL_ReleaseGPUGraphicsPipeline(gpu_device, points_pipeline);
@@ -431,55 +357,26 @@ class Visualizer
 
                 void cpu_update()
                 {
-                    // Check if event data has changed
-                    event_data.lock_data_vectors();
-                    const std::vector<glm::vec4> &evt_vector = event_data.get_evt_vector_ref(true);
-                    size_t current_data_size = evt_vector.size();
-                    event_data.unlock_data_vectors();
                     
-                    if (current_data_size != last_data_size)
-                    {
-                        data_changed = true;
-                        last_data_size = current_data_size;
-                    }
                 }
 
                 void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
-                    if (data_changed)
-                    {
-                        generate_points_from_event_data();
-                        
-                        if (vertex_buffer)
-                        {
-                            // Recreate vertex buffer with new size if needed
-                            SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
-                        }
 
-                        SDL_GPUBufferCreateInfo vertex_buffer_create_info = {0};
-                        vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-                        vertex_buffer_create_info.size = points.size() * sizeof(glm::vec4);
-                        vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
-
-                        // Upload updated points data to GPU
-                        upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, points.data(),
-                                                     points.size() * sizeof(glm::vec4));
-                        
-                        data_changed = false;
-                    }
                 }
 
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                 const glm::mat4 &mvp)
                 {
-                    if (!points_pipeline || !vertex_buffer || points.empty())
+
+                    if (scrubber->get_points_buffer_size() == 0)
                         return;
 
                     // Bind the graphics pipeline
                     SDL_BindGPUGraphicsPipeline(render_pass, points_pipeline);
 
                     // Bind the vertex buffer
-                    SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){vertex_buffer, 0}, 1);
+                    SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){scrubber->get_points_buffer(), 0}, 1);
 
                     // Create uniform buffer data for points shader
                     struct PointsUniforms {
@@ -488,8 +385,24 @@ class Visualizer
                         glm::vec4 positive_color;
                         float point_size;
                     } uniforms;
-                    
-                    uniforms.mvp = mvp;
+                
+
+                    float camera_width = 640.0f;
+                    float camera_height = 480.0f;
+
+                    // Create scaling matrix to transform from pixel coordinates to unit cube
+                    // Pixel coordinates: (0,0) to (camera_width, camera_height)
+                    // Target coordinates: (-1,-1) to (1,1)
+                    glm::mat4 scale_matrix = glm::mat4(1.0f);
+                    scale_matrix[0][0] = 2.0f / camera_width;   // Scale X from [0, width] to [-1, 1]
+                    scale_matrix[1][1] = 2.0f / camera_height;  // Scale Y from [0, height] to [-1, 1]
+                    scale_matrix[3][0] = -1.0f;                 // Translate X by -1 to center
+                    scale_matrix[3][1] = -1.0f;                 // Translate Y by -1 to center
+
+                    glm::mat4 scaled_mvp = mvp * scale_matrix;
+                    uniforms.mvp = scaled_mvp;
+
+                    // Get camera dimensions for scaling
                     uniforms.negative_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_neg_color"), 1.0f);
                     uniforms.positive_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_pos_color"), 1.0f);
                     uniforms.point_size = parameter_store.get<float>("particle_scale");
@@ -498,7 +411,7 @@ class Visualizer
                     SDL_PushGPUVertexUniformData(command_buffer, 0, &uniforms, sizeof(uniforms));
 
                     // Draw the points
-                    SDL_DrawGPUPrimitives(render_pass, points.size(), 1, 0, 0);
+                    SDL_DrawGPUPrimitives(render_pass, scrubber->get_points_buffer_size(), 1, 0, 0);
                 }
         };
 
@@ -526,7 +439,7 @@ class Visualizer
 
     public:
         Visualizer(ParameterStore &parameter_store, std::unordered_map<std::string, RenderTarget> &render_targets,
-                   EventData &event_data, SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
+                   EventData &event_data, Scrubber *scrubber, SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
                    SDL_GPUCopyPass *copy_pass)
             : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), window(window),
               gpu_device(gpu_device)
@@ -559,7 +472,7 @@ class Visualizer
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
             grid_renderer = new GridRenderer(parameter_store, gpu_device, upload_buffer, copy_pass);
-            points_renderer = new PointsRenderer(parameter_store, event_data, gpu_device, upload_buffer, copy_pass);
+            points_renderer = new PointsRenderer(parameter_store, event_data, scrubber, gpu_device, upload_buffer, copy_pass);
         }
 
         ~Visualizer()

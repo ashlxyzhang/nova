@@ -69,9 +69,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-    g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
     g_scrubber = new Scrubber(*g_parameter_store, &g_event_data, g_gpu_device);
-    g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, copy_pass);
+    g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device, g_scrubber);
+    g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window, g_gpu_device, g_upload_buffer, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -129,7 +129,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 g_event_data.lock_data_vectors();
 
                 const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-                std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size() << std::endl;
 
                 for (size_t i = 1; i < event_data.size(); ++i)
                 {
@@ -137,7 +136,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 }
 
                 const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
-                std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
 
                 for (size_t i = 1; i < frame_data.size(); ++i)
                 {
@@ -168,7 +166,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             g_event_data.lock_data_vectors();
 
             const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-            std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size() << std::endl;
 
             for (size_t i = 1; i < event_data.size(); ++i)
             {

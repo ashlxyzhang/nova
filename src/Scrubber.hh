@@ -1,5 +1,6 @@
 #pragma once
 
+#include <SDL3/SDL_gpu.h>
 #ifndef SCRUBBER_HH
 #define SCRUBBER_HH
 
@@ -9,19 +10,16 @@
 #include "ParameterStore.hh"
 #include "UploadBuffer.hh"
 
-// this class will handle all things to do with scrubbing and window size of particles.
-// since at the end of the day, everything is related to values in an vector,
-// we need a way to easily switch between time and event domains
-class Scrubber 
+class Scrubber
 {
     public:
-        enum class ScrubberType
+        enum class ScrubberType : uint8_t
         {
-            TIME,
             EVENT,
+            TIME,
         };
 
-        enum class ScrubberMode 
+        enum class ScrubberMode : uint8_t
         {
             PAUSED,
             PLAYING,
@@ -29,44 +27,52 @@ class Scrubber
         };
 
     private:
+        // so the idea is that we give the user two options for scrubbing through the data,
+        // an event and a time based system. however at the end of the day
+        // everything is an index into an array, so we need to keep all these values in
+        // sync in this class
+
+        // since we are looking for streaming data support, lets make the window always face behind the
+        // current stamp
+
+        std::size_t lower_index = 0;
+        std::size_t current_index = 0;
+        std::size_t index_step = 0;
+        std::size_t index_window = 0;
+
+        float lower_time = 0.0f;
+        float current_time = 0.0f;
+        float time_step = 0.0f;
+        float time_window = 0.0f;
+
         ParameterStore &parameter_store;
         EventData *event_data = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
 
-        // not sure how to deal with time yet, leave it for later
-        float lower_time = 0.0f;
-        float current_time = 0.0f;
-        float upper_time = 0.0f;
-        float time_window = 0.0f;
-
-        std::size_t lower_index = 0;
-        std::size_t current_index = 0;
-        std::size_t upper_index = 0;
-        std::size_t index_window = 50;
-
         SDL_GPUBuffer *points_buffer = nullptr;
+        std::size_t points_buffer_size = 0;
+
         SDL_GPUTexture *textures = nullptr;
         SDL_GPUBuffer *textures_timestamps = nullptr;
-        
-        // Track what scrubber type we're using
-        ScrubberType scrubber_type = ScrubberType::EVENT;
-        
-        // Track current data size for change detection
-        std::size_t last_data_size = 0;
 
     public:
-
-    
-        Scrubber(ParameterStore &parameter_store, EventData *event_data, SDL_GPUDevice *gpu_device) : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
+        Scrubber(ParameterStore &parameter_store, EventData *event_data, SDL_GPUDevice *gpu_device)
+            : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
         {
             parameter_store.add("scrubber.mode", ScrubberMode::PAUSED);
-            parameter_store.add("scrubber.type", scrubber_type);
+            parameter_store.add("scrubber.type", ScrubberType::TIME);
 
             parameter_store.add("scrubber.current_index", current_index);
             parameter_store.add("scrubber.index_window", index_window);
+            parameter_store.add("scrubber.index_step", index_step);
+            parameter_store.add("scrubber.min_index", 0ULL);
+            parameter_store.add("scrubber.max_index", 0ULL);
 
             parameter_store.add("scrubber.current_time", current_time);
             parameter_store.add("scrubber.time_window", time_window);
+            parameter_store.add("scrubber.time_step", time_step);
+            parameter_store.add("scrubber.min_time", 0.0f);
+            parameter_store.add("scrubber.max_time", 0.0f);
         }
 
         ~Scrubber()
@@ -87,194 +93,120 @@ class Scrubber
 
         void cpu_update()
         {
-            if (!event_data)
-                return;
-
-            // Get current parameters
-            ScrubberMode mode = parameter_store.get<ScrubberMode>("scrubber.mode");
-            scrubber_type = parameter_store.get<ScrubberType>("scrubber.type");
-            
-            // Update current based on mode
-            if (mode == ScrubberMode::PLAYING)
-            {
-                if (scrubber_type == ScrubberType::EVENT)
-                {
-                    current_index++;
-                    parameter_store.add("scrubber.current_index", current_index);
-                }
-                else // TIME
-                {
-                    // For time-based, we'd increment time_window worth of time
-                    // For now, just increment a small amount
-                    current_time += time_window * 0.01f;
-                    parameter_store.add("scrubber.current_time", current_time);
-                }
-            }
-            else if (mode == ScrubberMode::LATEST)
-            {
-                event_data->lock_data_vectors();
-                const auto &evt_vector = event_data->get_evt_vector_ref(true);
-                std::size_t data_size = evt_vector.size();
-                event_data->unlock_data_vectors();
-                
-                if (scrubber_type == ScrubberType::EVENT)
-                {
-                    if (data_size > 0)
-                    {
-                        current_index = data_size - 1;
-                        parameter_store.add("scrubber.current_index", current_index);
-                    }
-                }
-                else // TIME
-                {
-                    if (data_size > 0)
-                    {
-                        // Set to latest timestamp
-                        event_data->lock_data_vectors();
-                        const auto &evt_vector_abs = event_data->get_evt_vector_ref(false);
-                        current_time = evt_vector_abs[data_size - 1].z;
-                        event_data->unlock_data_vectors();
-                        parameter_store.add("scrubber.current_time", current_time);
-                    }
-                }
-            }
-            
-            // Get latest values from parameter store
             current_index = parameter_store.get<std::size_t>("scrubber.current_index");
             index_window = parameter_store.get<std::size_t>("scrubber.index_window");
-            current_time = parameter_store.get<float>("scrubber.current_time");
-            time_window = parameter_store.get<float>("scrubber.time_window");
-            
-            // Update lower and upper based on current and window
-            if (scrubber_type == ScrubberType::EVENT)
-            {
-                // Calculate window around current_index
-                std::size_t half_window = index_window / 2;
-                
-                if (current_index >= half_window)
-                {
-                    lower_index = current_index - half_window;
-                }
-                else
-                {
-                    lower_index = 0;
-                }
-                
-                upper_index = current_index + half_window;
-            }
-            else // TIME
-            {
-                lower_time = current_time - time_window;
-                upper_time = current_time + time_window;
-            }
-        }
+            index_step = parameter_store.get<std::size_t>("scrubber.index_step");
 
+            event_data->lock_data_vectors();
+
+            parameter_store.add("scrubber.min_index", 0ULL);
+            parameter_store.add("scrubber.max_index", event_data->get_evt_vector_ref(true).size() - 1);
+
+            if (parameter_store.get<ScrubberType>("scrubber.type") == ScrubberType::TIME)
+            {
+                if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PAUSED)
+                {
+                }
+                else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PLAYING)
+                {
+                }
+                else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::LATEST)
+                {
+                }
+            }
+
+            if (parameter_store.get<ScrubberType>("scrubber.type") == ScrubberType::EVENT)
+            {
+                if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PAUSED)
+                {
+                    current_index = std::clamp(current_index, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    index_window = std::clamp(index_window, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    index_step = std::clamp(index_step, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    lower_index = std::max(0ULL, current_index - index_window);
+                }
+                else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PLAYING)
+                {
+                    index_step = std::clamp(index_step, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    index_window = std::clamp(index_window, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    current_index = std::clamp(current_index + index_step, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    lower_index = std::max(0ULL, current_index - index_window);
+                }
+                else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::LATEST)
+                {
+                    current_index = event_data->get_evt_vector_ref(true).size() - 1;
+                    index_window = std::clamp(index_window, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    index_step = std::clamp(index_step, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    lower_index = std::max(0ULL, current_index - index_window);
+                }
+            }
+
+            event_data->unlock_data_vectors();
+        }
 
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
-            if (!event_data || !copy_pass)
+            if (!event_data || !upload_buffer || !copy_pass)
+            {
                 return;
-            
+            }
+
             event_data->lock_data_vectors();
-            const auto &evt_vector = event_data->get_evt_vector_ref(true);
-            const auto &evt_vector_abs = event_data->get_evt_vector_ref(false);
-            const auto &frame_vector = event_data->get_frame_vector_ref(false);
-            std::size_t data_size = evt_vector.size();
+
+            // Get the data we need to copy
+            const std::vector<glm::vec4> &evt_vector = event_data->get_evt_vector_ref(true);
+            
+            // Calculate how many points we need to upload (from lower_index to current_index)
+            std::size_t num_points = 0;
+            if (current_index >= lower_index)
+            {
+                num_points = current_index - lower_index + 1;
+            }
+            
+            // Clamp to the actual size of the vector
+            num_points = std::min(num_points, evt_vector.size() - lower_index);
+
             event_data->unlock_data_vectors();
-            
-            if (data_size == 0)
-                return;
-            
-            // Check if data has changed
-            bool data_changed = (data_size != last_data_size);
-            
-            // Determine which data to upload based on scrubber type
-            std::size_t lower, upper;
-            
-            if (scrubber_type == ScrubberType::EVENT)
+
+            // If we have no points to upload, skip
+            if (num_points == 0)
             {
-                lower = std::min(lower_index, data_size);
-                upper = std::min(upper_index, data_size);
-            }
-            else // TIME
-            {
-                // Find indices based on time range
-                lower = 0;
-                upper = data_size;
-                
-                event_data->lock_data_vectors();
-                for (std::size_t i = 0; i < data_size; ++i)
-                {
-                    float timestamp = evt_vector_abs[i].z;
-                    if (timestamp < lower_time && lower == 0)
-                    {
-                        lower = i;
-                    }
-                    if (timestamp > upper_time)
-                    {
-                        upper = i;
-                        break;
-                    }
-                }
-                event_data->unlock_data_vectors();
-            }
-            
-            // Ensure valid range
-            if (upper <= lower || lower >= data_size)
-            {
-                last_data_size = data_size;
                 return;
             }
-            
-            std::size_t range_size = upper - lower;
-            
-            // Create or update points buffer
-            if (!points_buffer || data_changed || range_size > 0)
+
+            // Delete old buffer if it exists
+            if (points_buffer)
             {
-                std::vector<glm::vec4> points_data;
-                points_data.reserve(range_size);
-                
-                event_data->lock_data_vectors();
-                for (std::size_t i = lower; i < upper; ++i)
-                {
-                    points_data.push_back(evt_vector[i]);
-                }
-                event_data->unlock_data_vectors();
-                
-                if (!points_buffer)
-                {
-                    SDL_GPUBufferCreateInfo buffer_create_info = {0};
-                    buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-                    buffer_create_info.size = std::max(points_data.size() * sizeof(glm::vec4), static_cast<size_t>(1024));
-                    points_buffer = SDL_CreateGPUBuffer(gpu_device, &buffer_create_info);
-                }
-                
-                if (!points_data.empty())
-                {
-                    upload_buffer->upload_to_gpu(copy_pass, points_buffer, points_data.data(), 
-                                                 points_data.size() * sizeof(glm::vec4));
-                }
+                SDL_ReleaseGPUBuffer(gpu_device, points_buffer);
+                points_buffer = nullptr;
             }
-            
-            last_data_size = data_size;
+
+            // Calculate the size needed for the buffer
+            points_buffer_size = num_points * sizeof(glm::vec4);
+
+            // Create new buffer
+            SDL_GPUBufferCreateInfo buffer_create_info = {0};
+            buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ;
+            buffer_create_info.size = points_buffer_size;
+            points_buffer = SDL_CreateGPUBuffer(gpu_device, &buffer_create_info);
+
+            // Upload data to the new buffer
+            event_data->lock_data_vectors();
+            const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
+            upload_buffer->upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
+            event_data->unlock_data_vectors();
         }
 
-        std::size_t get_lower_index() const
+        // return the points buffer
+        SDL_GPUBuffer *get_points_buffer()
         {
-            return lower_index;
+            return points_buffer;
         }
 
-        std::size_t get_current_index() const
+        // return the size of the points buffer
+        std::size_t get_points_buffer_size()
         {
-            return current_index;
+            return points_buffer_size / sizeof(glm::vec4);
         }
-
-        std::size_t get_upper_index() const
-        {
-            return upper_index;
-        }
-
-
 };
 
 #endif
