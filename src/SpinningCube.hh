@@ -1,8 +1,5 @@
 #pragma once
 
-#include <SDL3/SDL_gpu.h>
-#include <SDL3/SDL_log.h>
-#include <print>
 #ifndef SPINNING_CUBE_HH
 #define SPINNING_CUBE_HH
 
@@ -12,8 +9,8 @@
 #include "RenderTarget.hh"
 #include "UploadBuffer.hh"
 
-#include "shaders/spinning_cube_frag.h"
-#include "shaders/spinning_cube_vert.h"
+#include "shaders/spinning_cube/spinning_cube_frag.h"
+#include "shaders/spinning_cube/spinning_cube_vert.h"
 
 class SpinningCube
 {

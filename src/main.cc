@@ -6,6 +6,7 @@
 #include "RenderTarget.hh"
 #include "SpinningCube.hh"
 #include "UploadBuffer.hh"
+#include "Scrubber.hh"
 
 ParameterStore *g_parameter_store = nullptr;
 
@@ -13,8 +14,10 @@ SDL_Window *g_window = nullptr;
 SDL_GPUDevice *g_gpu_device = nullptr;
 
 UploadBuffer *g_upload_buffer = nullptr;
+
 GUI *g_gui = nullptr;
 SpinningCube *g_spinning_cube = nullptr;
+Scrubber *g_scrubber = nullptr;
 
 std::unordered_map<std::string, RenderTarget> g_render_targets;
 
@@ -68,6 +71,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
 
     g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets, g_window);
+
+    g_scrubber = new Scrubber(&g_event_data);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -183,8 +188,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             g_event_data.unlock_data_vectors();
         }
     }
-
+    
     // do the cpu updates here, before we do anything on the gpu
+    g_scrubber->cpu_update();
     g_spinning_cube->cpu_update();
 
     // acquire a command buffer, this is the main command buffer for the frame
