@@ -122,6 +122,24 @@ class DataAcquisition
             return data_read;
         }
 
+        /**
+         * @brief Returns camera width.
+         * @return camera_width
+         */
+        int32_t get_camera_width()
+        {
+            return camera_width;
+        }
+
+        /**
+         * @brief Returns camera height.
+         * @return camera_height
+         */
+        int32_t get_camera_height()
+        {
+            return camera_height;
+        }
+
     private:
         std::shared_ptr<dv::io::MonoCameraRecording> data_reader_ptr;
         int32_t camera_width;
