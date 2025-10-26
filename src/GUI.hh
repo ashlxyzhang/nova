@@ -7,6 +7,7 @@
 
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
+#include "Scrubber.hh"
 
 #include "fonts/CascadiaCode.ttf.h"
 
@@ -433,6 +434,149 @@ class GUI
             ImGui::End();
         }
 
+        void draw_visualizer()
+        {
+            ImGui::Begin("3D Visualizer");
+
+            // Check if the render target map and the specific target exist
+            if (render_targets.count("VisualizerColor"))
+            {
+                SDL_GPUTexture *texture = render_targets.at("VisualizerColor").texture;
+                if (texture)
+                {
+                    // Get the available pane size
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+
+                    // Get texture dimensions to calculate aspect ratio
+                    Uint32 tex_w, tex_h;
+                    float tex_aspect = (float)render_targets.at("VisualizerColor").width /
+                                       (float)render_targets.at("VisualizerColor").height;
+
+                    // Calculate display size to fit the pane while maintaining aspect ratio
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+
+                    if (tex_aspect > pane_aspect)
+                    {
+                        // Texture is wider than pane, fit to width
+                        display_size.y = pane_size.x / tex_aspect;
+                    }
+                    else
+                    {
+                        // Texture is taller than pane (or same aspect), fit to height
+                        display_size.x = pane_size.y * tex_aspect;
+                    }
+
+                    // Center the image within the pane
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+
+                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
+                    ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("VisualizerColor").is_focused = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    ImGui::Text("Texture for 'VisualizerColor' is null.");
+                }
+            }
+            else
+            {
+                ImGui::Text("Render target 'VisualizerColor' not found.");
+            }
+            ImGui::End();
+        }
+
+        void draw_scrubber_window()
+        {
+            ImGui::Begin("Scrubber");
+
+            // Scrubber Type
+            if (!parameter_store->exists("scrubber.type"))
+            {
+                parameter_store->add("scrubber.type", Scrubber::ScrubberType::EVENT);
+            }
+            
+            int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
+            const char* scrubber_type_names[] = { "Time", "Event" };
+            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 2))
+            {
+                parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
+            }
+
+            ImGui::Separator();
+
+            // Scrubber Mode
+            if (!parameter_store->exists("scrubber.mode"))
+            {
+                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+            }
+            
+            int scrubber_mode_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode"));
+            const char* scrubber_mode_names[] = { "Paused", "Playing", "Latest" };
+            if (ImGui::Combo("Mode", &scrubber_mode_int, scrubber_mode_names, 3))
+            {
+                parameter_store->add("scrubber.mode", static_cast<Scrubber::ScrubberMode>(scrubber_mode_int));
+            }
+
+            ImGui::Separator();
+
+            // Current Index (for EVENT type)
+            if (!parameter_store->exists("scrubber.current_index"))
+            {
+                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(0));
+            }
+            int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
+            if (ImGui::InputInt("Current Index", &current_index_int, 1, 100))
+            {
+                if (current_index_int < 0) current_index_int = 0;
+                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
+            }
+
+            // Index Window
+            if (!parameter_store->exists("scrubber.index_window"))
+            {
+                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
+            }
+            int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
+            if (ImGui::InputInt("Index Window", &index_window_int, 1, 10))
+            {
+                if (index_window_int < 1) index_window_int = 1;
+                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
+            }
+
+            ImGui::Separator();
+
+            // Current Time (for TIME type)
+            if (!parameter_store->exists("scrubber.current_time"))
+            {
+                parameter_store->add("scrubber.current_time", 0.0f);
+            }
+            float current_time = parameter_store->get<float>("scrubber.current_time");
+            if (ImGui::InputFloat("Current Time", &current_time))
+            {
+                parameter_store->add("scrubber.current_time", current_time);
+            }
+
+            // Time Window
+            if (!parameter_store->exists("scrubber.time_window"))
+            {
+                parameter_store->add("scrubber.time_window", 0.0f);
+            }
+            float time_window = parameter_store->get<float>("scrubber.time_window");
+            if (ImGui::InputFloat("Time Window", &time_window))
+            {
+                if (time_window < 0.0f) time_window = 0.0f;
+                parameter_store->add("scrubber.time_window", time_window);
+            }
+
+            ImGui::End();
+        }
+
     public:
         enum class TIME
         {
@@ -517,62 +661,11 @@ class GUI
             draw_debug_window(fps);
             draw_load_file_window();
             draw_stream_file_window();
+            draw_scrubber_window();
             // Create a simple demo window
             ImGui::ShowDemoWindow();
 
-            ImGui::Begin("Spinning Cube Viewport");
-
-            // Check if the render target map and the specific target exist
-            if (render_targets.count("SpinningCubeColor"))
-            {
-                SDL_GPUTexture *texture = render_targets.at("SpinningCubeColor").texture;
-                if (texture)
-                {
-                    // Get the available pane size
-                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
-
-                    // Get texture dimensions to calculate aspect ratio
-                    Uint32 tex_w, tex_h;
-                    float tex_aspect = (float)render_targets.at("SpinningCubeColor").width /
-                                       (float)render_targets.at("SpinningCubeColor").height;
-
-                    // Calculate display size to fit the pane while maintaining aspect ratio
-                    ImVec2 display_size = pane_size;
-                    float pane_aspect = pane_size.x / pane_size.y;
-
-                    if (tex_aspect > pane_aspect)
-                    {
-                        // Texture is wider than pane, fit to width
-                        display_size.y = pane_size.x / tex_aspect;
-                    }
-                    else
-                    {
-                        // Texture is taller than pane (or same aspect), fit to height
-                        display_size.x = pane_size.y * tex_aspect;
-                    }
-
-                    // Center the image within the pane
-                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-
-                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
-                    ImGui::Image((ImTextureID)texture, display_size);
-
-                    // Check if the item (image) we just rendered is hovered
-                    render_targets.at("SpinningCubeColor").is_focused = ImGui::IsItemHovered();
-                }
-                else
-                {
-                    ImGui::Text("Texture for 'SpinningCubeColor' is null.");
-                }
-            }
-            else
-            {
-                ImGui::Text("Render target 'SpinningCubeColor' not found.");
-            }
-            ImGui::End();
+            draw_visualizer();
 
             // Rendering
             ImGui::Render();

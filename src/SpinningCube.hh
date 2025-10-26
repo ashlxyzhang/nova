@@ -86,8 +86,7 @@ class SpinningCube
         SpinningCube(SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass,
                      std::unordered_map<std::string, RenderTarget> &render_targets, SDL_Window *window)
             : gpu_device(gpu_device), render_targets(render_targets), window(window),
-              camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, 0.0f, 45.0f, 1920.0f / 1080.0f,
-                     0.1f, 100.0f)
+              camera(glm::vec3(0.0f, 0.0f, 0.0f), 3.0f, 45.0f, 1920.0f / 1080.0f, 0.1f, 100.0f)
         {
             // create the vertex shader, this can in the future be replaced by sdl_shadercross
             SDL_GPUShaderCreateInfo vs_create_info = {0};
@@ -226,7 +225,7 @@ class SpinningCube
                         // When relative mouse mode is enabled, motion.x and motion.y contain
                         // the relative movement from the last motion event
                         float x_offset = event->motion.xrel;
-                        float y_offset = -event->motion.yrel; // Reversed since y-coordinates go from bottom to top
+                        float y_offset = event->motion.yrel;
 
                         // Update camera rotation based on mouse movement
                         camera.processMouseMovement(x_offset, y_offset);
@@ -256,31 +255,7 @@ class SpinningCube
         void cpu_update()
         {
             // Update rotation time (assuming 60 FPS, adjust as needed)
-            rotation_time += 0.016f; // ~60 FPS
-
-            if (render_targets["SpinningCubeColor"].is_focused == true)
-            {
-                // Process keyboard input for camera movement
-                float delta_time = 0.016f; // ~60 FPS
-                const bool *key_states = SDL_GetKeyboardState(NULL);
-
-                if (key_states[SDL_SCANCODE_W])
-                {
-                    camera.processKeyboard(Camera::MovementType::FORWARD, delta_time);
-                }
-                if (key_states[SDL_SCANCODE_S])
-                {
-                    camera.processKeyboard(Camera::MovementType::BACKWARD, delta_time);
-                }
-                if (key_states[SDL_SCANCODE_A])
-                {
-                    camera.processKeyboard(Camera::MovementType::LEFT, delta_time);
-                }
-                if (key_states[SDL_SCANCODE_D])
-                {
-                    camera.processKeyboard(Camera::MovementType::RIGHT, delta_time);
-                }
-            }
+            // rotation_time += 0.016f; // ~60 FPS
 
             // Create model matrix with rotation
             glm::mat4 model = glm::mat4(1.0f);

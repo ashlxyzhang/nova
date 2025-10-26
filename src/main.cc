@@ -4,9 +4,9 @@
 #include "GUI.hh"
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
-#include "SpinningCube.hh"
 #include "UploadBuffer.hh"
 #include "Scrubber.hh"
+#include "Visualizer.hh"
 
 ParameterStore *g_parameter_store = nullptr;
 
@@ -16,8 +16,9 @@ SDL_GPUDevice *g_gpu_device = nullptr;
 UploadBuffer *g_upload_buffer = nullptr;
 
 GUI *g_gui = nullptr;
-SpinningCube *g_spinning_cube = nullptr;
 Scrubber *g_scrubber = nullptr;
+Visualizer *g_visualizer = nullptr;
+
 
 std::unordered_map<std::string, RenderTarget> g_render_targets;
 
@@ -69,10 +70,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
-
-    g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets, g_window);
-
-    g_scrubber = new Scrubber(&g_event_data);
+    g_scrubber = new Scrubber(*g_parameter_store, &g_event_data, g_gpu_device);
+    g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -91,8 +90,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
     }
 
-    // if the spinning cube handled the event
-    g_spinning_cube->event_handler(event);
+    g_visualizer->event_handler(event);
 
     return SDL_APP_CONTINUE;
 }
@@ -191,21 +189,22 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     
     // do the cpu updates here, before we do anything on the gpu
     g_scrubber->cpu_update();
-    g_spinning_cube->cpu_update();
+    g_visualizer->cpu_update();
 
     // acquire a command buffer, this is the main command buffer for the frame
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
 
     // begin a copy pass, this is used to copy data from the cpu to the gpu
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    g_spinning_cube->copy_pass(g_upload_buffer, copy_pass);
+    g_scrubber->copy_pass(g_upload_buffer, copy_pass);
+    g_visualizer->copy_pass(g_upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
-    g_spinning_cube->compute_pass(command_buffer);
+    g_visualizer->compute_pass(command_buffer);
 
     // call all functions that may render to a texture, and not the window itself.
-    g_spinning_cube->render_pass(command_buffer);
+    g_visualizer->render_pass(command_buffer);
 
     SDL_GPUTexture *swapchain_texture;
     SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, g_window, &swapchain_texture, nullptr, nullptr);
@@ -246,7 +245,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     SDL_WaitForGPUIdle(g_gpu_device);
 
-    delete g_spinning_cube;
+    delete g_visualizer;
+    delete g_scrubber;
     delete g_gui;
     delete g_upload_buffer;
 
