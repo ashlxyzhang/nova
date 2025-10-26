@@ -121,6 +121,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 g_event_data.clear();
 
                 g_data_acq.init_reader(load_file_name);
+                g_data_acq.get_camera_resolution(g_event_data);
                 g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
                 g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store);
                 g_parameter_store->add("load_file_changed", false);
@@ -155,6 +156,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 std::string stream_file_name{g_parameter_store->get<std::string>("stream_file_name")};
                 g_event_data.clear();
                 g_data_acq.init_reader(stream_file_name);
+                g_data_acq.get_camera_resolution(g_event_data);
             }
 
             // Get event/frame data in batches every frame
@@ -170,6 +172,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             for (size_t i = 1; i < event_data.size(); ++i)
             {
                 assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                //std::cout << "AT i: " << i << " INDEX: " << g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
             }
 
             const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
