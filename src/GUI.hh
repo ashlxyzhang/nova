@@ -438,12 +438,56 @@ class GUI
             ImGui::Begin("Frame");
             ImGui::Text("Digital Coded Exposure");
 
-            ImVec2 image_sz = ImGui::GetContentRegionAvail();
-            ImVec2 final_sz = ImVec2(image_sz.x, image_sz.y);
+            if (render_targets.count("DigitalCodedExposure")) {
+                SDL_GPUTexture *texture = render_targets.at("DigitalCodedExposure").texture;
+                if (texture)
+                {
+                    // Get the available pane size
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
 
+                    // Get texture dimensions to calculate aspect ratio
+                    Uint32 tex_w, tex_h;
+                    float tex_aspect = (float)render_targets.at("DigitalCodedExposure").width /
+                                       (float)render_targets.at("DigitalCodedExposure").height;
+
+                    // Calculate display size to fit the pane while maintaining aspect ratio
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+
+                    if (tex_aspect > pane_aspect)
+                    {
+                        // Texture is wider than pane, fit to width
+                        display_size.y = pane_size.x / tex_aspect;
+                    }
+                    else
+                    {
+                        // Texture is taller than pane (or same aspect), fit to height
+                        display_size.x = pane_size.y * tex_aspect;
+                    }
+
+                    // Center the image within the pane
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+
+                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
+                    ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("DigitalCodedExposure").is_focused = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    ImGui::Text("Texture for 'DigitalCodedExposure' is null.");
+                }
+            }
+            else
+            {
+                ImGui::Text("Render target 'DigitalCodedExposure' not found.");
+            }
             ImGui::End();
         }
-
         void draw_spinning_cube_viewport() {
             ImGui::Begin("Spinning Cube Viewport");
 

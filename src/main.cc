@@ -5,6 +5,7 @@
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "SpinningCube.hh"
+#include "DigitalCodedExposure.hh"
 #include "UploadBuffer.hh"
 
 ParameterStore *g_parameter_store = nullptr;
@@ -15,6 +16,7 @@ SDL_GPUDevice *g_gpu_device = nullptr;
 UploadBuffer *g_upload_buffer = nullptr;
 GUI *g_gui = nullptr;
 SpinningCube *g_spinning_cube = nullptr;
+DigitalCodedExposure *g_digital_coded_exposure = nullptr;
 
 std::unordered_map<std::string, RenderTarget> g_render_targets;
 
@@ -68,6 +70,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
 
     g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets, g_window);
+    g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -186,6 +189,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // do the cpu updates here, before we do anything on the gpu
     g_spinning_cube->cpu_update();
+    g_digital_coded_exposure->cpu_update();
 
     // acquire a command buffer, this is the main command buffer for the frame
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
@@ -193,13 +197,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // begin a copy pass, this is used to copy data from the cpu to the gpu
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     g_spinning_cube->copy_pass(g_upload_buffer, copy_pass);
+    g_digital_coded_exposure->copy_pass(g_upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
     g_spinning_cube->compute_pass(command_buffer);
+    g_digital_coded_exposure->compute_pass(command_buffer);
 
     // call all functions that may render to a texture, and not the window itself.
     g_spinning_cube->render_pass(command_buffer);
+    g_digital_coded_exposure->render_pass(command_buffer);
 
     SDL_GPUTexture *swapchain_texture;
     SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, g_window, &swapchain_texture, nullptr, nullptr);
@@ -241,6 +248,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     SDL_WaitForGPUIdle(g_gpu_device);
 
     delete g_spinning_cube;
+    delete g_digital_coded_exposure;
     delete g_gui;
     delete g_upload_buffer;
 
