@@ -76,7 +76,7 @@ class DataAcquisition
             float threshold{1.0f / param_store.get<float>("event_discard_odds")};
 
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-events-from-a-file
-            if (data_reader_ptr->isRunning("events"))
+            if (data_reader_ptr -> isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
             {
                 if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
                 {
@@ -112,7 +112,7 @@ class DataAcquisition
             }
             bool data_read = false;
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-frames-from-a-file
-            if (data_reader_ptr->isRunning("frames"))
+            if (data_reader_ptr -> isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
             {
                 if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
                 {
