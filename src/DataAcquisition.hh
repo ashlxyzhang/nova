@@ -16,12 +16,22 @@ class DataAcquisition
         /**
          * Loads file to read. Initializes internal reader with filename.
          * @param file_name the name of the data file to read.
+         * @return false if failed to init reader, true otherwise.
          */
-        void init_reader(std::string file_name)
+        bool init_reader(std::string file_name)
         {
+            // FROM OLD NOVA source code
+            // Verify provided file is aedat4
+            size_t extension_pos = file_name.find_last_of('.');
+            if (extension_pos == std::string::npos || file_name.substr(extension_pos) != ".aedat4") {
+                std::cerr << "ERROR: File extension is not .aedat4" << std::endl;
+                return false;
+            }
+
             data_reader_ptr = std::make_shared<dv::io::MonoCameraRecording>(file_name);
             camera_width = data_reader_ptr->getEventResolution().value().width;
             camera_height = data_reader_ptr->getEventResolution().value().height;
+            return true;
         }
 
         /**
@@ -76,7 +86,7 @@ class DataAcquisition
             float threshold{1.0f / param_store.get<float>("event_discard_odds")};
 
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-events-from-a-file
-            if (data_reader_ptr->isRunning("events"))
+            if (data_reader_ptr -> isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
             {
                 if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
                 {
@@ -112,7 +122,7 @@ class DataAcquisition
             }
             bool data_read = false;
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-frames-from-a-file
-            if (data_reader_ptr->isRunning("frames"))
+            if (data_reader_ptr -> isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
             {
                 if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
                 {
