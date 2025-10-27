@@ -51,6 +51,9 @@ class Scrubber
 
         SDL_GPUBuffer *points_buffer = nullptr;
         std::size_t points_buffer_size = 0;
+        float lower_depth = 0.0f;
+        float upper_depth = 0.0f;
+        glm::vec2 camera_resolution = glm::vec2(0.0f, 0.0f);
 
         SDL_GPUTexture *textures = nullptr;
         SDL_GPUBuffer *textures_timestamps = nullptr;
@@ -173,6 +176,10 @@ class Scrubber
                 return;
             }
 
+            lower_depth = evt_vector[lower_index].z;
+            upper_depth = evt_vector[current_index].z;
+            camera_resolution = event_data->get_camera_resolution();
+
             // Delete old buffer if it exists
             if (points_buffer)
             {
@@ -206,6 +213,21 @@ class Scrubber
         std::size_t get_points_buffer_size()
         {
             return points_buffer_size / sizeof(glm::vec4);
+        }
+
+        float get_lower_depth()
+        {
+            return lower_depth;
+        }
+
+        float get_upper_depth()
+        {
+            return upper_depth;
+        }
+
+        glm::vec2 get_camera_resolution()
+        {
+            return camera_resolution;
         }
 };
 

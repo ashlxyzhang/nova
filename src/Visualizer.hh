@@ -385,22 +385,36 @@ class Visualizer
                         glm::vec4 positive_color;
                         float point_size;
                     } uniforms;
-                
-
-                    float camera_width = 640.0f;
-                    float camera_height = 480.0f;
-
-                    // Create scaling matrix to transform from pixel coordinates to unit cube
-                    // Pixel coordinates: (0,0) to (camera_width, camera_height)
-                    // Target coordinates: (-1,-1) to (1,1)
+                    
+                    glm::vec2 camera_resolution = scrubber->get_camera_resolution();
+                    float lower_depth = scrubber->get_lower_depth();
+                    float upper_depth = scrubber->get_upper_depth();
+                    float depth_range = upper_depth - lower_depth;
+                    
+                    // Initialize as an identity matrix
                     glm::mat4 scale_matrix = glm::mat4(1.0f);
-                    scale_matrix[0][0] = 2.0f / camera_width;   // Scale X from [0, width] to [-1, 1]
-                    scale_matrix[1][1] = 2.0f / camera_height;  // Scale Y from [0, height] to [-1, 1]
-                    scale_matrix[3][0] = -1.0f;                 // Translate X by -1 to center
-                    scale_matrix[3][1] = -1.0f;                 // Translate Y by -1 to center
-
-                    glm::mat4 scaled_mvp = mvp * scale_matrix;
-                    uniforms.mvp = scaled_mvp;
+            
+                    // 1. Set X and Y scaling to map from [0, width/height] to [-1, 1]  
+                    // x' = (2.0 * x / width) - 1.0 = (2.0 / width) * x - 1.0
+                    scale_matrix[0][0] = 2.0f / camera_resolution.x;
+                    scale_matrix[3][0] = -1.0f;  // x translation
+        
+                    // y' = (2.0 * y / height) - 1.0 = (2.0 / height) * y - 1.0
+                    scale_matrix[1][1] = 2.0f / camera_resolution.y;
+                    scale_matrix[3][1] = -1.0f;  // y translation
+            
+                    // 2. Set Z transformation: z' = (z - lower) / (upper - lower)
+                    // This maps from [lower, upper] to [0, 1], then to [-1, 1] by multiplying by 2 and subtracting 1
+                    // z' = 2 * ((z - lower) / (upper - lower)) - 1 = (2.0 / depth_range) * z - (2 * lower_depth / depth_range) - 1
+                    
+                    // Set Z scaling
+                    scale_matrix[2][2] = 2.0f / depth_range;
+                    
+                    // Set Z translation
+                    // In GLM (column-major), M[col][row]. This sets the z-component of the translation.
+                    scale_matrix[3][2] = -(2.0f * lower_depth / depth_range + 1.0f);
+            
+                    uniforms.mvp = mvp * scale_matrix;
 
                     // Get camera dimensions for scaling
                     uniforms.negative_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_neg_color"), 1.0f);
