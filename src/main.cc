@@ -74,7 +74,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     g_scrubber = new Scrubber(*g_parameter_store, &g_event_data, g_gpu_device);
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device, g_scrubber);
     g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window, g_gpu_device, g_upload_buffer, copy_pass);
-    g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, copy_pass);
+    g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, g_scrubber, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -261,8 +261,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     SDL_WaitForGPUIdle(g_gpu_device);
 
     delete g_visualizer;
-    delete g_scrubber;
     delete g_digital_coded_exposure;
+    delete g_scrubber;
     delete g_gui;
     delete g_upload_buffer;
 

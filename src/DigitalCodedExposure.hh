@@ -9,21 +9,38 @@
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "UploadBuffer.hh"
+#include "Scrubber.hh"
+#include "shaders/digital_coded_exposure/dce_comp.h"
 
 class DigitalCodedExposure
 {
+    private:
+        ParameterStore* parameter_store;
+        std::unordered_map<std::string, RenderTarget> &render_targets;
+        EventData &event_data;
+        Scrubber* scrubber = nullptr;
+        
+        SDL_Window *window = nullptr;
+        SDL_GPUDevice *gpu_device = nullptr;
+
+        SDL_GPUComputePipeline *compute_pipeline = nullptr;
+
+        std::string last_file = "";
+        unsigned int width;
+        unsigned int height;
+    
     public:
         DigitalCodedExposure(ParameterStore *parameter_store,
                              std::unordered_map<std::string, RenderTarget> &render_targets, EventData &event_data,
-                             SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
+                             SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, Scrubber* scrubber,
                              SDL_GPUCopyPass *copy_pass)
             : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), window(window),
-              gpu_device(gpu_device) {
+              gpu_device(gpu_device), scrubber(scrubber) {
                 // create the color texture, this is the texture that will store the color data
                 SDL_GPUTextureCreateInfo color_create_info = {
                     .type = SDL_GPU_TEXTURETYPE_2D,
                     .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
-                    .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
                     .width = 1920,
                     .height = 1080,
                     .layer_count_or_depth = 1,
@@ -32,61 +49,95 @@ class DigitalCodedExposure
                 };
                 render_targets["DigitalCodedExposure"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), 1920, 1080};
 
+                SDL_GPUComputePipelineCreateInfo compute_pipeline_info = {0};
+                compute_pipeline_info.code_size = sizeof(dce_comp);
+                compute_pipeline_info.code = (Uint8*) dce_comp;
+                compute_pipeline_info.entrypoint = "main";
+                compute_pipeline_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                compute_pipeline_info.num_samplers = 0;
+                compute_pipeline_info.num_readonly_storage_textures = 0;
+                compute_pipeline_info.num_readonly_storage_buffers = 1;
+                compute_pipeline_info.num_readwrite_storage_textures = 1;
+                compute_pipeline_info.num_readwrite_storage_buffers = 0;
+                compute_pipeline_info.num_uniform_buffers = 1;             
+                compute_pipeline_info.threadcount_x = 1;
+                compute_pipeline_info.threadcount_y = 1;
+                compute_pipeline_info.threadcount_z = 1; 
+
+                compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &compute_pipeline_info);
               }
               
         ~DigitalCodedExposure()
         {
+            SDL_ReleaseGPUComputePipeline(gpu_device, compute_pipeline);
+            SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
         }
 
         bool event_handler(SDL_Event *event)
         {
+            return false;
         }
         void cpu_update()
         {
+            bool file_changed = false;
+
+            file_changed = parameter_store->exists("streaming") && parameter_store->exists("stream_file_changed") && (parameter_store->get<bool>("streaming") && (last_file != parameter_store->get<std::string>("stream_file_name")));
+
+            if (parameter_store->exists("load_file_name") && last_file != parameter_store->get<std::string>("load_file_name")) {
+                file_changed = true;
+            }
+
+            if (file_changed) {
+
+                width = event_data.get_camera_resolution().x;
+                height = event_data.get_camera_resolution().y;
+
+                SDL_GPUTextureCreateInfo color_create_info = {
+                    .type = SDL_GPU_TEXTURETYPE_2D,
+                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                    .width = width,
+                    .height = height,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
+
+                render_targets["DigitalCodedExposure"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), width, height};
+            }
         }
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
         {
+            if (event_data.get_evt_vector_ref(false).empty()) {
+                return;
+            }
+            SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings = {0};
+
+            texture_buffer_bindings.texture = render_targets["DigitalCodedExposure"].texture;
+            texture_buffer_bindings.mip_level = 0;
+            texture_buffer_bindings.layer = 0;
+            texture_buffer_bindings.cycle = false;
+
+            SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(command_buffer, &texture_buffer_bindings, 1, nullptr, 0);
+            
+            SDL_GPUBuffer* points_buffer = scrubber->get_points_buffer();
+            SDL_BindGPUComputeStorageBuffers(compute_pass, 0, &points_buffer, 1);
+            SDL_BindGPUComputeStorageTextures(compute_pass, 1, &render_targets["DigitalCodedExposure"].texture, 1);
+            SDL_BindGPUComputePipeline(compute_pass, compute_pipeline);
+            
+            glm::vec4 color = glm::vec4(parameter_store->get<glm::vec3>("polarity_neg_color"), 1.0f);
+            SDL_PushGPUVertexUniformData(command_buffer, 0, &color[0], sizeof(color));
+            SDL_DispatchGPUCompute(compute_pass, width, height, 1);
+
+            SDL_EndGPUComputePass(compute_pass);
         }
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
-            SDL_GPUColorTargetInfo color_target_info = {0};
-            color_target_info.texture = render_targets["DigitalCodedExposure"].texture;
-            SDL_FColor clear_col = {1.0f, 0.0f, 0.0f, 1.0f};
-            color_target_info.clear_color = clear_col;
-            color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
-            color_target_info.store_op = SDL_GPU_STOREOP_STORE;
-            color_target_info.mip_level = 0;
-            color_target_info.layer_or_depth_plane = 0;
-            color_target_info.cycle = false;
-
-            SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, NULL);
-            // SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
-            // SDL_GPUBufferBinding vertex_buffer_bindings[] = {{vertex_buffer, 0}};
-            // SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_bindings, 1);
-            // SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp)); // for testing only red square
-            // SDL_DrawGPUPrimitives(render_pass, 36, 1, 0, 0);
-            SDL_EndGPURenderPass(render_pass);
         }
-
-    private:
-        Camera camera;
-        glm::vec3 box_min;
-        glm::vec3 box_max;
-
-        ParameterStore* parameter_store;
-        std::unordered_map<std::string, RenderTarget> &render_targets;
-        EventData &event_data;
-        
-        SDL_Window *window = nullptr;
-        SDL_GPUDevice *gpu_device = nullptr;
-
-        SDL_GPUGraphicsPipeline *grid_pipeline = nullptr;
-        SDL_GPUGraphicsPipeline *points_pipeline = nullptr;
-        SDL_GPUGraphicsPipeline *frame_pipeline = nullptr;
-        SDL_GPUGraphicsPipeline *text_pipeline = nullptr;
 };
 
 #endif

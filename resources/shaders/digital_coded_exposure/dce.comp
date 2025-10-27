@@ -1,0 +1,27 @@
+#version 450
+// Vulkan GLSL compute shader
+// - Read-only SSBO of vec4s: set=0, binding=0
+// - Read-write storage image: set=0, binding=1
+// Map SSBO elements to image texels by row-major index:
+//   index = y * imageWidth + x
+// Optional: a push constant 'elementCount' is used to avoid out-of-bounds reads.
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+// Read-only SSBO of vec4s
+layout(std430, set = 0, binding = 0) readonly buffer EventBuffer {
+	vec4 data[];
+} event_buffer;
+
+// Read-write storage image (RGBA32F). Use writeonly if you never read back.
+layout(set = 1, binding = 0, rgba32f) uniform writeonly image2D out_image;
+
+layout(set = 2, binding = 0) uniform Uniforms 
+{
+    vec4 color;
+} ubo;
+
+void main() {
+    uvec3 gid = gl_GlobalInvocationID; // global invocation id
+    imageStore(out_image, ivec2(gid.x, gid.y), ubo.color);
+}

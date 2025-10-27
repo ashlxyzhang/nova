@@ -269,7 +269,8 @@ class Visualizer
                     SDL_BindGPUGraphicsPipeline(render_pass, grid_pipeline);
 
                     // Bind the vertex buffer
-                    SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){vertex_buffer, 0}, 1);
+                    SDL_GPUBufferBinding vertex_buffer_binding[] = {vertex_buffer, 0};
+                    SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_binding, 1);
 
                     // Push the MVP matrix uniform data
                     SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
@@ -376,7 +377,8 @@ class Visualizer
                     SDL_BindGPUGraphicsPipeline(render_pass, points_pipeline);
 
                     // Bind the vertex buffer
-                    SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){scrubber->get_points_buffer(), 0}, 1);
+                    SDL_GPUBufferBinding vertex_buffer_binding[] = {scrubber->get_points_buffer(), 0};
+                    SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_binding, 1);
 
                     // Create uniform buffer data for points shader
                     struct PointsUniforms {
@@ -593,7 +595,8 @@ class Visualizer
             // create the color target info, this is the texture that will store the color data
             SDL_GPUColorTargetInfo color_target_info = {0};
             color_target_info.texture = render_targets["VisualizerColor"].texture;
-            color_target_info.clear_color = (SDL_FColor){1.0f, 1.0f, 1.0f, 1.0f};
+            SDL_FColor color = {1.0f, 1.0f, 1.0f, 1.0f};
+            color_target_info.clear_color = color;
             color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
             color_target_info.store_op = SDL_GPU_STOREOP_STORE;
             color_target_info.mip_level = 0;
