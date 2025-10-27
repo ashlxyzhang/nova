@@ -152,7 +152,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
         // case for streaming
         else if (streaming && g_parameter_store->exists("stream_file_name") &&
-                 g_parameter_store->exists("stream_file_changed"))
+                 g_parameter_store->exists("stream_file_changed") && g_parameter_store->exists("stream_paused"))
         {
             // If stream file changed, reset reader to read from new file and clear previously read event data
             if (g_parameter_store->get<bool>("stream_file_changed"))
@@ -166,32 +166,37 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                     g_parameter_store->add("stream_file_changed", false);
                 }
             }
-
-            // Get event/frame data in batches every frame
-            g_data_acq.get_batch_evt_data(g_event_data, *g_parameter_store);
-            g_data_acq.get_batch_frame_data(g_event_data, *g_parameter_store);
             
-
-            // Test to ensure event/frame data was added and is ordered
-            g_event_data.lock_data_vectors();
-
-            const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-
-            for (size_t i = 1; i < event_data.size(); ++i)
+            // Check if stream is paused
+            bool stream_paused{g_parameter_store->get<bool>("stream_paused")};
+            if(!stream_paused)
             {
-                assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                //std::cout << "AT i: " << i << " INDEX: " << g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
+                // Get event/frame data in batches every frame
+                g_data_acq.get_batch_evt_data(g_event_data, *g_parameter_store);
+                g_data_acq.get_batch_frame_data(g_event_data, *g_parameter_store);
+                
+
+                // Test to ensure event/frame data was added and is ordered
+                g_event_data.lock_data_vectors();
+
+                const auto &event_data{g_event_data.get_evt_vector_ref(true)};
+
+                for (size_t i = 1; i < event_data.size(); ++i)
+                {
+                    assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                    //std::cout << "AT i: " << i << " INDEX: " << g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
+                }
+
+                const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
+                std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
+
+                for (size_t i = 1; i < frame_data.size(); ++i)
+                {
+                    assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
+                }
+
+                g_event_data.unlock_data_vectors();
             }
-
-            const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
-            std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
-
-            for (size_t i = 1; i < frame_data.size(); ++i)
-            {
-                assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-            }
-
-            g_event_data.unlock_data_vectors();
         }
     }
     
