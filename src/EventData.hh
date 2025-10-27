@@ -11,6 +11,13 @@
 
 #include <set>
 
+// From previous NOVA source code
+// Used for timestamp comparisons
+inline bool less_vec4_t(const glm::vec4& a, const glm::vec4& b) {
+    return a.z < b.z;
+}
+
+
 class EventData
 {
 
@@ -62,6 +69,9 @@ class EventData
             frame_data_vector_absolute.clear();
             frame_data_vector_relative.clear();
 
+            camera_width = 0;
+            camera_height = 0;
+
             evt_data_vector_need_update = false;
             frame_data_vector_need_update = false;
 
@@ -86,6 +96,31 @@ class EventData
         void unlock_data_vectors()
         {
             evt_lock.unlock();
+        }
+
+        /**
+         * Sets camera resolution for event data.
+         * @param width Width of camera.
+         * @param height Height of camera.
+         */
+        void set_camera_resolution(int32_t width, int32_t height)
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            camera_width = width;
+            camera_height = height;
+            evt_lock_ul.unlock();
+        }
+
+        /**
+         * Gets camera resolution.
+         * @return camera resolution as glm::vec2 (width, height).
+         */
+        glm::vec2 get_camera_resolution()
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            glm::vec2 camera_res{static_cast<float>(camera_width), static_cast<float>(camera_height)};
+            evt_lock_ul.unlock();
+            return camera_res;
         }
 
         /**
@@ -288,6 +323,35 @@ class EventData
 
             return timestamp;
         }
+        
+        /**
+         * @brief Gets index of first event data in relative event data vector with timestamp that is equal or greater 
+         *        than provided timestamp.
+         * @param timestamp Provided timestamp.
+         * @return -1 if relative event data vector is empty, index otherwise.
+         */
+        int64_t get_index_from_timestamp(float timestamp)
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+
+            if(evt_data_vector_relative.empty())
+            {
+                evt_lock_ul.unlock();
+                return -1; // Vector is empty, return -1
+            }
+            glm::vec4 timestampVec4(0.0f, 0.0f, timestamp, 0.0f); 
+
+            // evt_data_vector_relative should be sorted by the way EventData class is setup.
+            auto lb = std::lower_bound(evt_data_vector_relative.begin(), evt_data_vector_relative.end(), timestampVec4, less_vec4_t);
+            if (lb == evt_data_vector_relative.end()) {
+                return evt_data_vector_relative.size() - 1;
+            }
+            int64_t ret_index{static_cast<int64_t>(std::distance(evt_data_vector_relative.begin(), lb))};
+            
+            evt_lock_ul.unlock();
+            return ret_index;
+        }
+
 
     private:
         std::multiset<EventDatum> evt_data; // Ensures ordered event data
@@ -298,6 +362,10 @@ class EventData
         std::vector<glm::vec4> evt_data_vector_relative;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_absolute;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
+
+        // Set camera resolution
+        int32_t camera_width;
+        int32_t camera_height;
 
         bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
         bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are
@@ -408,5 +476,7 @@ inline bool operator<(const EventData::FrameDatum &left, const EventData::FrameD
 {
     return left.timestamp < right.timestamp;
 }
+
+
 
 #endif // EVENTDATA_HH

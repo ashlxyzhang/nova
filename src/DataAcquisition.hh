@@ -25,6 +25,15 @@ class DataAcquisition
         }
 
         /**
+         * Gives camera resolution to event data.
+         * @param evt_data Event data to give camera resolution to.
+         */
+        void get_camera_resolution(EventData &evt_data)
+        {
+            evt_data.set_camera_resolution(camera_width, camera_height);
+        }
+
+        /**
          * For static loading, gets all event data from a file and populates evt_data with them.
          * @param evt_data EventData object to populate with event/frame data
          * @param param_store ParameterStore object with data from GUI.
@@ -120,6 +129,24 @@ class DataAcquisition
             }
 
             return data_read;
+        }
+
+        /**
+         * @brief Returns camera width.
+         * @return camera_width
+         */
+        int32_t get_camera_width()
+        {
+            return camera_width;
+        }
+
+        /**
+         * @brief Returns camera height.
+         * @return camera_height
+         */
+        int32_t get_camera_height()
+        {
+            return camera_height;
         }
 
     private:

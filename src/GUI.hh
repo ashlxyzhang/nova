@@ -7,6 +7,7 @@
 
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
+#include "Scrubber.hh"
 
 #include "fonts/CascadiaCode.ttf.h"
 
@@ -58,6 +59,7 @@ class GUI
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
         ImDrawData *draw_data = nullptr;
+        Scrubber *scrubber = nullptr;
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -433,6 +435,146 @@ class GUI
             ImGui::End();
         }
 
+        void draw_visualizer()
+        {
+            ImGui::Begin("3D Visualizer");
+
+            // Check if the render target map and the specific target exist
+            if (render_targets.count("VisualizerColor"))
+            {
+                SDL_GPUTexture *texture = render_targets.at("VisualizerColor").texture;
+                if (texture)
+                {
+                    // Get the available pane size
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+
+                    // Get texture dimensions to calculate aspect ratio
+                    Uint32 tex_w, tex_h;
+                    float tex_aspect = (float)render_targets.at("VisualizerColor").width /
+                                       (float)render_targets.at("VisualizerColor").height;
+
+                    // Calculate display size to fit the pane while maintaining aspect ratio
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+
+                    if (tex_aspect > pane_aspect)
+                    {
+                        // Texture is wider than pane, fit to width
+                        display_size.y = pane_size.x / tex_aspect;
+                    }
+                    else
+                    {
+                        // Texture is taller than pane (or same aspect), fit to height
+                        display_size.x = pane_size.y * tex_aspect;
+                    }
+
+                    // Center the image within the pane
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+
+                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
+                    ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("VisualizerColor").is_focused = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    ImGui::Text("Texture for 'VisualizerColor' is null.");
+                }
+            }
+            else
+            {
+                ImGui::Text("Render target 'VisualizerColor' not found.");
+            }
+            ImGui::End();
+        }
+
+        void draw_scrubber_window()
+        {
+            ImGui::Begin("Scrubber");
+
+            // Scrubber Type
+            if (!parameter_store->exists("scrubber.type"))
+            {
+                parameter_store->add("scrubber.type", Scrubber::ScrubberType::EVENT);
+            }
+            
+            int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
+            const char* scrubber_type_names[] = { "Event" };
+            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 1))
+            {
+                parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
+            }
+
+            ImGui::Separator();
+
+            // Scrubber Mode
+            if (!parameter_store->exists("scrubber.mode"))
+            {
+                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+            }
+            
+            int scrubber_mode_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode"));
+            const char* scrubber_mode_names[] = { "Paused", "Playing", "Latest" };
+            if (ImGui::Combo("Mode", &scrubber_mode_int, scrubber_mode_names, 3))
+            {
+                parameter_store->add("scrubber.mode", static_cast<Scrubber::ScrubberMode>(scrubber_mode_int));
+            }
+
+            ImGui::Separator();
+
+            // Current Index (for EVENT type)
+            if (!parameter_store->exists("scrubber.current_index"))
+            {
+                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(0));
+            }
+            int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
+            
+            // Get min/max values from scrubber if available
+            int min_index_int = 0;
+            int max_index_int = 0;
+            if (scrubber)
+            {
+                min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
+                max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
+            }
+            
+            if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
+            {
+                if (current_index_int < min_index_int) current_index_int = min_index_int;
+                if (current_index_int > max_index_int) current_index_int = max_index_int;
+                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
+            }
+
+            // Index Window
+            if (!parameter_store->exists("scrubber.index_window"))
+            {
+                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
+            }
+            int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
+            
+            // Calculate maximum window size (half of data size, minimum 1)
+            int max_window_size = 1;
+            if (scrubber)
+            {
+                int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") - parameter_store->get<std::size_t>("scrubber.min_index") + 1);
+                max_window_size = std::max(1, data_size / 2);
+            }
+            
+            if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
+            {
+                if (index_window_int < 1) index_window_int = 1;
+                if (index_window_int > max_window_size) index_window_int = max_window_size;
+                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
+            }
+
+
+            ImGui::End();
+        }
+
         void draw_digital_coded_exposure()
         {
             ImGui::Begin("Frame");
@@ -558,9 +700,9 @@ class GUI
         };
 
         GUI(std::unordered_map<std::string, RenderTarget> &render_targets, ParameterStore *parameter_store,
-            SDL_Window *window, SDL_GPUDevice *gpu_device)
+            SDL_Window *window, SDL_GPUDevice *gpu_device, Scrubber *scrubber)
             : render_targets(render_targets), parameter_store(parameter_store), window(window), gpu_device(gpu_device),
-              fps_history_buf(100, 0.0f), fps_buf_index(0)
+              scrubber(scrubber), fps_history_buf(100, 0.0f), fps_buf_index(0)
         {
             // Setup Dear ImGui context
             IMGUI_CHECKVERSION();
@@ -628,9 +770,10 @@ class GUI
             draw_load_file_window();
             draw_digital_coded_exposure();
             draw_stream_file_window();
+            draw_scrubber_window();
             // Create a simple demo window
             ImGui::ShowDemoWindow();
-            draw_spinning_cube_viewport();
+            draw_visualizer();
 
             // Rendering
             ImGui::Render();

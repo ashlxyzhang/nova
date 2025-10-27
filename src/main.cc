@@ -7,6 +7,8 @@
 #include "SpinningCube.hh"
 #include "DigitalCodedExposure.hh"
 #include "UploadBuffer.hh"
+#include "Scrubber.hh"
+#include "Visualizer.hh"
 
 ParameterStore *g_parameter_store = nullptr;
 
@@ -14,8 +16,10 @@ SDL_Window *g_window = nullptr;
 SDL_GPUDevice *g_gpu_device = nullptr;
 
 UploadBuffer *g_upload_buffer = nullptr;
+
 GUI *g_gui = nullptr;
-SpinningCube *g_spinning_cube = nullptr;
+Scrubber *g_scrubber = nullptr;
+Visualizer *g_visualizer = nullptr;
 DigitalCodedExposure *g_digital_coded_exposure = nullptr;
 
 std::unordered_map<std::string, RenderTarget> g_render_targets;
@@ -67,9 +71,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-    g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device);
-
-    g_spinning_cube = new SpinningCube(g_gpu_device, g_upload_buffer, copy_pass, g_render_targets, g_window);
+    g_scrubber = new Scrubber(*g_parameter_store, &g_event_data, g_gpu_device);
+    g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device, g_scrubber);
+    g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window, g_gpu_device, g_upload_buffer, copy_pass);
     g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
@@ -89,8 +93,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_SUCCESS;
     }
 
-    // if the spinning cube handled the event
-    g_spinning_cube->event_handler(event);
+    g_visualizer->event_handler(event);
 
     return SDL_APP_CONTINUE;
 }
@@ -121,6 +124,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 g_event_data.clear();
 
                 g_data_acq.init_reader(load_file_name);
+                g_data_acq.get_camera_resolution(g_event_data);
                 g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
                 g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store);
                 g_parameter_store->add("load_file_changed", false);
@@ -129,7 +133,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 g_event_data.lock_data_vectors();
 
                 const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-                std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size() << std::endl;
 
                 for (size_t i = 1; i < event_data.size(); ++i)
                 {
@@ -137,7 +140,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 }
 
                 const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
-                std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
 
                 for (size_t i = 1; i < frame_data.size(); ++i)
                 {
@@ -157,6 +159,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
                 std::string stream_file_name{g_parameter_store->get<std::string>("stream_file_name")};
                 g_event_data.clear();
                 g_data_acq.init_reader(stream_file_name);
+                g_data_acq.get_camera_resolution(g_event_data);
             }
 
             // Get event/frame data in batches every frame
@@ -168,11 +171,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             g_event_data.lock_data_vectors();
 
             const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-            std::cout << "EVENT DATA RECEIVED, SIZE: " << event_data.size() << std::endl;
 
             for (size_t i = 1; i < event_data.size(); ++i)
             {
                 assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                //std::cout << "AT i: " << i << " INDEX: " << g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
             }
 
             const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
@@ -186,9 +189,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             g_event_data.unlock_data_vectors();
         }
     }
-
+    
     // do the cpu updates here, before we do anything on the gpu
-    g_spinning_cube->cpu_update();
+    g_scrubber->cpu_update();
+    g_visualizer->cpu_update();
     g_digital_coded_exposure->cpu_update();
 
     // acquire a command buffer, this is the main command buffer for the frame
@@ -196,16 +200,17 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // begin a copy pass, this is used to copy data from the cpu to the gpu
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    g_spinning_cube->copy_pass(g_upload_buffer, copy_pass);
+    g_scrubber->copy_pass(g_upload_buffer, copy_pass);
+    g_visualizer->copy_pass(g_upload_buffer, copy_pass);
     g_digital_coded_exposure->copy_pass(g_upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
-    g_spinning_cube->compute_pass(command_buffer);
+    g_visualizer->compute_pass(command_buffer);
     g_digital_coded_exposure->compute_pass(command_buffer);
 
     // call all functions that may render to a texture, and not the window itself.
-    g_spinning_cube->render_pass(command_buffer);
+    g_visualizer->render_pass(command_buffer);
     g_digital_coded_exposure->render_pass(command_buffer);
 
     SDL_GPUTexture *swapchain_texture;
@@ -247,7 +252,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     SDL_WaitForGPUIdle(g_gpu_device);
 
-    delete g_spinning_cube;
+    delete g_visualizer;
+    delete g_scrubber;
     delete g_digital_coded_exposure;
     delete g_gui;
     delete g_upload_buffer;
