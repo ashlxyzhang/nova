@@ -16,12 +16,22 @@ class DataAcquisition
         /**
          * Loads file to read. Initializes internal reader with filename.
          * @param file_name the name of the data file to read.
+         * @return false if failed to init reader, true otherwise.
          */
-        void init_reader(std::string file_name)
+        bool init_reader(std::string file_name)
         {
+            // FROM OLD NOVA source code
+            // Verify provided file is aedat4
+            size_t extension_pos = file_name.find_last_of('.');
+            if (extension_pos == std::string::npos || file_name.substr(extension_pos) != ".aedat4") {
+                std::cerr << "ERROR: File extension is not .aedat4" << std::endl;
+                return false;
+            }
+
             data_reader_ptr = std::make_shared<dv::io::MonoCameraRecording>(file_name);
             camera_width = data_reader_ptr->getEventResolution().value().width;
             camera_height = data_reader_ptr->getEventResolution().value().height;
+            return true;
         }
 
         /**

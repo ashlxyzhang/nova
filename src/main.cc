@@ -120,30 +120,34 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
                 g_event_data.clear();
 
-                g_data_acq.init_reader(load_file_name);
-                g_data_acq.get_camera_resolution(g_event_data);
-                g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
-                g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store);
-                g_parameter_store->add("load_file_changed", false);
+                bool init_success{g_data_acq.init_reader(load_file_name)};
 
-                // Test to ensure event/frame data was added and is ordered
-                g_event_data.lock_data_vectors();
-
-                const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-
-                for (size_t i = 1; i < event_data.size(); ++i)
+                if(init_success)
                 {
-                    assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                    g_data_acq.get_camera_resolution(g_event_data);
+                    g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
+                    g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store);
+                    g_parameter_store->add("load_file_changed", false);
+
+                    // Test to ensure event/frame data was added and is ordered
+                    g_event_data.lock_data_vectors();
+
+                    const auto &event_data{g_event_data.get_evt_vector_ref(true)};
+
+                    for (size_t i = 1; i < event_data.size(); ++i)
+                    {
+                        assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                    }
+
+                    const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
+
+                    for (size_t i = 1; i < frame_data.size(); ++i)
+                    {
+                        assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
+                    }
+
+                    g_event_data.unlock_data_vectors();
                 }
-
-                const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
-
-                for (size_t i = 1; i < frame_data.size(); ++i)
-                {
-                    assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-                }
-
-                g_event_data.unlock_data_vectors();
             }
         }
         // case for streaming
@@ -155,14 +159,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
             {
                 std::string stream_file_name{g_parameter_store->get<std::string>("stream_file_name")};
                 g_event_data.clear();
-                g_data_acq.init_reader(stream_file_name);
-                g_data_acq.get_camera_resolution(g_event_data);
+                bool init_success{g_data_acq.init_reader(stream_file_name)};
+                if(init_success)
+                {
+                    g_data_acq.get_camera_resolution(g_event_data);
+                    g_parameter_store->add("stream_file_changed", false);
+                }
             }
 
             // Get event/frame data in batches every frame
             g_data_acq.get_batch_evt_data(g_event_data, *g_parameter_store);
             g_data_acq.get_batch_frame_data(g_event_data, *g_parameter_store);
-            g_parameter_store->add("stream_file_changed", false);
+            
 
             // Test to ensure event/frame data was added and is ordered
             g_event_data.lock_data_vectors();
