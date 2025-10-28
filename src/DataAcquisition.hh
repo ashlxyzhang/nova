@@ -2,6 +2,7 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
+#include "DataWriter.hh"
 #include "EventData.hh"
 #include "ParameterStore.hh"
 #include <dv-processing/io/mono_camera_recording.hpp>
