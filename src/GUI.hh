@@ -496,14 +496,8 @@ class GUI
         {
             ImGui::Begin("Scrubber");
 
-            // Scrubber Type
-            if (!parameter_store->exists("scrubber.type"))
-            {
-                parameter_store->add("scrubber.type", Scrubber::ScrubberType::EVENT);
-            }
-            
             int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
-            const char* scrubber_type_names[] = { "Event" };
+            const char *scrubber_type_names[] = {"Event", "Time"};
             if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 1))
             {
                 parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
@@ -512,13 +506,8 @@ class GUI
             ImGui::Separator();
 
             // Scrubber Mode
-            if (!parameter_store->exists("scrubber.mode"))
-            {
-                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
-            }
-            
             int scrubber_mode_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode"));
-            const char* scrubber_mode_names[] = { "Paused", "Playing", "Latest" };
+            const char *scrubber_mode_names[] = {"Paused", "Playing", "Latest"};
             if (ImGui::Combo("Mode", &scrubber_mode_int, scrubber_mode_names, 3))
             {
                 parameter_store->add("scrubber.mode", static_cast<Scrubber::ScrubberMode>(scrubber_mode_int));
@@ -527,50 +516,53 @@ class GUI
             ImGui::Separator();
 
             // Current Index (for EVENT type)
-            if (!parameter_store->exists("scrubber.current_index"))
+            if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::EVENT)
             {
-                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(0));
-            }
-            int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
-            
-            // Get min/max values from scrubber if available
-            int min_index_int = 0;
-            int max_index_int = 0;
-            if (scrubber)
-            {
-                min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
-                max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
-            }
-            
-            if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
-            {
-                if (current_index_int < min_index_int) current_index_int = min_index_int;
-                if (current_index_int > max_index_int) current_index_int = max_index_int;
-                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
-            }
+                int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
 
-            // Index Window
-            if (!parameter_store->exists("scrubber.index_window"))
-            {
-                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
-            }
-            int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
-            
-            // Calculate maximum window size (half of data size, minimum 1)
-            int max_window_size = 1;
-            if (scrubber)
-            {
-                int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") - parameter_store->get<std::size_t>("scrubber.min_index") + 1);
-                max_window_size = std::max(1, data_size / 2);
-            }
-            
-            if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
-            {
-                if (index_window_int < 1) index_window_int = 1;
-                if (index_window_int > max_window_size) index_window_int = max_window_size;
-                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
-            }
+                // Get min/max values from scrubber if available
+                int min_index_int = 0;
+                int max_index_int = 0;
+                if (scrubber)
+                {
+                    min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
+                    max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
+                }
 
+                if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
+                {
+                    if (current_index_int < min_index_int)
+                        current_index_int = min_index_int;
+                    if (current_index_int > max_index_int)
+                        current_index_int = max_index_int;
+                    parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
+                }
+
+                // Index Window
+                if (!parameter_store->exists("scrubber.index_window"))
+                {
+                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
+                }
+                int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
+
+                // Calculate maximum window size (half of data size, minimum 1)
+                int max_window_size = 1;
+                if (scrubber)
+                {
+                    int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") -
+                                                     parameter_store->get<std::size_t>("scrubber.min_index") + 1);
+                    max_window_size = std::max(1, data_size / 2);
+                }
+
+                if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
+                {
+                    if (index_window_int < 1)
+                        index_window_int = 1;
+                    if (index_window_int > max_window_size)
+                        index_window_int = max_window_size;
+                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
+                }
+            }
 
             ImGui::End();
         }

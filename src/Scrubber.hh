@@ -62,8 +62,8 @@ class Scrubber
         Scrubber(ParameterStore &parameter_store, EventData *event_data, SDL_GPUDevice *gpu_device)
             : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
         {
+            parameter_store.add("scrubber.type", ScrubberType::EVENT);
             parameter_store.add("scrubber.mode", ScrubberMode::PAUSED);
-            parameter_store.add("scrubber.type", ScrubberType::TIME);
 
             parameter_store.add("scrubber.current_index", current_index);
             parameter_store.add("scrubber.index_window", index_window);
@@ -136,11 +136,16 @@ class Scrubber
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::LATEST)
                 {
-                    current_index = event_data->get_evt_vector_ref(true).size() - 1;
-                    index_window = std::clamp(index_window, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
-                    index_step = std::clamp(index_step, 0ULL, event_data->get_evt_vector_ref(true).size() - 1);
+                    std::size_t event_data_size = event_data->get_evt_vector_ref(true).empty() ? 0 : event_data->get_evt_vector_ref(true).size() - 1; 
+                    current_index = event_data_size;
+                    index_window = std::clamp(index_window, 0ULL, event_data_size);
+                    index_step = std::clamp(index_step, 0ULL, event_data_size);
                     lower_index = std::max(0ULL, current_index - index_window);
                 }
+
+                parameter_store.add("scrubber.current_index", current_index);
+                parameter_store.add("scrubber.index_window", index_window);
+                parameter_store.add("scrubber.index_step", index_step);
             }
 
             event_data->unlock_data_vectors();
