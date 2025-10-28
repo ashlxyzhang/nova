@@ -1,27 +1,40 @@
 #version 450
-// Vulkan GLSL compute shader
-// - Read-only SSBO of vec4s: set=0, binding=0
-// - Read-write storage image: set=0, binding=1
-// Map SSBO elements to image texels by row-major index:
-//   index = y * imageWidth + x
-// Optional: a push constant 'elementCount' is used to avoid out-of-bounds reads.
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-// Read-only SSBO of vec4s
 layout(std430, set = 0, binding = 0) readonly buffer EventBuffer {
-	vec4 data[];
+    vec4 data[];
 } event_buffer;
 
-// Read-write storage image (RGBA32F). Use writeonly if you never read back.
-layout(set = 1, binding = 0, rgba32f) uniform writeonly image2D out_image;
+layout(set = 1, binding = 0, rgba8) uniform writeonly image2D out_image;
 
-layout(set = 2, binding = 0) uniform Uniforms 
-{
+layout(set = 2, binding = 0) uniform Uniforms {
     vec4 color;
 } ubo;
 
+int countEvents(int x, int y, inout int dataArray[2]) {
+    int len = event_buffer.data.length(); // or pass len as uniform
+    for (int i = 0; i < len; i++) {
+        vec4 evt = event_buffer.data[i];
+        if (evt.x == float(x) && evt.y == float(y)) {
+            if (evt.w == 0.0) {
+                dataArray[0] += 1;
+            } else {
+                dataArray[1] += 1;
+            }
+        }
+    }
+    return len;
+}
+
 void main() {
-    uvec3 gid = gl_GlobalInvocationID; // global invocation id
-    imageStore(out_image, ivec2(gid.x, gid.y), ubo.color);
+    uvec3 gid = gl_GlobalInvocationID;
+    int events[2] = int[2](0, 0);
+
+    int total = countEvents(int(gid.x), int(gid.y), events);
+
+    float color = 0.5 + 0.02 * float(events[1]) - 0.02 * float(events[0]);
+    vec4 newColor = vec4(color, color, color, 0.5);
+
+    imageStore(out_image, ivec2(gid.xy), newColor);
 }
