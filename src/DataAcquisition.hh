@@ -8,8 +8,22 @@
 
 class DataAcquisition
 {
+
+    private:
+        std::shared_ptr<dv::io::MonoCameraRecording> data_reader_ptr;
+        int32_t camera_width;
+        int32_t camera_height;
+
+        std::mutex acq_lock; // For thread safety
+        // From old NOVA source code
+        // to get random float from 0.0 to 1.0
+        float randFloat()
+        {
+            return static_cast<float>(rand()) / RAND_MAX;
+        };
+
     public:
-        DataAcquisition() : data_reader_ptr{}, camera_width{}, camera_height{}
+        DataAcquisition() : data_reader_ptr{}, camera_width{}, camera_height{}, acq_lock{}
         {
         }
 
@@ -20,17 +34,21 @@ class DataAcquisition
          */
         bool init_reader(std::string file_name)
         {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
             // FROM OLD NOVA source code
             // Verify provided file is aedat4
             size_t extension_pos = file_name.find_last_of('.');
-            if (extension_pos == std::string::npos || file_name.substr(extension_pos) != ".aedat4") {
+            if (extension_pos == std::string::npos || file_name.substr(extension_pos) != ".aedat4")
+            {
                 std::cerr << "ERROR: File extension is not .aedat4" << std::endl;
+                acq_lock_ul.unlock();
                 return false;
             }
 
             data_reader_ptr = std::make_shared<dv::io::MonoCameraRecording>(file_name);
             camera_width = data_reader_ptr->getEventResolution().value().width;
             camera_height = data_reader_ptr->getEventResolution().value().height;
+            acq_lock_ul.unlock();
             return true;
         }
 
@@ -86,7 +104,7 @@ class DataAcquisition
             float threshold{1.0f / param_store.get<float>("event_discard_odds")};
 
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-events-from-a-file
-            if (data_reader_ptr -> isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
+            if (data_reader_ptr->isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
             {
                 if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
                 {
@@ -122,7 +140,7 @@ class DataAcquisition
             }
             bool data_read = false;
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-frames-from-a-file
-            if (data_reader_ptr -> isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
+            if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
             {
                 if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
                 {
@@ -147,7 +165,10 @@ class DataAcquisition
          */
         int32_t get_camera_width()
         {
-            return camera_width;
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            int32_t ret_camera_width{camera_width};
+            acq_lock_ul.unlock();
+            return ret_camera_width;
         }
 
         /**
@@ -156,20 +177,11 @@ class DataAcquisition
          */
         int32_t get_camera_height()
         {
-            return camera_height;
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            int32_t ret_camera_height{camera_height};
+            acq_lock_ul.unlock();
+            return ret_camera_height;
         }
-
-    private:
-        std::shared_ptr<dv::io::MonoCameraRecording> data_reader_ptr;
-        int32_t camera_width;
-        int32_t camera_height;
-
-        // From old NOVA source code
-        // to get random float from 0.0 to 1.0
-        float randFloat()
-        {
-            return static_cast<float>(rand()) / RAND_MAX;
-        };
 };
 
 #endif // DATA_ACQUISITION_HH
