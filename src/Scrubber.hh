@@ -63,7 +63,7 @@ class Scrubber
             : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
         {
             parameter_store.add("scrubber.mode", ScrubberMode::PAUSED);
-            parameter_store.add("scrubber.type", ScrubberType::TIME);
+            parameter_store.add("scrubber.type", ScrubberType::EVENT);
 
             parameter_store.add("scrubber.current_index", current_index);
             parameter_store.add("scrubber.index_window", index_window);

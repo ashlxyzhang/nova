@@ -12,6 +12,13 @@
 #include "Scrubber.hh"
 #include "shaders/digital_coded_exposure/dce_comp.h"
 
+#include <iostream>
+
+struct PassData{
+    glm::vec4 col;
+    glm::vec4 posOnly;
+};
+
 class DigitalCodedExposure
 {
     private:
@@ -130,7 +137,18 @@ class DigitalCodedExposure
             SDL_BindGPUComputePipeline(compute_pass, compute_pipeline);
             
             glm::vec4 color = glm::vec4(parameter_store->get<glm::vec3>("polarity_neg_color"), 1.0f);
-            SDL_PushGPUVertexUniformData(command_buffer, 0, &color[0], sizeof(color));
+            PassData pass_data;
+            pass_data.col = color;
+            bool shutter_is_positive_only = false;
+            try{
+                shutter_is_positive_only = parameter_store->get<bool>("shutter_is_positive_only");
+
+            } catch(...){
+                std::cout << "lol" << std::endl;
+            }
+            glm::vec4 positiveOnly = glm::vec4(shutter_is_positive_only ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
+            pass_data.posOnly = positiveOnly;
+            SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
             SDL_EndGPUComputePass(compute_pass);

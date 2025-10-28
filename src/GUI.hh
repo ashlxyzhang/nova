@@ -503,8 +503,8 @@ class GUI
             }
             
             int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
-            const char* scrubber_type_names[] = { "Event" };
-            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 1))
+            const char* scrubber_type_names[] = { "Event", "Time" };
+            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 2))
             {
                 parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
             }
