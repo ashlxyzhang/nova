@@ -67,9 +67,9 @@ class DataAcquisition
          * @param evt_data EventData object to populate with event/frame data
          * @param param_store ParameterStore object with data from GUI.
          */
-        void get_all_evt_data(EventData &evt_data, ParameterStore &param_store)
+        void get_all_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
-            while (get_batch_evt_data(evt_data, param_store))
+            while (get_batch_evt_data(evt_data, param_store, data_writer))
             {
             }
         }
@@ -79,9 +79,9 @@ class DataAcquisition
          * @param evt_data EventData object to populate with event/frame data
          * @param param_store ParameterStore object with data from GUI.
          */
-        void get_all_frame_data(EventData &evt_data, ParameterStore &param_store)
+        void get_all_frame_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
-            while (get_batch_frame_data(evt_data, param_store))
+            while (get_batch_frame_data(evt_data, param_store, data_writer))
             {
             }
         }
@@ -92,7 +92,7 @@ class DataAcquisition
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.
          */
-        bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store)
+        bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
             // If reader is not properly initialized, return immediately
             if (!data_reader_ptr)
@@ -109,6 +109,9 @@ class DataAcquisition
             {
                 if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
                 {
+                    // In case of persistent storage
+                    // https://dv-processing.inivation.com/master/event_store.html
+                    dv::EventStore event_store{};
                     for (auto &evt : events.value())
                     {
                         if (randFloat() > threshold) // Random discard
@@ -120,7 +123,17 @@ class DataAcquisition
 
                         evt_data.write_evt_data(evt_datum);
                         data_read = true;
+
+                        event_store.emplace_back(evt.timestamp(), evt.x(), evt.y(), evt.polarity());
+                        
                     }
+
+                    // Add to queue for persistent storage in case of persistent storage
+                    if(param_store.get<bool>("stream_save"))
+                    {
+                        data_writer.add_event_store(event_store);
+                    }
+
                 }
             }
             return data_read;
@@ -132,7 +145,7 @@ class DataAcquisition
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.
          */
-        bool get_batch_frame_data(EventData &evt_data, ParameterStore &param_store)
+        bool get_batch_frame_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
             // If reader is not initialized, return immediately
             if (!data_reader_ptr)
@@ -154,6 +167,13 @@ class DataAcquisition
 
                     evt_data.write_frame_data(frame_datum);
                     data_read = true;
+
+                    // If saving stream, add to queue to write
+                    if(param_store.get<bool>("stream_save"))
+                    {
+                        dv::Frame frame_datum(frame_data->timestamp, frame_data->image);
+                        data_writer.add_frame_data(frame_datum);
+                    }
                 }
             }
 

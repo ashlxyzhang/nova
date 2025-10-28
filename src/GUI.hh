@@ -407,6 +407,42 @@ class GUI
                 parameter_store->add("stream_paused", !stream_paused); // Toggle whether stream is paused
             }
 
+            if(!parameter_store->exists("stream_save"))
+            {
+                parameter_store->add("stream_save", false);
+            }
+
+            bool stream_save{parameter_store->get<bool>("stream_save")};
+            // Save or stop saving stream
+            ImGui::Checkbox("Saving", &stream_save);
+            parameter_store->add("stream_save", stream_save);
+
+            if(!parameter_store->exists("stream_save_file_name"))
+            {
+                std::string stream_save_file_name{"out"}; // Default out file name
+                parameter_store->add("stream_save_file_name", stream_save_file_name);
+            }
+
+            std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
+            // From old NOVA source code
+            const unsigned int max_length = 50; 
+            char buf[max_length];
+            memset(buf, 0, max_length);
+            memcpy(buf, stream_save_file_name.c_str(), stream_save_file_name.size());
+            ImGui::InputText("Video Output Name", buf, max_length);
+            stream_save_file_name = buf;
+
+            if(stream_save_file_name.length() == 0)
+            {
+                stream_save_file_name = "out";
+            }
+
+            if(!parameter_store->get<bool>("stream_save"))
+            {
+                parameter_store->add("stream_save_file_name", stream_save_file_name);
+            }
+
+
             ImGui::End();
         }
 

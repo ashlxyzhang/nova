@@ -1,6 +1,6 @@
 #pragma once
-#ifndef DATA_ACQUISITION_HH
-#define DATA_ACQUISITION_HH
+#ifndef DATA_WRITER_HH
+#define DATA_WRITER_HH
 
 #include "ParameterStore.hh"
 #include <dv-processing/io/mono_camera_recording.hpp>
@@ -31,6 +31,28 @@ class DataWriter
         }
 
         /**
+         * @brief Clears all data from internal structures.
+         */
+        void clear()
+        {
+            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            data_writer_ptr.reset();
+            camera_width = 0;
+            camera_height = 0;
+            // Clear queues
+            while(!writer_event_queue.empty())
+            {
+                writer_event_queue.pop();
+            }
+
+            while(!writer_frame_queue.empty())
+            {
+                writer_frame_queue.pop();
+            }
+
+        }
+
+        /**
          * @brief Initializes writer with DAVIS camera configs (event, frame, and IMU data).
          * @param file_name Output file of data.
          * @param camera_width Width of camera resolution.
@@ -40,14 +62,17 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
-            // Create config for writing all types of data for DAVIS Camera
+            // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
-
             const auto writer_config{
-                dv::io::MonoCameraWriter::DVSConfig("DAVISConfig", cv::Size(camera_width, camera_height))};
-            data_writer_ptr = std::make_shared<dv::io::MonoCameraWriter>(file_name, writer_config);
+                dv::io::MonoCameraWriter::DAVISConfig("DAVISConfig", cv::Size(camera_height, camera_width))};
+            std::string file_name_appended{file_name};
+            file_name_appended.append(".aedat4");
+            data_writer_ptr = std::make_shared<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
 
             writer_lock_ul.unlock();
+
+            return true;
         }
 
         /**
