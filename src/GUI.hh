@@ -429,7 +429,7 @@ class GUI
             char buf[max_length];
             memset(buf, 0, max_length);
             memcpy(buf, stream_save_file_name.c_str(), stream_save_file_name.size());
-            ImGui::InputText("Video Output Name", buf, max_length);
+            ImGui::InputText("Stream Output Name", buf, max_length);
             stream_save_file_name = buf;
 
             if(stream_save_file_name.length() == 0)
