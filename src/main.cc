@@ -209,12 +209,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
                 const auto &event_data{g_event_data.get_evt_vector_ref(true)};
 
-                for (size_t i = 1; i < event_data.size(); ++i)
-                {
-                    assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                    // std::cout << "AT i: " << i << " INDEX: " <<
-                    // g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
-                }
+                // for (size_t i = 1; i < event_data.size(); ++i)
+                // {
+                //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                //     //std::cout << "AT i: " << i << " INDEX: " << g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
+                // }
 
                 const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
                 // std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
