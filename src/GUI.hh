@@ -498,7 +498,7 @@ class GUI
 
             int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
             const char *scrubber_type_names[] = {"Event", "Time"};
-            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 1))
+            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 2))
             {
                 parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
             }
@@ -561,6 +561,70 @@ class GUI
                     if (index_window_int > max_window_size)
                         index_window_int = max_window_size;
                     parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
+                }
+            }
+            // Time-based controls (for TIME type)
+            else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
+            {
+                // Get time unit information
+                int32_t unit_type = parameter_store->get<int32_t>("unit_type");
+                std::string time_unit_suffix = time_units[unit_type];
+                
+                // Current Time
+                if (!parameter_store->exists("scrubber.current_time"))
+                {
+                    parameter_store->add("scrubber.current_time", 0.0f);
+                }
+                float current_time = parameter_store->get<float>("scrubber.current_time");
+                
+                // Get min/max time values from scrubber if available
+                float min_time = 0.0f;
+                float max_time = 0.0f;
+                if (scrubber)
+                {
+                    min_time = parameter_store->get<float>("scrubber.min_time");
+                    max_time = parameter_store->get<float>("scrubber.max_time");
+                }
+
+                std::string current_time_label = "Current Time " + time_unit_suffix;
+                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time, min_time, max_time, "%.4f"))
+                {
+                    current_time = std::clamp(current_time, min_time, max_time);
+                    parameter_store->add("scrubber.current_time", current_time);
+                }
+
+                // Time Window
+                if (!parameter_store->exists("scrubber.time_window"))
+                {
+                    parameter_store->add("scrubber.time_window", 1.0f);
+                }
+                float time_window = parameter_store->get<float>("scrubber.time_window");
+                
+                // Calculate maximum window size (half of total time range, minimum 0.001)
+                float max_window_time = std::max(0.001f, (max_time - min_time) * 0.5f);
+
+                std::string time_window_label = "Time Window " + time_unit_suffix;
+                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window, 0.001f, max_window_time, "%.4f"))
+                {
+                    time_window = std::clamp(time_window, 0.001f, max_window_time);
+                    parameter_store->add("scrubber.time_window", time_window);
+                }
+
+                // Time Step
+                if (!parameter_store->exists("scrubber.time_step"))
+                {
+                    parameter_store->add("scrubber.time_step", 0.1f);
+                }
+                float time_step = parameter_store->get<float>("scrubber.time_step");
+                
+                // Calculate maximum step size (total time range)
+                float max_step_time = max_time - min_time;
+
+                std::string time_step_label = "Time Step " + time_unit_suffix;
+                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step, 0.001f, max_step_time, "%.4f"))
+                {
+                    time_step = std::clamp(time_step, 0.001f, max_step_time);
+                    parameter_store->add("scrubber.time_step", time_step);
                 }
             }
 
