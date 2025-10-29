@@ -5,6 +5,8 @@
 
 #include "pch.hh"
 
+#include "imgui_internal.h"
+
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
@@ -65,6 +67,8 @@ class GUI
 
         std::vector<float> fps_history_buf;
         size_t fps_buf_index;
+
+        bool check_for_layout_file;
 
         // Update circular buffer of fps data
         // From old NOVA source code
@@ -383,6 +387,10 @@ class GUI
             ImGui::PlotLines("##FPS History", fps_history_buf.data(), static_cast<int>(fps_history_buf.size()),
                              static_cast<int>(fps_buf_index), nullptr, 0.0f, max_fps + 10.0f, ImVec2(0, 80));
             ImGui::Separator();
+            if (ImGui::Button("Reset Layout"))
+            {
+                reset_layout_with_dockbuilder();
+            }
             ImGui::End();
         }
 
@@ -717,6 +725,8 @@ class GUI
             std::memcpy(font_memory, CascadiaCode_ttf, sizeof CascadiaCode_ttf);
             io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
 
+            check_for_layout_file = true;
+
             // Setup Dear ImGui style
             // ImGui::StyleColorsDark();
 
@@ -760,7 +770,17 @@ class GUI
             ImGui_ImplSDLGPU3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
-            ImGui::DockSpaceOverViewport();
+            // ImGui::DockSpaceOverViewport();
+            ImGuiID dockspace_id = ImGui::GetMainViewport()->ID;
+            ImGui::DockSpaceOverViewport(dockspace_id);
+
+            if (check_for_layout_file) {
+                if (!std::filesystem::exists("imgui.ini")) {
+                    // std::cout << "No imgui.ini found, setting default layout." << std::endl;
+                    reset_layout_with_dockbuilder();
+                }
+                check_for_layout_file = false;
+            }
 
             // Draw info block
             draw_info_window();
@@ -796,6 +816,42 @@ class GUI
             // {
             //     ImGui::UpdatePlatformWindows();
             //     ImGui::RenderPlatformWindowsDefault();
+            // }
+        }
+
+        void reset_layout_with_dockbuilder()
+        {
+            // ImGuiID dockspace_id = ImGui::GetID("My Dockspace");
+            // ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGuiID dockspace_id = ImGui::GetMainViewport()->ID;
+            ImGui::DockBuilderRemoveNode(dockspace_id);
+            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+
+            // if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
+            // {
+                // ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+                // ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+                ImGuiID dock_id_right; // right side for info and debug/load/stream windows
+                ImGuiID dock_id_main = dockspace_id;
+                ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Right, 0.40f, &dock_id_right, &dock_id_main); // split window 60% left, 40% right
+
+                ImGuiID dock_id_left_bottom; // bottom left for scrubber
+                ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.20f, &dock_id_left_bottom, &dock_id_main);
+
+                ImGuiID dock_id_right_top = dock_id_right; // top right for info
+                ImGuiID dock_id_right_bottom; // top bottom for debug/load/stream
+                ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.20f, &dock_id_right_bottom, &dock_id_right_top);
+
+                ImGui::DockBuilderDockWindow("Info", dock_id_right_top);
+                ImGui::DockBuilderDockWindow("Debug", dock_id_right_bottom);
+                ImGui::DockBuilderDockWindow("Load", dock_id_right_bottom);
+                ImGui::DockBuilderDockWindow("Streaming", dock_id_right_bottom);
+                ImGui::DockBuilderDockWindow("Frame", dock_id_main); // DCE window
+                ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
+                ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
+
+                ImGui::DockBuilderFinish(dockspace_id);
             // }
         }
 };
