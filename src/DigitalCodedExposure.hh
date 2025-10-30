@@ -15,8 +15,11 @@
 #include <iostream>
 
 struct PassData{
-    glm::vec4 col;
-    glm::vec4 posOnly;
+    glm::vec4 posCol;
+    glm::vec4 neutCol;
+    glm::vec4 negCol;
+    glm::vec4 colorMode;
+    glm::vec4 flags;
 };
 
 class DigitalCodedExposure
@@ -135,19 +138,87 @@ class DigitalCodedExposure
             SDL_BindGPUComputeStorageBuffers(compute_pass, 0, &points_buffer, 1);
             SDL_BindGPUComputeStorageTextures(compute_pass, 1, &render_targets["DigitalCodedExposure"].texture, 1);
             SDL_BindGPUComputePipeline(compute_pass, compute_pipeline);
-            
-            glm::vec4 color = glm::vec4(parameter_store->get<glm::vec3>("polarity_neg_color"), 1.0f);
-            PassData pass_data;
-            pass_data.col = color;
-            bool shutter_is_positive_only = false;
-            try{
-                shutter_is_positive_only = parameter_store->get<bool>("shutter_is_positive_only");
 
-            } catch(...){
-                std::cout << "lol" << std::endl;
+            if (!parameter_store->exists("dce_color"))
+            {
+                parameter_store->add("dce_color", 0);
             }
-            glm::vec4 positiveOnly = glm::vec4(shutter_is_positive_only ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f);
-            pass_data.posOnly = positiveOnly;
+            int32_t dce_color{parameter_store->get<int32_t>("dce_color")};
+
+            //This is awful, sorry
+            glm::vec3 polarity_pos_color;
+            glm::vec3 polarity_neut_color;
+            glm::vec3 polarity_neg_color;
+
+            if (dce_color > 0){
+                if (!parameter_store->exists("polarity_neg_color_dce"))
+                {
+                    parameter_store->add("polarity_neg_color_dce", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
+                }
+                polarity_neg_color = parameter_store->get<glm::vec3>("polarity_neg_color_dce");
+
+                if (!parameter_store->exists("polarity_pos_color_dce"))
+                {
+                    parameter_store->add("polarity_pos_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                }
+                polarity_pos_color = parameter_store->get<glm::vec3>("polarity_pos_color_dce");
+
+                if (!parameter_store->exists("polarity_neut_color_dce"))
+                {
+                    parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                }
+                polarity_neut_color = parameter_store->get<glm::vec3>("polarity_neut_color_dce");
+            }
+            else{
+                if (!parameter_store->exists("polarity_neg_color"))
+                {
+                    parameter_store->add("polarity_neg_color", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
+                }
+                polarity_neg_color = parameter_store->get<glm::vec3>("polarity_neg_color");
+
+                if (!parameter_store->exists("polarity_pos_color"))
+                {
+                    parameter_store->add("polarity_pos_color", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                }
+                polarity_pos_color = parameter_store->get<glm::vec3>("polarity_pos_color");
+
+                polarity_neut_color = glm::vec3(0.0f, 0.0f, 0.0f);
+            }
+
+            glm::vec4 negCol = glm::vec4(polarity_neg_color, 1.0f);
+            glm::vec4 neutCol = glm::vec4(polarity_neut_color, 1.0f);
+            glm::vec4 posCol = glm::vec4(polarity_pos_color, 1.0f);
+
+            //flag building
+            //TODO: use other flags, unSNAFU parameter store
+
+            if (!parameter_store->exists("shutter_is_positive_only"))
+            {
+                parameter_store->add("shutter_is_positive_only", false);
+            }
+            bool shutter_is_positive_only = parameter_store->get<bool>("shutter_is_positive_only");
+
+            if (!parameter_store->exists("shutter_is_morlet"))
+            {
+                parameter_store->add("shutter_is_morlet", false);
+            }
+            bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
+
+            // if (!parameter_store->exists("shutter_is_pca"))
+            // {
+            //     parameter_store->add("shutter_is_pca", false);
+            // }
+            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
+            glm::vec4 colorMode = glm::vec4(dce_color, 0.0f, 0.0f, 0.0f);
+
+            glm::vec4 flags = glm::vec4((shutter_is_positive_only ? 1.0f : 0.0f), (shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
+            
+            PassData pass_data;
+            pass_data.posCol = posCol;
+            pass_data.neutCol = neutCol;
+            pass_data.negCol = negCol;
+
+            pass_data.flags = flags;
             SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 

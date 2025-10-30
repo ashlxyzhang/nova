@@ -121,6 +121,7 @@ class GUI
         }
 
         // Recreate info window from old NOVA
+        // Also currently draws DCE controls for local variables' sake
         void draw_info_window()
         {
             ImGui::Begin("Info");
@@ -352,8 +353,60 @@ class GUI
             bool shutter_is_positive_only{parameter_store->get<bool>("shutter_is_positive_only")};
             ImGui::Checkbox("Positive Events Only", &shutter_is_positive_only);
             parameter_store->add("shutter_is_positive_only", shutter_is_positive_only);
-            // ImGui::Separator();
 
+            ImGui::Separator();
+
+            if (!parameter_store->exists("dce_color"))
+            {
+                parameter_store->add("dce_color", 0);
+            }
+            int32_t dce_color{parameter_store->get<int32_t>("dce_color")};
+
+            ImGui::Combo("Digital Exposure Color", &dce_color, "Use Visualizer Colors\0Tricolor\0High/Low\0");
+
+            parameter_store->add("dce_color", dce_color);
+
+            if (!parameter_store->exists("polarity_neg_color_dce"))
+            {
+                parameter_store->add("polarity_neg_color_dce", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
+            }
+            glm::vec3 polarity_neg_color_dce{parameter_store->get<glm::vec3>("polarity_neg_color_dce")};
+
+            if (!parameter_store->exists("polarity_pos_color_dce"))
+            {
+                parameter_store->add("polarity_pos_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+            }
+            glm::vec3 polarity_pos_color_dce{parameter_store->get<glm::vec3>("polarity_pos_color_dce")};
+            
+            if (!parameter_store->exists("polarity_neut_color_dce"))
+            {
+                parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+            }
+            glm::vec3 polarity_neut_color_dce{parameter_store->get<glm::vec3>("polarity_neut_color_dce")};
+
+            if(dce_color > 0 ) // Only allow editing colors if using visualizer colors
+            {
+                ImGui::ColorEdit3("Negative Color", (float *)&polarity_neg_color_dce);
+                ImGui::ColorEdit3("Positive Color", (float *)&polarity_pos_color_dce);
+                if(dce_color == 1)
+                {
+                    ImGui::ColorEdit3("Neutral Color", (float *)&polarity_neut_color_dce);
+                }
+            }
+
+            parameter_store->add("polarity_neg_color_dce", polarity_neg_color_dce);
+            parameter_store->add("polarity_pos_color_dce", polarity_pos_color_dce);
+            parameter_store->add("polarity_neut_color_dce", polarity_neut_color_dce);
+
+            if (!parameter_store->exists("combine_color"))
+            {
+                parameter_store->add("combine_color", false);
+            }
+            bool combine_color{parameter_store->get<bool>("combine_color")};
+            if(dce_color == 1){
+                ImGui::Checkbox("Combine Simultaneous Event Color", &combine_color);
+            }
+            parameter_store->add("combine_color", combine_color);
             // TODO implement video recording
             // Video (ffmpeg) controls
             // ImGui::Text("Video options"); // TODO add documentation
