@@ -122,24 +122,26 @@ class SpinningCube
             upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, cubeVertices, sizeof(cubeVertices));
 
             // create the graphics pipeline, this is the pipeline that will be used to render the vertex data
+
+            SDL_GPUVertexAttribute vertex_attributes [] = {{0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0},
+            {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3}};
+            SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {{0, sizeof(Vertex), SDL_GPU_VERTEXINPUTRATE_VERTEX, 0}};
+            SDL_GPUVertexInputState vertex_input_state = {
+                        .vertex_buffer_descriptions = vertex_buffer_descriptions,
+                        .num_vertex_buffers = 1,
+                        .vertex_attributes = vertex_attributes,
+                        .num_vertex_attributes = 2};
+            SDL_GPUColorTargetDescription color_target_descriptions[] = {{SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM}};
+            
             SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {
                 .vertex_shader = vs,
                 .fragment_shader = fs,
-                .vertex_input_state =
-                    (SDL_GPUVertexInputState){
-                        .vertex_buffer_descriptions =
-                            (SDL_GPUVertexBufferDescription[]){0, sizeof(Vertex), SDL_GPU_VERTEXINPUTRATE_VERTEX, 0},
-                        .num_vertex_buffers = 1,
-                        .vertex_attributes =
-                            (SDL_GPUVertexAttribute[]){0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0, 1, 0,
-                                                       SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3},
-                        .num_vertex_attributes = 2},
+                .vertex_input_state = vertex_input_state,
                 .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
                 .depth_stencil_state = {.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
                                         .enable_depth_test = true,
                                         .enable_depth_write = true},
-                .target_info = {.color_target_descriptions =
-                                    (SDL_GPUColorTargetDescription[]){SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM},
+                .target_info = {.color_target_descriptions = color_target_descriptions,
                                 .num_color_targets = 1,
                                 .depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
                                 .has_depth_stencil_target = true}};
@@ -287,7 +289,8 @@ class SpinningCube
             // create the color target info, this is the texture that will store the color data
             SDL_GPUColorTargetInfo color_target_info = {0};
             color_target_info.texture = render_targets["SpinningCubeColor"].texture;
-            color_target_info.clear_color = (SDL_FColor){1.0f, 1.0f, 1.0f, 1.0f};
+            SDL_FColor clear_col = {1.0f, 1.0f, 1.0f, 1.0f};
+            color_target_info.clear_color = clear_col;
             color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
             color_target_info.store_op = SDL_GPU_STOREOP_STORE;
             color_target_info.mip_level = 0;
@@ -306,7 +309,8 @@ class SpinningCube
             SDL_GPURenderPass *render_pass =
                 SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
             SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
-            SDL_BindGPUVertexBuffers(render_pass, 0, (SDL_GPUBufferBinding[]){vertex_buffer, 0}, 1);
+            SDL_GPUBufferBinding vertex_buffer_bindings[] = {{vertex_buffer, 0}};
+            SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_bindings, 1);
             SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
             SDL_DrawGPUPrimitives(render_pass, 36, 1, 0, 0);
             SDL_EndGPURenderPass(render_pass);

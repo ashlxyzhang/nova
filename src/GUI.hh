@@ -5,6 +5,8 @@
 
 #include "pch.hh"
 
+#include "imgui_internal.h"
+
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
@@ -65,6 +67,8 @@ class GUI
 
         std::vector<float> fps_history_buf;
         size_t fps_buf_index;
+
+        bool check_for_layout_file;
 
         // Update circular buffer of fps data
         // From old NOVA source code
@@ -383,6 +387,10 @@ class GUI
             ImGui::PlotLines("##FPS History", fps_history_buf.data(), static_cast<int>(fps_history_buf.size()),
                              static_cast<int>(fps_buf_index), nullptr, 0.0f, max_fps + 10.0f, ImVec2(0, 80));
             ImGui::Separator();
+            if (ImGui::Button("Reset Layout"))
+            {
+                reset_layout_with_dockbuilder();
+            }
             ImGui::End();
         }
 
@@ -667,6 +675,116 @@ class GUI
             ImGui::End();
         }
 
+        void draw_digital_coded_exposure()
+        {
+            ImGui::Begin("Frame");
+            ImGui::Text("Digital Coded Exposure");
+
+            if (render_targets.count("DigitalCodedExposure")) {
+                SDL_GPUTexture *texture = render_targets.at("DigitalCodedExposure").texture;
+                if (texture)
+                {
+                    // Get the available pane size
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+
+                    // Get texture dimensions to calculate aspect ratio
+                    Uint32 tex_w, tex_h;
+                    float tex_aspect = (float)render_targets.at("DigitalCodedExposure").width /
+                                       (float)render_targets.at("DigitalCodedExposure").height;
+
+                    // Calculate display size to fit the pane while maintaining aspect ratio
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+
+                    if (tex_aspect > pane_aspect)
+                    {
+                        // Texture is wider than pane, fit to width
+                        display_size.y = pane_size.x / tex_aspect;
+                    }
+                    else
+                    {
+                        // Texture is taller than pane (or same aspect), fit to height
+                        display_size.x = pane_size.y * tex_aspect;
+                    }
+
+                    // Center the image within the pane
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+
+                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
+                    ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("DigitalCodedExposure").is_focused = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    ImGui::Text("Texture for 'DigitalCodedExposure' is null.");
+                }
+            }
+            else
+            {
+                ImGui::Text("Render target 'DigitalCodedExposure' not found.");
+            }
+            ImGui::End();
+        }
+        void draw_spinning_cube_viewport() {
+            ImGui::Begin("Spinning Cube Viewport");
+
+            // Check if the render target map and the specific target exist
+            if (render_targets.count("SpinningCubeColor"))
+            {
+                SDL_GPUTexture *texture = render_targets.at("SpinningCubeColor").texture;
+                if (texture)
+                {
+                    // Get the available pane size
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+
+                    // Get texture dimensions to calculate aspect ratio
+                    Uint32 tex_w, tex_h;
+                    float tex_aspect = (float)render_targets.at("SpinningCubeColor").width /
+                                       (float)render_targets.at("SpinningCubeColor").height;
+
+                    // Calculate display size to fit the pane while maintaining aspect ratio
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+
+                    if (tex_aspect > pane_aspect)
+                    {
+                        // Texture is wider than pane, fit to width
+                        display_size.y = pane_size.x / tex_aspect;
+                    }
+                    else
+                    {
+                        // Texture is taller than pane (or same aspect), fit to height
+                        display_size.x = pane_size.y * tex_aspect;
+                    }
+
+                    // Center the image within the pane
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+
+                    // Display the image. ImTextureID is typedef'd to SDL_GPUTexture*
+                    ImGui::Image((ImTextureID)texture, display_size);
+
+                    // Check if the item (image) we just rendered is hovered
+                    render_targets.at("SpinningCubeColor").is_focused = ImGui::IsItemHovered();
+                }
+                else
+                {
+                    ImGui::Text("Texture for 'SpinningCubeColor' is null.");
+                }
+            }
+            else
+            {
+                ImGui::Text("Render target 'SpinningCubeColor' not found.");
+            }
+            ImGui::End();
+        }
     public:
         enum class TIME
         {
@@ -698,6 +816,8 @@ class GUI
             void *font_memory = malloc(sizeof CascadiaCode_ttf);
             std::memcpy(font_memory, CascadiaCode_ttf, sizeof CascadiaCode_ttf);
             io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
+
+            check_for_layout_file = true;
 
             // Setup Dear ImGui style
             // ImGui::StyleColorsDark();
@@ -742,7 +862,17 @@ class GUI
             ImGui_ImplSDLGPU3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
-            ImGui::DockSpaceOverViewport();
+            // ImGui::DockSpaceOverViewport();
+            ImGuiID dockspace_id = ImGui::GetMainViewport()->ID;
+            ImGui::DockSpaceOverViewport(dockspace_id);
+
+            if (check_for_layout_file) {
+                if (!std::filesystem::exists("imgui.ini")) {
+                    // std::cout << "No imgui.ini found, setting default layout." << std::endl;
+                    reset_layout_with_dockbuilder();
+                }
+                check_for_layout_file = false;
+            }
 
             // Draw info block
             draw_info_window();
@@ -750,11 +880,11 @@ class GUI
             // Draw debug block
             draw_debug_window(fps);
             draw_load_file_window();
+            draw_digital_coded_exposure();
             draw_stream_file_window();
             draw_scrubber_window();
             // Create a simple demo window
             ImGui::ShowDemoWindow();
-
             draw_visualizer();
 
             // Rendering
@@ -778,6 +908,42 @@ class GUI
             // {
             //     ImGui::UpdatePlatformWindows();
             //     ImGui::RenderPlatformWindowsDefault();
+            // }
+        }
+
+        void reset_layout_with_dockbuilder()
+        {
+            // ImGuiID dockspace_id = ImGui::GetID("My Dockspace");
+            // ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGuiID dockspace_id = ImGui::GetMainViewport()->ID;
+            ImGui::DockBuilderRemoveNode(dockspace_id);
+            ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
+
+            // if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
+            // {
+                // ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+                // ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+                ImGuiID dock_id_right; // right side for info and debug/load/stream windows
+                ImGuiID dock_id_main = dockspace_id;
+                ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Right, 0.40f, &dock_id_right, &dock_id_main); // split window 60% left, 40% right
+
+                ImGuiID dock_id_left_bottom; // bottom left for scrubber
+                ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.20f, &dock_id_left_bottom, &dock_id_main);
+
+                ImGuiID dock_id_right_top = dock_id_right; // top right for info
+                ImGuiID dock_id_right_bottom; // top bottom for debug/load/stream
+                ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.20f, &dock_id_right_bottom, &dock_id_right_top);
+
+                ImGui::DockBuilderDockWindow("Info", dock_id_right_top);
+                ImGui::DockBuilderDockWindow("Debug", dock_id_right_bottom);
+                ImGui::DockBuilderDockWindow("Load", dock_id_right_bottom);
+                ImGui::DockBuilderDockWindow("Streaming", dock_id_right_bottom);
+                ImGui::DockBuilderDockWindow("Frame", dock_id_main); // DCE window
+                ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
+                ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
+
+                ImGui::DockBuilderFinish(dockspace_id);
             // }
         }
 };

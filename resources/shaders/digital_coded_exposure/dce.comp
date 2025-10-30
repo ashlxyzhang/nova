@@ -1,0 +1,51 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) readonly buffer EventBuffer {
+    vec4 data[];
+} event_buffer;
+
+layout(set = 1, binding = 0, rgba8) uniform writeonly image2D out_image;
+
+layout(set = 2, binding = 0) uniform Uniforms {
+    vec4 col;
+    vec4 posOnly;
+} ubo;
+
+int countEvents(int x, int y, inout int dataArray[2]) {
+    int len = event_buffer.data.length(); // or pass len as uniform
+    for (int i = 0; i < len; i++) {
+        vec4 evt = event_buffer.data[i];
+        if (evt.x == float(x) && evt.y == float(y)) {
+            if (evt.w == 0.0) {
+                dataArray[0] += 1;
+            } else {
+                dataArray[1] += 1;
+            }
+        }
+    }
+    return len;
+}
+
+void main() {
+    uvec3 gid = gl_GlobalInvocationID;
+    int events[2] = int[2](0, 0);
+
+    int total = countEvents(int(gid.x), int(gid.y), events);
+    float scale = 0.5;
+    vec4 colorNeg = vec4(1.0, 0.0, 0.0, 1.0);
+    vec4 colorPos = vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 colorNeut = vec4(0.0, 0.0, 0.0, 1.0);
+    float colorScale = 1/(1+exp(scale*(float(events[1]) - float(events[0]))));
+    float negScale = 1.0 - colorScale;
+    vec4 color;
+    if (colorScale > 0.5 || ubo.posOnly.x > 0.5) {
+        color = mix(colorNeut, colorPos, (colorScale - 0.5) * 2.0);
+    } else {
+        color = mix(colorNeut, colorNeg, (negScale - 0.5) * 2.0);
+
+    }
+    vec4 newColor = color;
+    imageStore(out_image, ivec2(gid.xy), newColor);
+}

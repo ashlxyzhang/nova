@@ -6,6 +6,8 @@
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
+#include "SpinningCube.hh"
+#include "DigitalCodedExposure.hh"
 #include "UploadBuffer.hh"
 #include "Visualizer.hh"
 
@@ -19,6 +21,7 @@ UploadBuffer *g_upload_buffer = nullptr;
 GUI *g_gui = nullptr;
 Scrubber *g_scrubber = nullptr;
 Visualizer *g_visualizer = nullptr;
+DigitalCodedExposure *g_digital_coded_exposure = nullptr;
 
 std::unordered_map<std::string, RenderTarget> g_render_targets;
 
@@ -207,6 +210,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device, g_scrubber);
     g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window,
                                   g_gpu_device, g_upload_buffer, copy_pass);
+    g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, g_scrubber, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -248,6 +252,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // do the cpu updates here, before we do anything on the gpu
     g_scrubber->cpu_update();
     g_visualizer->cpu_update();
+    g_digital_coded_exposure->cpu_update();
 
     // acquire a command buffer, this is the main command buffer for the frame
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(g_gpu_device);
@@ -256,13 +261,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     g_scrubber->copy_pass(g_upload_buffer, copy_pass);
     g_visualizer->copy_pass(g_upload_buffer, copy_pass);
+    g_digital_coded_exposure->copy_pass(g_upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
     g_visualizer->compute_pass(command_buffer);
+    g_digital_coded_exposure->compute_pass(command_buffer);
 
     // call all functions that may render to a texture, and not the window itself.
     g_visualizer->render_pass(command_buffer);
+    g_digital_coded_exposure->render_pass(command_buffer);
 
     SDL_GPUTexture *swapchain_texture;
     SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, g_window, &swapchain_texture, nullptr, nullptr);
@@ -313,6 +321,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     SDL_WaitForGPUIdle(g_gpu_device);
 
     delete g_visualizer;
+    delete g_digital_coded_exposure;
     delete g_scrubber;
     delete g_gui;
     delete g_upload_buffer;

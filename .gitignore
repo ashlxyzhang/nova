@@ -3,3 +3,5 @@ build/
 .vscode/
 .vs/
 compile_commands.json
+vcpkg_installed/
+imgui.ini

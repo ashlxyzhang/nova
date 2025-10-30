@@ -48,3 +48,4 @@ foreach ($shaderFile in $shaderFiles) {
 }
 
 Write-Host "`nShader compilation complete!" -ForegroundColor Green
+
