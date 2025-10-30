@@ -94,9 +94,11 @@ class DataAcquisition
          */
         bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
             // If reader is not properly initialized, return immediately
             if (!data_reader_ptr)
             {
+                acq_lock_ul.unlock();
                 return false;
             }
             bool data_read = false;
@@ -125,17 +127,16 @@ class DataAcquisition
                         data_read = true;
 
                         event_store.emplace_back(evt.timestamp(), evt.x(), evt.y(), evt.polarity());
-                        
                     }
 
                     // Add to queue for persistent storage in case of persistent storage
-                    if(param_store.get<bool>("stream_save"))
+                    if (param_store.get<bool>("stream_save"))
                     {
                         data_writer.add_event_store(event_store);
                     }
-
                 }
             }
+            acq_lock_ul.unlock();
             return data_read;
         }
 
@@ -147,9 +148,11 @@ class DataAcquisition
          */
         bool get_batch_frame_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
             // If reader is not initialized, return immediately
             if (!data_reader_ptr)
             {
+                acq_lock_ul.unlock();
                 return false;
             }
             bool data_read = false;
@@ -169,14 +172,14 @@ class DataAcquisition
                     data_read = true;
 
                     // If saving stream, add to queue to write
-                    if(param_store.get<bool>("stream_save"))
+                    if (param_store.get<bool>("stream_save"))
                     {
                         dv::Frame frame_datum(frame_data->timestamp, frame_data->image);
                         data_writer.add_frame_data(frame_datum);
                     }
                 }
             }
-
+            acq_lock_ul.unlock();
             return data_read;
         }
 

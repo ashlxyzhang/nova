@@ -209,6 +209,13 @@ class Scrubber
             // Get the data we need to copy
             const std::vector<glm::vec4> &evt_vector = event_data->get_evt_vector_ref(true);
             
+            // Return if event data is empty
+            if(evt_vector.empty())
+            {
+                event_data->unlock_data_vectors();
+                return;
+            }
+
             // Calculate how many points we need to upload (from lower_index to current_index)
             std::size_t num_points = 0;
             if (current_index >= lower_index)
