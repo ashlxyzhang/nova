@@ -13,10 +13,10 @@
 
 // From previous NOVA source code
 // Used for timestamp comparisons
-inline bool less_vec4_t(const glm::vec4& a, const glm::vec4& b) {
+inline bool less_vec4_t(const glm::vec4 &a, const glm::vec4 &b)
+{
     return a.z < b.z;
 }
-
 
 class EventData
 {
@@ -323,9 +323,9 @@ class EventData
 
             return timestamp;
         }
-        
+
         /**
-         * @brief Gets index of first event data in relative event data vector with timestamp that is equal or greater 
+         * @brief Gets index of first event data in relative event data vector with timestamp that is equal or greater
          *        than provided timestamp.
          * @param timestamp Provided timestamp.
          * @return -1 if relative event data vector is empty, index otherwise.
@@ -334,24 +334,25 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
-            if(evt_data_vector_relative.empty())
+            if (evt_data_vector_relative.empty())
             {
                 evt_lock_ul.unlock();
                 return -1; // Vector is empty, return -1
             }
-            glm::vec4 timestampVec4(0.0f, 0.0f, timestamp, 0.0f); 
+            glm::vec4 timestampVec4(0.0f, 0.0f, timestamp, 0.0f);
 
             // evt_data_vector_relative should be sorted by the way EventData class is setup.
-            auto lb = std::lower_bound(evt_data_vector_relative.begin(), evt_data_vector_relative.end(), timestampVec4, less_vec4_t);
-            if (lb == evt_data_vector_relative.end()) {
+            auto lb = std::lower_bound(evt_data_vector_relative.begin(), evt_data_vector_relative.end(), timestampVec4,
+                                       less_vec4_t);
+            if (lb == evt_data_vector_relative.end())
+            {
                 return evt_data_vector_relative.size() - 1;
             }
             int64_t ret_index{static_cast<int64_t>(std::distance(evt_data_vector_relative.begin(), lb))};
-            
+
             evt_lock_ul.unlock();
             return ret_index;
         }
-
 
     private:
         std::multiset<EventDatum> evt_data; // Ensures ordered event data
@@ -476,7 +477,5 @@ inline bool operator<(const EventData::FrameDatum &left, const EventData::FrameD
 {
     return left.timestamp < right.timestamp;
 }
-
-
 
 #endif // EVENTDATA_HH
