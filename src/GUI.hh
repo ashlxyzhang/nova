@@ -415,6 +415,42 @@ class GUI
                 parameter_store->add("stream_paused", !stream_paused); // Toggle whether stream is paused
             }
 
+            if(!parameter_store->exists("stream_save"))
+            {
+                parameter_store->add("stream_save", false);
+            }
+
+            bool stream_save{parameter_store->get<bool>("stream_save")};
+            // Save or stop saving stream
+            ImGui::Checkbox("Saving", &stream_save);
+            parameter_store->add("stream_save", stream_save);
+
+            if(!parameter_store->exists("stream_save_file_name"))
+            {
+                std::string stream_save_file_name{"out"}; // Default out file name
+                parameter_store->add("stream_save_file_name", stream_save_file_name);
+            }
+
+            std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
+            // From old NOVA source code
+            const unsigned int max_length = 50; 
+            char buf[max_length];
+            memset(buf, 0, max_length);
+            memcpy(buf, stream_save_file_name.c_str(), stream_save_file_name.size());
+            ImGui::InputText("Stream Output Name", buf, max_length);
+            stream_save_file_name = buf;
+
+            if(stream_save_file_name.length() == 0)
+            {
+                stream_save_file_name = "out";
+            }
+
+            if(!parameter_store->get<bool>("stream_save"))
+            {
+                parameter_store->add("stream_save_file_name", stream_save_file_name);
+            }
+
+
             ImGui::End();
         }
 
@@ -504,14 +540,8 @@ class GUI
         {
             ImGui::Begin("Scrubber");
 
-            // Scrubber Type
-            if (!parameter_store->exists("scrubber.type"))
-            {
-                parameter_store->add("scrubber.type", Scrubber::ScrubberType::EVENT);
-            }
-            
             int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
-            const char* scrubber_type_names[] = { "Event", "Time" };
+            const char *scrubber_type_names[] = {"Event", "Time"};
             if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 2))
             {
                 parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
@@ -520,13 +550,8 @@ class GUI
             ImGui::Separator();
 
             // Scrubber Mode
-            if (!parameter_store->exists("scrubber.mode"))
-            {
-                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
-            }
-            
             int scrubber_mode_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode"));
-            const char* scrubber_mode_names[] = { "Paused", "Playing", "Latest" };
+            const char *scrubber_mode_names[] = {"Paused", "Playing", "Latest"};
             if (ImGui::Combo("Mode", &scrubber_mode_int, scrubber_mode_names, 3))
             {
                 parameter_store->add("scrubber.mode", static_cast<Scrubber::ScrubberMode>(scrubber_mode_int));
@@ -535,50 +560,117 @@ class GUI
             ImGui::Separator();
 
             // Current Index (for EVENT type)
-            if (!parameter_store->exists("scrubber.current_index"))
+            if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::EVENT)
             {
-                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(0));
-            }
-            int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
-            
-            // Get min/max values from scrubber if available
-            int min_index_int = 0;
-            int max_index_int = 0;
-            if (scrubber)
-            {
-                min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
-                max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
-            }
-            
-            if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
-            {
-                if (current_index_int < min_index_int) current_index_int = min_index_int;
-                if (current_index_int > max_index_int) current_index_int = max_index_int;
-                parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
-            }
+                int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
 
-            // Index Window
-            if (!parameter_store->exists("scrubber.index_window"))
-            {
-                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
-            }
-            int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
-            
-            // Calculate maximum window size (half of data size, minimum 1)
-            int max_window_size = 1;
-            if (scrubber)
-            {
-                int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") - parameter_store->get<std::size_t>("scrubber.min_index") + 1);
-                max_window_size = std::max(1, data_size / 2);
-            }
-            
-            if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
-            {
-                if (index_window_int < 1) index_window_int = 1;
-                if (index_window_int > max_window_size) index_window_int = max_window_size;
-                parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
-            }
+                // Get min/max values from scrubber if available
+                int min_index_int = 0;
+                int max_index_int = 0;
+                if (scrubber)
+                {
+                    min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
+                    max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
+                }
 
+                if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
+                {
+                    if (current_index_int < min_index_int)
+                        current_index_int = min_index_int;
+                    if (current_index_int > max_index_int)
+                        current_index_int = max_index_int;
+                    parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
+                }
+
+                // Index Window
+                if (!parameter_store->exists("scrubber.index_window"))
+                {
+                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
+                }
+                int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
+
+                // Calculate maximum window size (half of data size, minimum 1)
+                int max_window_size = 1;
+                if (scrubber)
+                {
+                    int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") -
+                                                     parameter_store->get<std::size_t>("scrubber.min_index") + 1);
+                    max_window_size = std::max(1, data_size / 2);
+                }
+
+                if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
+                {
+                    if (index_window_int < 1)
+                        index_window_int = 1;
+                    if (index_window_int > max_window_size)
+                        index_window_int = max_window_size;
+                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
+                }
+            }
+            // Time-based controls (for TIME type)
+            else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
+            {
+                // Get time unit information
+                int32_t unit_type = parameter_store->get<int32_t>("unit_type");
+                std::string time_unit_suffix = time_units[unit_type];
+                
+                // Current Time
+                if (!parameter_store->exists("scrubber.current_time"))
+                {
+                    parameter_store->add("scrubber.current_time", 0.0f);
+                }
+                float current_time = parameter_store->get<float>("scrubber.current_time");
+                
+                // Get min/max time values from scrubber if available
+                float min_time = 0.0f;
+                float max_time = 0.0f;
+                if (scrubber)
+                {
+                    min_time = parameter_store->get<float>("scrubber.min_time");
+                    max_time = parameter_store->get<float>("scrubber.max_time");
+                }
+
+                std::string current_time_label = "Current Time " + time_unit_suffix;
+                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time, min_time, max_time, "%.4f"))
+                {
+                    current_time = std::clamp(current_time, min_time, max_time);
+                    parameter_store->add("scrubber.current_time", current_time);
+                }
+
+                // Time Window
+                if (!parameter_store->exists("scrubber.time_window"))
+                {
+                    parameter_store->add("scrubber.time_window", 1.0f);
+                }
+                float time_window = parameter_store->get<float>("scrubber.time_window");
+                
+                // Calculate maximum window size (half of total time range, minimum 0.001)
+                float max_window_time = std::max(0.001f, (max_time - min_time) * 0.5f);
+
+                std::string time_window_label = "Time Window " + time_unit_suffix;
+                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window, 0.001f, max_window_time, "%.4f"))
+                {
+                    time_window = std::clamp(time_window, 0.001f, max_window_time);
+                    parameter_store->add("scrubber.time_window", time_window);
+                }
+
+                // Time Step
+                if (!parameter_store->exists("scrubber.time_step"))
+                {
+                    parameter_store->add("scrubber.time_step", 0.1f);
+                }
+                float time_step = parameter_store->get<float>("scrubber.time_step");
+                
+                // Calculate maximum step size (total time range)
+                float max_step_time = max_time - min_time;
+
+                std::string time_step_label = "Time Step " + time_unit_suffix;
+                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step, 0.001f, max_step_time, "%.4f"))
+                {
+                    time_step = std::clamp(time_step, 0.001f, max_step_time);
+                    parameter_store->add("scrubber.time_step", time_step);
+                }
+            }
 
             ImGui::End();
         }

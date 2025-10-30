@@ -1,13 +1,14 @@
 #include "pch.hh"
 
 #include "DataAcquisition.hh"
+#include "DataWriter.hh"
 #include "GUI.hh"
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
+#include "Scrubber.hh"
 #include "SpinningCube.hh"
 #include "DigitalCodedExposure.hh"
 #include "UploadBuffer.hh"
-#include "Scrubber.hh"
 #include "Visualizer.hh"
 
 ParameterStore *g_parameter_store = nullptr;
@@ -28,6 +29,140 @@ float g_last_frame_render_time{0.0f};
 
 EventData g_event_data{};
 DataAcquisition g_data_acq{};
+DataWriter g_data_writer{};
+
+// Needed to ensure thread joins for program clean up
+std::atomic<bool> g_writer_running{true};
+
+// Thread for writing data back to persistent storage when streaming
+inline void writer_thread()
+{
+    // For now let us spin
+    while (g_writer_running)
+    {
+        g_data_writer.write_event_store();
+        g_data_writer.write_frame_data();
+    }
+}
+
+// Start writer thread
+std::shared_ptr<std::thread> g_writer_thread_obj;
+
+// Needed to ensure thread joins for program clean up
+std::atomic<bool> g_data_acquisition_running{true};
+
+// Thread for data acquisition, storing into g_event_data
+inline void data_acquisition_thread()
+{
+    while (g_data_acquisition_running)
+    {
+        // DATA ACQUISITION CODE
+        if (g_parameter_store->exists("streaming"))
+        {
+            bool streaming{g_parameter_store->get<bool>("streaming")};
+            // Case for not streaming
+            if (!streaming && g_parameter_store->exists("load_file_name") &&
+                g_parameter_store->exists("load_file_changed"))
+            {
+                if (g_parameter_store->get<bool>("load_file_changed"))
+                {
+                    std::string load_file_name{g_parameter_store->get<std::string>("load_file_name")};
+
+                    g_event_data.clear();
+                    g_data_writer.clear();
+                    bool init_success{g_data_acq.init_reader(load_file_name)};
+
+                    if (init_success)
+                    {
+                        g_data_acq.get_camera_resolution(g_event_data);
+                        g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store, g_data_writer);
+                        g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store, g_data_writer);
+                        g_parameter_store->add("load_file_changed", false);
+
+                        // Test to ensure event/frame data was added and is ordered
+                        g_event_data.lock_data_vectors();
+
+                        const auto &event_data{g_event_data.get_evt_vector_ref(true)};
+
+                        // for (size_t i = 1; i < event_data.size(); ++i)
+                        // {
+                        //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                        // }
+
+                        // const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
+
+                        // for (size_t i = 1; i < frame_data.size(); ++i)
+                        // {
+                        //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
+                        // }
+
+                        g_event_data.unlock_data_vectors();
+                    }
+                }
+            }
+            // case for streaming
+            else if (streaming && g_parameter_store->exists("stream_file_name") &&
+                     g_parameter_store->exists("stream_file_changed") && g_parameter_store->exists("stream_paused"))
+            {
+                // If stream file changed, reset reader to read from new file and clear previously read event data
+                if (g_parameter_store->get<bool>("stream_file_changed"))
+                {
+                    std::string stream_file_name{g_parameter_store->get<std::string>("stream_file_name")};
+                    g_event_data.clear();
+                    bool init_success{g_data_acq.init_reader(stream_file_name)};
+                    if (init_success)
+                    {
+                        g_data_acq.get_camera_resolution(g_event_data);
+                        g_parameter_store->add("stream_file_changed", false);
+                    }
+
+                    // If gui indicates writing needs to be done, then set up writer for writing
+                    g_data_writer.clear();
+                    if (g_parameter_store->exists("stream_save") &&
+                        g_parameter_store->exists("stream_save_file_name") &&
+                        g_parameter_store->get<bool>("stream_save"))
+                    {
+                        g_data_writer.init_data_writer(g_parameter_store->get<std::string>("stream_save_file_name"),
+                                                       g_data_acq.get_camera_height(), g_data_acq.get_camera_width());
+                    }
+                }
+
+                // Check if stream is paused
+                bool stream_paused{g_parameter_store->get<bool>("stream_paused")};
+                if (!stream_paused)
+                {
+                    // Get event/frame data in batches every frame
+                    g_data_acq.get_batch_evt_data(g_event_data, *g_parameter_store, g_data_writer);
+                    g_data_acq.get_batch_frame_data(g_event_data, *g_parameter_store, g_data_writer);
+
+                    // Test to ensure event/frame data was added and is ordered
+                    g_event_data.lock_data_vectors();
+
+                    const auto &event_data{g_event_data.get_evt_vector_ref(true)};
+
+                    // for (size_t i = 1; i < event_data.size(); ++i)
+                    // {
+                    //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
+                    //     // std::cout << "AT i: " << i << " INDEX: " <<
+                    //     // g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
+                    // }
+
+                    // const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
+                    // // std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
+
+                    // for (size_t i = 1; i < frame_data.size(); ++i)
+                    // {
+                    //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
+                    // }
+
+                    g_event_data.unlock_data_vectors();
+                }
+            }
+        }
+    }
+}
+
+std::shared_ptr<std::thread> g_data_acquisition_thread_obj;
 
 // This function runs once at startup.
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -73,11 +208,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     g_scrubber = new Scrubber(*g_parameter_store, &g_event_data, g_gpu_device);
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device, g_scrubber);
-    g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window, g_gpu_device, g_upload_buffer, copy_pass);
+    g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window,
+                                  g_gpu_device, g_upload_buffer, copy_pass);
     g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, g_scrubber, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
+
+    // Initialize threads
+    g_writer_thread_obj = std::make_shared<std::thread>(writer_thread);
+    g_data_acquisition_thread_obj = std::make_shared<std::thread>(data_acquisition_thread);
+
     return SDL_APP_CONTINUE;
 }
 
@@ -108,96 +249,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
-    // data aq hopefully is being done on another thread, if not do it here
-    // Unfortunately, for now, let us do data aq in this thread
-    // DATA ACQUISITION CODE
-    if (g_parameter_store->exists("streaming"))
-    {
-        bool streaming{g_parameter_store->get<bool>("streaming")};
-        // Case for not streaming
-        if (!streaming && g_parameter_store->exists("load_file_name") && g_parameter_store->exists("load_file_changed"))
-        {
-            if (g_parameter_store->get<bool>("load_file_changed"))
-            {
-                std::string load_file_name{g_parameter_store->get<std::string>("load_file_name")};
-
-                g_event_data.clear();
-
-                bool init_success{g_data_acq.init_reader(load_file_name)};
-
-                if(init_success)
-                {
-                    g_data_acq.get_camera_resolution(g_event_data);
-                    g_data_acq.get_all_evt_data(g_event_data, *g_parameter_store);
-                    g_data_acq.get_all_frame_data(g_event_data, *g_parameter_store);
-                    g_parameter_store->add("load_file_changed", false);
-
-                    // Test to ensure event/frame data was added and is ordered
-                    g_event_data.lock_data_vectors();
-
-                    const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-
-                    for (size_t i = 1; i < event_data.size(); ++i)
-                    {
-                        assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                    }
-
-                    const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
-
-                    for (size_t i = 1; i < frame_data.size(); ++i)
-                    {
-                        assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-                    }
-
-                    g_event_data.unlock_data_vectors();
-                }
-            }
-        }
-        // case for streaming
-        else if (streaming && g_parameter_store->exists("stream_file_name") &&
-                 g_parameter_store->exists("stream_file_changed"))
-        {
-            // If stream file changed, reset reader to read from new file and clear previously read event data
-            if (g_parameter_store->get<bool>("stream_file_changed"))
-            {
-                std::string stream_file_name{g_parameter_store->get<std::string>("stream_file_name")};
-                g_event_data.clear();
-                bool init_success{g_data_acq.init_reader(stream_file_name)};
-                if(init_success)
-                {
-                    g_data_acq.get_camera_resolution(g_event_data);
-                    g_parameter_store->add("stream_file_changed", false);
-                }
-            }
-
-            // Get event/frame data in batches every frame
-            g_data_acq.get_batch_evt_data(g_event_data, *g_parameter_store);
-            g_data_acq.get_batch_frame_data(g_event_data, *g_parameter_store);
-            
-
-            // Test to ensure event/frame data was added and is ordered
-            g_event_data.lock_data_vectors();
-
-            const auto &event_data{g_event_data.get_evt_vector_ref(true)};
-
-            for (size_t i = 1; i < event_data.size(); ++i)
-            {
-                assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                //std::cout << "AT i: " << i << " INDEX: " << g_event_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
-            }
-
-            const auto &frame_data{g_event_data.get_frame_vector_ref(true)};
-            std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
-
-            for (size_t i = 1; i < frame_data.size(); ++i)
-            {
-                assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-            }
-
-            g_event_data.unlock_data_vectors();
-        }
-    }
-    
     // do the cpu updates here, before we do anything on the gpu
     g_scrubber->cpu_update();
     g_visualizer->cpu_update();
@@ -258,6 +309,15 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+
+    // Ensure writer thread exits
+    g_writer_running = false;
+    g_writer_thread_obj->join();
+
+    // Ensure data acquisition thread exits
+    g_data_acquisition_running = false;
+    g_data_acquisition_thread_obj->join();
+
     SDL_WaitForGPUIdle(g_gpu_device);
 
     delete g_visualizer;
