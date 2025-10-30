@@ -18,7 +18,7 @@ struct PassData{
     glm::vec4 posCol;
     glm::vec4 neutCol;
     glm::vec4 negCol;
-    glm::vec4 colorMode;
+    glm::vec4 floatFlags;
     glm::vec4 flags;
 };
 
@@ -162,6 +162,12 @@ class DigitalCodedExposure
             }
             int32_t dce_color{parameter_store->get<int32_t>("dce_color")};
 
+            if (!parameter_store->exists("combine_color"))
+            {
+                parameter_store->add("combine_color", false);
+            }
+            bool combine_color{parameter_store->get<bool>("combine_color")};
+
             //This is awful, sorry
             glm::vec3 polarity_pos_color;
             glm::vec3 polarity_neut_color;
@@ -206,6 +212,12 @@ class DigitalCodedExposure
             glm::vec4 neutCol = glm::vec4(polarity_neut_color, 1.0f);
             glm::vec4 posCol = glm::vec4(polarity_pos_color, 1.0f);
 
+            if (!parameter_store->exists("event_contrib_weight"))
+            {
+                parameter_store->add("event_contrib_weight", 0.5f);
+            }
+            float event_contrib_weight{parameter_store->get<float>("event_contrib_weight")};
+
             //flag building
             //TODO: use other flags, unSNAFU parameter store
 
@@ -226,15 +238,15 @@ class DigitalCodedExposure
             //     parameter_store->add("shutter_is_pca", false);
             // }
             // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            glm::vec4 colorMode = glm::vec4(dce_color, 0.0f, 0.0f, 0.0f);
-
+            glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight, (combine_color ? 1.0f : 0.0f), 0.0f);
+            
             glm::vec4 flags = glm::vec4((shutter_is_positive_only ? 1.0f : 0.0f), (shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
             
             PassData pass_data;
             pass_data.posCol = posCol;
             pass_data.neutCol = neutCol;
             pass_data.negCol = negCol;
-
+            pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
             SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);

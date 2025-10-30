@@ -158,16 +158,6 @@ class GUI
 
             ImGui::Separator();
 
-            if (!parameter_store->exists("event_contrib_weight"))
-            {
-                parameter_store->add("event_contrib_weight", 0.5f);
-            }
-            float event_contrib_weight{parameter_store->get<float>("event_contrib_weight")};
-            ImGui::SliderFloat("Event Contribution Weight", &event_contrib_weight, 0.0f, 1.0f);
-            parameter_store->add("event_contrib_weight", event_contrib_weight);
-
-            ImGui::Separator();
-
             if (!parameter_store->exists("unit_type"))
             {
                 parameter_store->add("unit_type", 1);
@@ -189,7 +179,9 @@ class GUI
             ImGui::Checkbox("Show Frame Data", &show_frame_data);
             parameter_store->add("show_frame_data", show_frame_data);
 
-            ImGui::Separator();
+            // ImGui::Separator();
+
+            ImGui::End();
 
             // ImGui::Text("Processing options");
 
@@ -319,21 +311,33 @@ class GUI
             //                        "%.4f");
             // }
 
-            // if (!parameter_store->exists("shutter_is_morlet"))
-            // {
-            //     parameter_store->add("shutter_is_morlet", false);
-            // }
-            // bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
-            // ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
-            // parameter_store->add("shutter_is_morlet", shutter_is_morlet);
+            ImGui::Begin("Digital Coded Exposure Controls");
 
-            // if (!parameter_store->exists("shutter_is_pca"))
-            // {
-            //     parameter_store->add("shutter_is_pca", false);
-            // }
-            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            // ImGui::Checkbox("PCA", &shutter_is_pca);
-            // parameter_store->add("shutter_is_pca", shutter_is_pca);
+            if (!parameter_store->exists("event_contrib_weight"))
+            {
+                parameter_store->add("event_contrib_weight", 0.5f);
+            }
+            float event_contrib_weight{parameter_store->get<float>("event_contrib_weight")};
+            ImGui::SliderFloat("Event Contribution Weight", &event_contrib_weight, 0.0f, 1.0f);
+            parameter_store->add("event_contrib_weight", event_contrib_weight);
+
+            ImGui::Separator();
+
+            if (!parameter_store->exists("shutter_is_morlet"))
+            {
+                parameter_store->add("shutter_is_morlet", false);
+            }
+            bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
+            ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
+            parameter_store->add("shutter_is_morlet", shutter_is_morlet);
+
+            if (!parameter_store->exists("shutter_is_pca"))
+            {
+                parameter_store->add("shutter_is_pca", false);
+            }
+            bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
+            ImGui::Checkbox("PCA", &shutter_is_pca);
+            parameter_store->add("shutter_is_pca", shutter_is_pca);
 
             if (!parameter_store->exists("shutter_is_positive_only"))
             {
@@ -369,7 +373,7 @@ class GUI
             
             if (!parameter_store->exists("polarity_neut_color_dce"))
             {
-                parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 0.0f, 0.0f)); // Default particle scale
             }
             glm::vec3 polarity_neut_color_dce{parameter_store->get<glm::vec3>("polarity_neut_color_dce")};
 
@@ -392,9 +396,9 @@ class GUI
                 parameter_store->add("combine_color", false);
             }
             bool combine_color{parameter_store->get<bool>("combine_color")};
-            if(dce_color == 1){
-                ImGui::Checkbox("Combine Simultaneous Event Color", &combine_color);
-            }
+            // if(dce_color == 1){
+            //     ImGui::Checkbox("Combine Simultaneous Event Color", &combine_color);
+            // }
             parameter_store->add("combine_color", combine_color);
             // TODO implement video recording
             // Video (ffmpeg) controls
