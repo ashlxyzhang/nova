@@ -42,10 +42,9 @@ class EventData
          * @brief Default constructor for event data.
          */
         EventData()
-            : evt_data{}, frame_data{}, evt_data_vector_absolute{}, evt_data_vector_relative{},
-              frame_data_vector_absolute{}, frame_data_vector_relative{}, evt_data_vector_need_update{false},
-              frame_data_vector_need_update{false}, max_element_percentage{0.8f}, cull_element_percentage{0.5f},
-              evt_lock{}
+            : evt_data{}, frame_data{}, evt_data_vector_relative{}, frame_data_vector_relative{},
+              evt_data_vector_need_update{false}, frame_data_vector_need_update{false}, max_element_percentage{0.8f},
+              cull_element_percentage{0.5f}, evt_lock{}
 
         // changed_evt_thread_map{}, changed_evt_thread_map_lock{}, changed_frame_thread_map{},
         // changed_frame_thread_map_lock{}
@@ -64,9 +63,7 @@ class EventData
             frame_data.clear();
 
             // Clear ref vectors
-            evt_data_vector_absolute.clear();
             evt_data_vector_relative.clear();
-            frame_data_vector_absolute.clear();
             frame_data_vector_relative.clear();
 
             camera_width = 0;
@@ -141,15 +138,12 @@ class EventData
             // New data is latest data and vector is already ordered (due to evt_data_vector_need_update being
             // false). Just push back to ref vectors in this case.
             if (!evt_data_vector_need_update && raw_evt_data.timestamp >= (*(--evt_data.end())).timestamp &&
-                !cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage) &&
-                !cull_elements(evt_data_vector_absolute, evt_data, max_element_percentage, cull_element_percentage))
+                !cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage))
             {
                 float x{static_cast<float>(raw_evt_data.x)};
                 float y{static_cast<float>(raw_evt_data.y)};
-                float timestamp_absolute{static_cast<float>(raw_evt_data.timestamp)};
                 float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - get_earliest_evt_timestamp())};
                 float polarity{static_cast<float>(raw_evt_data.polarity)};
-                evt_data_vector_absolute.push_back(glm::vec4{x, y, timestamp_absolute, polarity});
                 evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
             }
             else
@@ -178,13 +172,9 @@ class EventData
             frame_data.insert(raw_frame_data);
 
             if (!frame_data_vector_need_update && raw_frame_data.timestamp >= (*(--frame_data.end())).timestamp &&
-                !cull_elements(frame_data_vector_relative, frame_data, max_element_percentage,
-                               cull_element_percentage) &&
-                !cull_elements(frame_data_vector_absolute, frame_data, max_element_percentage, cull_element_percentage))
+                !cull_elements(frame_data_vector_relative, frame_data, max_element_percentage, cull_element_percentage))
             {
-                float timestamp_absolute{static_cast<float>(raw_frame_data.timestamp)};
                 float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - get_earliest_frame_timestamp())};
-                frame_data_vector_absolute.push_back(std::make_pair(raw_frame_data.frameData, timestamp_absolute));
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
             }
             else
@@ -200,14 +190,14 @@ class EventData
         }
 
         /**
-         * @brief Exposes event data with absolute or relative timestamp as a vector of glm::vec4.
+         * @brief Exposes event data with relative timestamp as a vector of glm::vec4.
          *        IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors()
          *        when done working with the data vectors.
          * @param relative If true, returns data with relative timestamps (earliest timestamp subtracted from all
          * timestamps). Otherwise regular timestamps.
          * @return const reference to internal event data vector.
          */
-        const std::vector<glm::vec4> &get_evt_vector_ref(bool relative)
+        const std::vector<glm::vec4> &get_evt_vector_ref()
         {
             // Update changed_thread_map to indicate this thread has up-to-date data
             /*std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
@@ -218,22 +208,19 @@ class EventData
             {
                 update_evt_data_vectors();
             }
-            if (relative)
-            {
-                return evt_data_vector_relative;
-            }
-            return evt_data_vector_absolute;
+
+            return evt_data_vector_relative;
         }
 
         /**
-         * @brief Exposes frame data with absolute or relative timestamp as a vector of pairs containing image data and
+         * @brief Exposes frame data with relative timestamp as a vector of pairs containing image data and
          * timestamp. IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors() when done
          * working with the data vectors.
          * @param relative If true, returns data with relative timestamps (earliest timestamp subtracted from all
          * timestamps). Otherwise regular timestamps.
          * @return const reference to internal frame data vector.
          */
-        const std::vector<std::pair<cv::Mat, float>> &get_frame_vector_ref(bool relative)
+        const std::vector<std::pair<cv::Mat, float>> &get_frame_vector_ref()
         {
             // Update changed_thread_map to indicate this thread has up-to-date data
             /*std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
@@ -243,11 +230,8 @@ class EventData
             {
                 update_frame_data_vectors();
             }
-            if (relative)
-            {
-                return frame_data_vector_relative;
-            }
-            return frame_data_vector_absolute;
+
+            return frame_data_vector_relative;
         }
 
         /**
@@ -359,9 +343,7 @@ class EventData
 
         std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
 
-        std::vector<glm::vec4> evt_data_vector_absolute;
         std::vector<glm::vec4> evt_data_vector_relative;
-        std::vector<std::pair<cv::Mat, float>> frame_data_vector_absolute;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
 
         // Set camera resolution
@@ -393,18 +375,14 @@ class EventData
         void update_evt_data_vectors()
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            evt_data_vector_absolute.clear();
             evt_data_vector_relative.clear();
-            cull_elements(evt_data_vector_absolute, evt_data, max_element_percentage, cull_element_percentage);
             cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage);
             for (const EventDatum &evt_el : evt_data)
             {
                 float x{static_cast<float>(evt_el.x)};
                 float y{static_cast<float>(evt_el.y)};
-                float timestamp_absolute{static_cast<float>(evt_el.timestamp)};
                 float timestamp_relative{static_cast<float>(evt_el.timestamp - get_earliest_evt_timestamp())};
                 float polarity{static_cast<float>(evt_el.polarity)};
-                evt_data_vector_absolute.push_back(glm::vec4{x, y, timestamp_absolute, polarity});
                 evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
             }
 
@@ -419,15 +397,11 @@ class EventData
         void update_frame_data_vectors()
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            frame_data_vector_absolute.clear();
             frame_data_vector_relative.clear();
-            cull_elements(frame_data_vector_absolute, frame_data, max_element_percentage, cull_element_percentage);
             cull_elements(frame_data_vector_relative, frame_data, 0.8f, 0.5f);
             for (const FrameDatum &frame_el : frame_data)
             {
-                float timestamp_absolute{static_cast<float>(frame_el.timestamp)};
                 float timestamp_relative{static_cast<float>(frame_el.timestamp - get_earliest_frame_timestamp())};
-                frame_data_vector_absolute.push_back(std::make_pair(frame_el.frameData, timestamp_absolute));
                 frame_data_vector_relative.push_back(std::make_pair(frame_el.frameData, timestamp_relative));
             }
 

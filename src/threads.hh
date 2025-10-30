@@ -1,15 +1,14 @@
-#include "ParameterStore.hh"
-#include "EventData.hh"
-#include "DataWriter.hh"
 #include "DataAcquisition.hh"
-
+#include "DataWriter.hh"
+#include "EventData.hh"
+#include "ParameterStore.hh"
 
 /**
  * @brief Thread for writing data back to persistent storage when streaming.
  * @param running Atomic boolean that determines if thread is running or not.
  * @param data_writer DataWriter object to write data with
- * 
- */ 
+ *
+ */
 
 inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer)
 {
@@ -29,7 +28,8 @@ inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer)
  * @param data_writer DataWriter object to store event/frame data into to be saved to persistent storage.
  */
 // Thread for data acquisition, storing into event_data
-inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, ParameterStore &param_store, EventData &evt_data, DataWriter &data_writer)
+inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, ParameterStore &param_store,
+                                    EventData &evt_data, DataWriter &data_writer)
 {
     while (running)
     {
@@ -38,8 +38,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
         {
             bool streaming{param_store.get<bool>("streaming")};
             // Case for not streaming
-            if (!streaming && param_store.exists("load_file_name") &&
-                param_store.exists("load_file_changed"))
+            if (!streaming && param_store.exists("load_file_name") && param_store.exists("load_file_changed"))
             {
                 if (param_store.get<bool>("load_file_changed"))
                 {
@@ -59,7 +58,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         // Test to ensure event/frame data was added and is ordered
                         evt_data.lock_data_vectors();
 
-                        const auto &event_data{evt_data.get_evt_vector_ref(true)};
+                        const auto &event_data{evt_data.get_evt_vector_ref()};
 
                         // for (size_t i = 1; i < event_data.size(); ++i)
                         // {
@@ -78,8 +77,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                 }
             }
             // case for streaming
-            else if (streaming && param_store.exists("stream_file_name") &&
-                     param_store.exists("stream_file_changed") && param_store.exists("stream_paused"))
+            else if (streaming && param_store.exists("stream_file_name") && param_store.exists("stream_file_changed") &&
+                     param_store.exists("stream_paused"))
             {
                 // If stream file changed, reset reader to read from new file and clear previously read event data
                 if (param_store.get<bool>("stream_file_changed"))
@@ -95,12 +94,11 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 
                     // If gui indicates writing needs to be done, then set up writer for writing
                     data_writer.clear();
-                    if (param_store.exists("stream_save") &&
-                        param_store.exists("stream_save_file_name") &&
+                    if (param_store.exists("stream_save") && param_store.exists("stream_save_file_name") &&
                         param_store.get<bool>("stream_save"))
                     {
                         data_writer.init_data_writer(param_store.get<std::string>("stream_save_file_name"),
-                                                       data_acq.get_camera_height(), data_acq.get_camera_width());
+                                                     data_acq.get_camera_height(), data_acq.get_camera_width());
                     }
                 }
 
@@ -115,7 +113,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     // Test to ensure event/frame data was added and is ordered
                     evt_data.lock_data_vectors();
 
-                    const auto &event_data{evt_data.get_evt_vector_ref(true)};
+                    const auto &event_data{evt_data.get_evt_vector_ref()};
 
                     // for (size_t i = 1; i < event_data.size(); ++i)
                     // {
