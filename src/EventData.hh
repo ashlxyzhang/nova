@@ -12,10 +12,17 @@
 #include <set>
 
 // From previous NOVA source code
-// Used for timestamp comparisons
-inline bool less_vec4_t(const glm::vec4 &a, const glm::vec4 &b)
+// Used for timestamp comparisons of event data
+inline bool event_less_vec4_t(const glm::vec4 &a, const glm::vec4 &b)
 {
     return a.z < b.z;
+}
+
+// From previous NOVA source code
+// Used for timestamp comparisons of frame data
+inline bool frame_less_vec4_t(const std::pair<cv::Mat, float> &a, const std::pair<cv::Mat, float> &b)
+{
+    return a.second < b.second;
 }
 
 class EventData
@@ -314,7 +321,7 @@ class EventData
          * @param timestamp Provided timestamp.
          * @return -1 if relative event data vector is empty, index otherwise.
          */
-        int64_t get_index_from_timestamp(float timestamp)
+        int64_t get_event_index_from_timestamp(float timestamp)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
@@ -327,12 +334,42 @@ class EventData
 
             // evt_data_vector_relative should be sorted by the way EventData class is setup.
             auto lb = std::lower_bound(evt_data_vector_relative.begin(), evt_data_vector_relative.end(), timestampVec4,
-                                       less_vec4_t);
+                                       event_less_vec4_t);
             if (lb == evt_data_vector_relative.end())
             {
                 return evt_data_vector_relative.size() - 1;
             }
             int64_t ret_index{static_cast<int64_t>(std::distance(evt_data_vector_relative.begin(), lb))};
+
+            evt_lock_ul.unlock();
+            return ret_index;
+        }
+
+        /**
+         * @brief Gets index of first frame data in relative event data vector with timestamp that is equal or greater
+         *        than provided timestamp.
+         * @param timestamp Provided timestamp.
+         * @return -1 if relative frame data vector is empty, index otherwise.
+         */
+        int64_t get_frame_index_from_timestamp(float timestamp)
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+
+            if (frame_data_vector_relative.empty())
+            {
+                evt_lock_ul.unlock();
+                return -1; // Vector is empty, return -1
+            }
+            std::pair<cv::Mat, float> timestampPair{cv::Mat{}, timestamp};
+
+            // frame_data_vector_relative should be sorted by the way EventData class is setup.
+            auto lb = std::lower_bound(frame_data_vector_relative.begin(), frame_data_vector_relative.end(),
+                                       timestampPair, frame_less_vec4_t);
+            if (lb == frame_data_vector_relative.end())
+            {
+                return frame_data_vector_relative.size() - 1;
+            }
+            int64_t ret_index{static_cast<int64_t>(std::distance(frame_data_vector_relative.begin(), lb))};
 
             evt_lock_ul.unlock();
             return ret_index;

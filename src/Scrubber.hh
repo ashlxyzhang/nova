@@ -147,8 +147,8 @@ class Scrubber
                 }
 
                 // Convert time values to indices for internal use
-                current_index = event_data->get_index_from_timestamp(current_time);
-                lower_index = event_data->get_index_from_timestamp(lower_time);
+                current_index = event_data->get_event_index_from_timestamp(current_time);
+                lower_index = event_data->get_event_index_from_timestamp(lower_time);
 
                 // Ensure indices are valid
                 if (current_index == -1)

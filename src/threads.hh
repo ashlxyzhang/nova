@@ -56,9 +56,9 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         param_store.add("load_file_changed", false);
 
                         // Test to ensure event/frame data was added and is ordered
-                        evt_data.lock_data_vectors();
+                        // evt_data.lock_data_vectors();
 
-                        const auto &event_data{evt_data.get_evt_vector_ref()};
+                        // const auto &event_data{evt_data.get_evt_vector_ref()};
 
                         // for (size_t i = 1; i < event_data.size(); ++i)
                         // {
@@ -72,7 +72,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
                         // }
 
-                        evt_data.unlock_data_vectors();
+                        // evt_data.unlock_data_vectors();
                     }
                 }
             }
@@ -111,9 +111,9 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
 
                     // Test to ensure event/frame data was added and is ordered
-                    evt_data.lock_data_vectors();
+                    // evt_data.lock_data_vectors();
 
-                    const auto &event_data{evt_data.get_evt_vector_ref()};
+                    // const auto &event_data{evt_data.get_evt_vector_ref()};
 
                     // for (size_t i = 1; i < event_data.size(); ++i)
                     // {
@@ -122,15 +122,18 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     //     // evt_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
                     // }
 
-                    // const auto &frame_data{evt_data.get_frame_vector_ref(true)};
-                    // // std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
+                    // const auto &frame_data{evt_data.get_frame_vector_ref()};
+                    // std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
 
                     // for (size_t i = 1; i < frame_data.size(); ++i)
                     // {
+                    //     std::cout << "AT i: " << i << " TIMESTAMP: " << frame_data[i].second << std::endl;
                     //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
+                    //     std::cout << "RETRIEVED: " << evt_data.get_frame_index_from_timestamp(frame_data[i].second)
+                    //     << std::endl;
                     // }
 
-                    evt_data.unlock_data_vectors();
+                    // evt_data.unlock_data_vectors();
                 }
             }
         }
