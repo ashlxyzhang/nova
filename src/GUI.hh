@@ -124,17 +124,6 @@ class GUI
         void draw_info_window()
         {
             ImGui::Begin("Info");
-            if (parameter_store->exists("camera_pos"))
-            {
-                const glm::vec3 &camera_pos{parameter_store->get<glm::vec3>("camera_pos")};
-                ImGui::Text("Camera (World): (%.3f, %.3f, %.3f)", camera_pos.x, camera_pos.y, camera_pos.z);
-            }
-            else
-            {
-                ImGui::Text("No Camera (World)");
-            }
-
-            ImGui::Separator();
 
             if (!parameter_store->exists("particle_scale"))
             {
@@ -201,157 +190,157 @@ class GUI
 
             ImGui::Separator();
 
-            ImGui::Text("Processing options");
+            // ImGui::Text("Processing options");
 
-            if (!parameter_store->exists("shutter_type"))
-            {
-                parameter_store->add("shutter_type", 0);
-            }
-            int32_t shutter_type{parameter_store->get<int32_t>("shutter_type")};
-            ImGui::Combo("Shutter", &shutter_type, "Time Based\0Event Based\0");
-            parameter_store->add("shutter_type", shutter_type);
+            // if (!parameter_store->exists("shutter_type"))
+            // {
+            //     parameter_store->add("shutter_type", 0);
+            // }
+            // int32_t shutter_type{parameter_store->get<int32_t>("shutter_type")};
+            // ImGui::Combo("Shutter", &shutter_type, "Time Based\0Event Based\0");
+            // parameter_store->add("shutter_type", shutter_type);
 
-            if (static_cast<GUI::SHUTTER>(parameter_store->get<int32_t>("shutter_type")) == GUI::SHUTTER::TIME_BASED)
-            {
+            // if (static_cast<GUI::SHUTTER>(parameter_store->get<int32_t>("shutter_type")) == GUI::SHUTTER::TIME_BASED)
+            // {
 
-                if (parameter_store->exists("time_window_begin") && parameter_store->exists("time_window_end"))
-                {
-                    float time_window_end{parameter_store->get<float>("time_window_end")};
-                    float time_window_begin{parameter_store->get<float>("time_window_begin")};
-                    float frameLength_T = time_window_end - time_window_begin;
+            //     if (parameter_store->exists("time_window_begin") && parameter_store->exists("time_window_end"))
+            //     {
+            //         float time_window_end{parameter_store->get<float>("time_window_end")};
+            //         float time_window_begin{parameter_store->get<float>("time_window_begin")};
+            //         float frameLength_T = time_window_end - time_window_begin;
 
-                    // Get user input for beginning of time shutter window
-                    if (!parameter_store->exists("time_shutter_window_begin"))
-                    {
-                        parameter_store->add("time_shutter_window_begin", time_window_begin);
-                    }
-                    float time_shutter_window_begin{parameter_store->get<float>("time_shutter_window_begin")};
-                    std::string shutter_initial{"Shutter Initial "};
-                    shutter_initial.append(time_units[parameter_store->get<int32_t>("unit_type")]);
-                    ImGui::SliderFloat(shutter_initial.c_str(), &time_shutter_window_begin, 0, frameLength_T, "%.4f");
+            //         // Get user input for beginning of time shutter window
+            //         if (!parameter_store->exists("time_shutter_window_begin"))
+            //         {
+            //             parameter_store->add("time_shutter_window_begin", time_window_begin);
+            //         }
+            //         float time_shutter_window_begin{parameter_store->get<float>("time_shutter_window_begin")};
+            //         std::string shutter_initial{"Shutter Initial "};
+            //         shutter_initial.append(time_units[parameter_store->get<int32_t>("unit_type")]);
+            //         ImGui::SliderFloat(shutter_initial.c_str(), &time_shutter_window_begin, 0, frameLength_T, "%.4f");
 
-                    // Get user input for ending of time shutter window
-                    if (!parameter_store->exists("time_shutter_window_end"))
-                    {
-                        parameter_store->add("time_shutter_window_end", time_window_end);
-                    }
-                    float time_shutter_window_end{parameter_store->get<float>("time_shutter_window_end")};
-                    std::string shutter_final{"Shutter Final "};
-                    shutter_final.append(time_units[parameter_store->get<int32_t>("unit_type")]);
-                    ImGui::SliderFloat(shutter_final.c_str(), &time_shutter_window_end, 0, frameLength_T, "%.4f");
+            //         // Get user input for ending of time shutter window
+            //         if (!parameter_store->exists("time_shutter_window_end"))
+            //         {
+            //             parameter_store->add("time_shutter_window_end", time_window_end);
+            //         }
+            //         float time_shutter_window_end{parameter_store->get<float>("time_shutter_window_end")};
+            //         std::string shutter_final{"Shutter Final "};
+            //         shutter_final.append(time_units[parameter_store->get<int32_t>("unit_type")]);
+            //         ImGui::SliderFloat(shutter_final.c_str(), &time_shutter_window_end, 0, frameLength_T, "%.4f");
 
-                    // Not sure if clamping is necessary
-                    // evtData->getTimeShutterWindow_L() = std::clamp(evtData->getTimeShutterWindow_L(), 0.0f,
-                    // frameLength_T); evtData->getTimeShutterWindow_R() = std::clamp(evtData->getTimeShutterWindow_R(),
-                    // evtData->getTimeShutterWindow_L(), frameLength_T);
+            //         // Not sure if clamping is necessary
+            //         // evtData->getTimeShutterWindow_L() = std::clamp(evtData->getTimeShutterWindow_L(), 0.0f,
+            //         // frameLength_T); evtData->getTimeShutterWindow_R() = std::clamp(evtData->getTimeShutterWindow_R(),
+            //         // evtData->getTimeShutterWindow_L(), frameLength_T);
 
-                    // Add user time shutter window input to parameter store
-                    parameter_store->add("time_shutter_window_begin", time_shutter_window_begin);
-                    parameter_store->add("time_shutter_window_end", time_shutter_window_end);
-                }
-            }
-            else if (static_cast<GUI::SHUTTER>(parameter_store->get<int32_t>("shutter_type")) ==
-                     GUI::SHUTTER::EVENT_BASED)
-            {
+            //         // Add user time shutter window input to parameter store
+            //         parameter_store->add("time_shutter_window_begin", time_shutter_window_begin);
+            //         parameter_store->add("time_shutter_window_end", time_shutter_window_end);
+            //     }
+            // }
+            // else if (static_cast<GUI::SHUTTER>(parameter_store->get<int32_t>("shutter_type")) ==
+            //          GUI::SHUTTER::EVENT_BASED)
+            // {
 
-                if (parameter_store->exists("event_window_begin") && parameter_store->exists("event_window_end"))
-                {
-                    uint32_t event_window_end{parameter_store->get<uint32_t>("event_window_end")};
-                    uint32_t event_window_begin{parameter_store->get<uint32_t>("event_window_begin")};
-                    uint32_t frameLength_E = event_window_end - event_window_begin;
+            //     if (parameter_store->exists("event_window_begin") && parameter_store->exists("event_window_end"))
+            //     {
+            //         uint32_t event_window_end{parameter_store->get<uint32_t>("event_window_end")};
+            //         uint32_t event_window_begin{parameter_store->get<uint32_t>("event_window_begin")};
+            //         uint32_t frameLength_E = event_window_end - event_window_begin;
 
-                    if (!parameter_store->exists("event_shutter_window_begin"))
-                    {
-                        parameter_store->add("event_shutter_window_begin", event_window_begin);
-                    }
-                    uint32_t event_shutter_window_begin{parameter_store->get<uint32_t>("event_shutter_window_begin")};
-                    ImGui::SliderInt("Shutter Initial (events)", (int *)&event_shutter_window_begin, 0, frameLength_E);
+            //         if (!parameter_store->exists("event_shutter_window_begin"))
+            //         {
+            //             parameter_store->add("event_shutter_window_begin", event_window_begin);
+            //         }
+            //         uint32_t event_shutter_window_begin{parameter_store->get<uint32_t>("event_shutter_window_begin")};
+            //         ImGui::SliderInt("Shutter Initial (events)", (int *)&event_shutter_window_begin, 0, frameLength_E);
 
-                    if (!parameter_store->exists("event_shutter_window_end"))
-                    {
-                        parameter_store->add("event_shutter_window_end", event_window_end);
-                    }
-                    uint32_t event_shutter_window_end{parameter_store->get<uint32_t>("event_shutter_window_end")};
-                    ImGui::SliderInt("Shutter Final (events)", (int *)&event_shutter_window_end, 0, frameLength_E);
+            //         if (!parameter_store->exists("event_shutter_window_end"))
+            //         {
+            //             parameter_store->add("event_shutter_window_end", event_window_end);
+            //         }
+            //         uint32_t event_shutter_window_end{parameter_store->get<uint32_t>("event_shutter_window_end")};
+            //         ImGui::SliderInt("Shutter Final (events)", (int *)&event_shutter_window_end, 0, frameLength_E);
 
-                    // Not sure if clamping is necessary
-                    // evtData->getEventShutterWindow_L() = std::clamp(evtData->getEventShutterWindow_L(), (uint) 0,
-                    // frameLength_E); evtData->getEventShutterWindow_R() =
-                    // std::clamp(evtData->getEventShutterWindow_R(), evtData->getEventShutterWindow_L(),
-                    // frameLength_E);
+            //         // Not sure if clamping is necessary
+            //         // evtData->getEventShutterWindow_L() = std::clamp(evtData->getEventShutterWindow_L(), (uint) 0,
+            //         // frameLength_E); evtData->getEventShutterWindow_R() =
+            //         // std::clamp(evtData->getEventShutterWindow_R(), evtData->getEventShutterWindow_L(),
+            //         // frameLength_E);
 
-                    // Add user input back to parameter store
-                    parameter_store->add("event_shutter_window_begin", event_shutter_window_begin);
-                    parameter_store->add("event_shutter_window_end", event_shutter_window_end);
-                }
-            }
+            //         // Add user input back to parameter store
+            //         parameter_store->add("event_shutter_window_begin", event_shutter_window_begin);
+            //         parameter_store->add("event_shutter_window_end", event_shutter_window_end);
+            //     }
+            // }
 
-            // Auto update controls
-            if (!parameter_store->exists("shutter_fps"))
-            {
-                parameter_store->add("shutter_fps", 0.0f);
-            }
-            float shutter_fps{parameter_store->get<float>("shutter_fps")};
-            ImGui::SliderFloat("FPS", &shutter_fps, 0.0f, 100.0f);
-            parameter_store->add("shutter_fps", shutter_fps);
+            // // Auto update controls
+            // if (!parameter_store->exists("shutter_fps"))
+            // {
+            //     parameter_store->add("shutter_fps", 0.0f);
+            // }
+            // float shutter_fps{parameter_store->get<float>("shutter_fps")};
+            // ImGui::SliderFloat("FPS", &shutter_fps, 0.0f, 100.0f);
+            // parameter_store->add("shutter_fps", shutter_fps);
 
-            // TODO Implement buttons
-            if (ImGui::Button("Play (Time period)"))
-            {
-            }
-            if (ImGui::Button("Play (Events period)"))
-            {
-            }
+            // // TODO Implement buttons
+            // if (ImGui::Button("Play (Time period)"))
+            // {
+            // }
+            // if (ImGui::Button("Play (Events period)"))
+            // {
+            // }
 
-            // "Post" processing
-            if (!parameter_store->exists("shutter_frequency"))
-            {
-                parameter_store->add("shutter_frequency", 100.0f);
-            }
-            float shutter_frequency{parameter_store->get<float>("shutter_frequency")};
-            ImGui::SliderFloat("Frequency (Hz)", &shutter_frequency, 0.001f, 250.0f);
-            parameter_store->add("shutter_frequency", shutter_frequency);
+            // // "Post" processing
+            // if (!parameter_store->exists("shutter_frequency"))
+            // {
+            //     parameter_store->add("shutter_frequency", 100.0f);
+            // }
+            // float shutter_frequency{parameter_store->get<float>("shutter_frequency")};
+            // ImGui::SliderFloat("Frequency (Hz)", &shutter_frequency, 0.001f, 250.0f);
+            // parameter_store->add("shutter_frequency", shutter_frequency);
 
-            if (parameter_store->exists("time_window_begin") && parameter_store->exists("time_window_end"))
-            {
-                if (!parameter_store->exists("fwhm"))
-                {
-                    parameter_store->add("fwhm", 0.0014f);
-                }
-                float fwhm{parameter_store->get<float>("fwhm")};
-                std::string fwhm_str{"Full Width at Half Measure "};
-                fwhm_str.append(time_units[parameter_store->get<int32_t>("unit_type")]);
+            // if (parameter_store->exists("time_window_begin") && parameter_store->exists("time_window_end"))
+            // {
+            //     if (!parameter_store->exists("fwhm"))
+            //     {
+            //         parameter_store->add("fwhm", 0.0014f);
+            //     }
+            //     float fwhm{parameter_store->get<float>("fwhm")};
+            //     std::string fwhm_str{"Full Width at Half Measure "};
+            //     fwhm_str.append(time_units[parameter_store->get<int32_t>("unit_type")]);
 
-                ImGui::SliderFloat(fwhm_str.c_str(), &fwhm, 0.0001f,
-                                   (parameter_store->get<float>("time_window_after") -
-                                    parameter_store->get<float>("time_window_after")) *
-                                       0.5,
-                                   "%.4f");
-            }
+            //     ImGui::SliderFloat(fwhm_str.c_str(), &fwhm, 0.0001f,
+            //                        (parameter_store->get<float>("time_window_after") -
+            //                         parameter_store->get<float>("time_window_after")) *
+            //                            0.5,
+            //                        "%.4f");
+            // }
 
-            if (!parameter_store->exists("shutter_is_morlet"))
-            {
-                parameter_store->add("shutter_is_morlet", false);
-            }
-            bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
-            ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
-            parameter_store->add("shutter_is_morlet", shutter_is_morlet);
+            // if (!parameter_store->exists("shutter_is_morlet"))
+            // {
+            //     parameter_store->add("shutter_is_morlet", false);
+            // }
+            // bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
+            // ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
+            // parameter_store->add("shutter_is_morlet", shutter_is_morlet);
 
-            if (!parameter_store->exists("shutter_is_pca"))
-            {
-                parameter_store->add("shutter_is_pca", false);
-            }
-            bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            ImGui::Checkbox("PCA", &shutter_is_pca);
-            parameter_store->add("shutter_is_pca", shutter_is_pca);
+            // if (!parameter_store->exists("shutter_is_pca"))
+            // {
+            //     parameter_store->add("shutter_is_pca", false);
+            // }
+            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
+            // ImGui::Checkbox("PCA", &shutter_is_pca);
+            // parameter_store->add("shutter_is_pca", shutter_is_pca);
 
-            if (!parameter_store->exists("shutter_is_positive_only"))
-            {
-                parameter_store->add("shutter_is_positive_only", false);
-            }
-            bool shutter_is_positive_only{parameter_store->get<bool>("shutter_is_positive_only")};
-            ImGui::Checkbox("Positive Events Only", &shutter_is_positive_only);
-            parameter_store->add("shutter_is_positive_only", shutter_is_positive_only);
+            // if (!parameter_store->exists("shutter_is_positive_only"))
+            // {
+            //     parameter_store->add("shutter_is_positive_only", false);
+            // }
+            // bool shutter_is_positive_only{parameter_store->get<bool>("shutter_is_positive_only")};
+            // ImGui::Checkbox("Positive Events Only", &shutter_is_positive_only);
+            // parameter_store->add("shutter_is_positive_only", shutter_is_positive_only);
             // ImGui::Separator();
 
             // TODO implement video recording
