@@ -656,8 +656,11 @@ class GUI
                 std::string time_step_label = "Time Step " + time_unit_suffix;
                 if (ImGui::SliderFloat(time_step_label.c_str(), &time_step, 0.001f, max_step_time, "%.4f"))
                 {
-                    time_step = std::clamp(time_step, 0.001f, max_step_time);
-                    parameter_store->add("scrubber.time_step", time_step);
+                    if(max_step_time > 0.001f)
+                    {
+                        time_step = std::clamp(time_step, 0.001f, max_step_time);
+                        parameter_store->add("scrubber.time_step", time_step);
+                    }
                 }
             }
 

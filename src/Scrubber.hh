@@ -102,6 +102,12 @@ class Scrubber
 
             event_data->lock_data_vectors();
 
+            if(event_data -> get_evt_vector_ref().empty())
+            {
+                event_data -> unlock_data_vectors();
+                return;
+            }
+
             parameter_store.add("scrubber.min_index", 0ULL);
             parameter_store.add("scrubber.max_index", event_data->get_evt_vector_ref().size() - 1);
 
