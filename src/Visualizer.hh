@@ -38,24 +38,24 @@ class Visualizer
                     lines.clear();
 
                     // Generate lines only on the three outside faces:
-                    // 1. Back face (Z = -1.0f)
+                    // 1. Front face (Z = +1.0f)
                     // 2. Bottom face (Y = -1.0f) 
                     // 3. Left face (X = -1.0f)
 
-                    // Back face (Z = -1.0f) - lines parallel to X and Y axes
+                    // Front face (Z = +1.0f) - lines parallel to X and Y axes
                     for (uint32_t i = 0; i <= x_subdivisions; ++i)
                     {
                         float x = 2.0f * static_cast<float>(i) / static_cast<float>(x_subdivisions) - 1.0f;
-                        // Lines parallel to Y-axis on back face
-                        lines.push_back(glm::vec3(x, -1.0f, -1.0f));
-                        lines.push_back(glm::vec3(x, 1.0f, -1.0f));
+                        // Lines parallel to Y-axis on front face
+                        lines.push_back(glm::vec3(x, -1.0f, 1.0f));
+                        lines.push_back(glm::vec3(x, 1.0f, 1.0f));
                     }
                     for (uint32_t i = 0; i <= y_subdivisions; ++i)
                     {
                         float y = 2.0f * static_cast<float>(i) / static_cast<float>(y_subdivisions) - 1.0f;
-                        // Lines parallel to X-axis on back face
-                        lines.push_back(glm::vec3(-1.0f, y, -1.0f));
-                        lines.push_back(glm::vec3(1.0f, y, -1.0f));
+                        // Lines parallel to X-axis on front face
+                        lines.push_back(glm::vec3(-1.0f, y, 1.0f));
+                        lines.push_back(glm::vec3(1.0f, y, 1.0f));
                     }
 
                     // Bottom face (Y = -1.0f) - lines parallel to X and Z axes
@@ -367,7 +367,7 @@ class Visualizer
                 }
 
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                const glm::mat4 &mvp)
+                                const glm::mat4 &vp)
                 {
 
                     if (scrubber->get_points_buffer_size() == 0)
@@ -394,29 +394,12 @@ class Visualizer
                     float depth_range = upper_depth - lower_depth;
                     
                     // Initialize as an identity matrix
-                    glm::mat4 scale_matrix = glm::mat4(1.0f);
+                    glm::mat4 z_translate = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -lower_depth));
+                    glm::mat4 scale_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f / camera_resolution.x, 2.0f / camera_resolution.y, 2.0f / depth_range));
+                    glm::mat4 translate_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, -1.0f));
+                    glm::mat4 rotate_matrix = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
             
-                    // 1. Set X and Y scaling to map from [0, width/height] to [-1, 1]  
-                    // x' = (2.0 * x / width) - 1.0 = (2.0 / width) * x - 1.0
-                    scale_matrix[0][0] = 2.0f / camera_resolution.x;
-                    scale_matrix[3][0] = -1.0f;  // x translation
-        
-                    // y' = (2.0 * y / height) - 1.0 = (2.0 / height) * y - 1.0
-                    scale_matrix[1][1] = 2.0f / camera_resolution.y;
-                    scale_matrix[3][1] = -1.0f;  // y translation
-            
-                    // 2. Set Z transformation: z' = (z - lower) / (upper - lower)
-                    // This maps from [lower, upper] to [0, 1], then to [-1, 1] by multiplying by 2 and subtracting 1
-                    // z' = 2 * ((z - lower) / (upper - lower)) - 1 = (2.0 / depth_range) * z - (2 * lower_depth / depth_range) - 1
-                    
-                    // Set Z scaling
-                    scale_matrix[2][2] = 2.0f / depth_range;
-                    
-                    // Set Z translation
-                    // In GLM (column-major), M[col][row]. This sets the z-component of the translation.
-                    scale_matrix[3][2] = -(2.0f * lower_depth / depth_range + 1.0f);
-            
-                    uniforms.mvp = mvp * scale_matrix;
+                    uniforms.mvp = vp * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
                     // Get camera dimensions for scaling
                     uniforms.negative_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_neg_color"), 1.0f);
@@ -444,6 +427,7 @@ class Visualizer
 
         GridRenderer *grid_renderer = nullptr;
         PointsRenderer *points_renderer = nullptr;
+
         SDL_GPUGraphicsPipeline *frame_pipeline = nullptr;
         SDL_GPUGraphicsPipeline *text_pipeline = nullptr;
 
@@ -546,7 +530,7 @@ class Visualizer
                     {
                         // When relative mouse mode is enabled, motion.x and motion.y contain
                         // the relative movement from the last motion event
-                        float x_offset = event->motion.xrel;
+                        float x_offset = -event->motion.xrel;
                         float y_offset = event->motion.yrel;
 
                         // Update camera rotation based on mouse movement
