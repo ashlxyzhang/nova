@@ -17,6 +17,8 @@
 #include "shaders/visualizer/points/points_frag.h"
 #include "shaders/visualizer/points/points_vert.h"
 
+#include "fonts/CascadiaCode.ttf.h"
+
 class Visualizer
 {
     private:
@@ -411,6 +413,50 @@ class Visualizer
 
                     // Draw the points
                     SDL_DrawGPUPrimitives(render_pass, scrubber->get_points_buffer_size(), 1, 0, 0);
+                }
+        };
+
+        class TextRenderer
+        {
+            private:
+                ParameterStore &parameter_store;
+                SDL_GPUDevice *gpu_device = nullptr;
+                SDL_GPUGraphicsPipeline *text_pipeline = nullptr;
+                TTF_TextEngine *text_engine = nullptr;
+                TTF_Font *font = nullptr;
+
+
+            public:
+                TextRenderer(ParameterStore &parameter_store, SDL_GPUDevice *gpu_device)
+                    : parameter_store(parameter_store), gpu_device(gpu_device)
+                {
+                    text_engine = TTF_CreateGPUTextEngine(gpu_device);
+                    SDL_IOStream *io = SDL_IOFromConstMem(CascadiaCode_ttf, sizeof CascadiaCode_ttf);
+                    font = TTF_OpenFontIO(io, true, 16.0f);
+                }
+
+                ~TextRenderer()
+                {
+                }
+
+                void queue_text(const std::string &text, const glm::vec2 &position, const glm::vec4 &color)
+                {
+                    
+                }
+
+                void cpu_update()
+                {
+
+                }
+
+                void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                {
+
+                }
+
+                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass, const glm::mat4 &vp)
+                {
+                    
                 }
         };
 

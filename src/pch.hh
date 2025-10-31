@@ -30,6 +30,8 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_iostream.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <imgui.h>
 #include <backends/imgui_impl_sdl3.h>
