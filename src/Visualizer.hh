@@ -16,6 +16,8 @@
 #include "shaders/visualizer/grid/grid_vert.h"
 #include "shaders/visualizer/points/points_frag.h"
 #include "shaders/visualizer/points/points_vert.h"
+#include "shaders/visualizer/text/text_frag.h"
+#include "shaders/visualizer/text/text_vert.h"
 
 #include "fonts/CascadiaCode.ttf.h"
 
@@ -41,7 +43,7 @@ class Visualizer
 
                     // Generate lines only on the three outside faces:
                     // 1. Front face (Z = +1.0f)
-                    // 2. Bottom face (Y = -1.0f) 
+                    // 2. Bottom face (Y = -1.0f)
                     // 3. Left face (X = -1.0f)
 
                     // Front face (Z = +1.0f) - lines parallel to X and Y axes
@@ -262,7 +264,7 @@ class Visualizer
                 }
 
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &mvp)
+                                 const glm::mat4 &vp)
                 {
                     if (!grid_pipeline || !vertex_buffer)
                         return;
@@ -275,7 +277,7 @@ class Visualizer
                     SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_binding, 1);
 
                     // Push the MVP matrix uniform data
-                    SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
+                    SDL_PushGPUVertexUniformData(command_buffer, 0, &vp[0][0], sizeof(vp));
 
                     // Draw the grid lines
                     SDL_DrawGPUPrimitives(render_pass, lines.size(), 1, 0, 0);
@@ -292,9 +294,10 @@ class Visualizer
                 SDL_GPUGraphicsPipeline *points_pipeline = nullptr;
 
             public:
-                PointsRenderer(ParameterStore &parameter_store, EventData &event_data, Scrubber *scrubber, SDL_GPUDevice *gpu_device, 
-                              UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
-                    : parameter_store(parameter_store), event_data(event_data), scrubber(scrubber), gpu_device(gpu_device)
+                PointsRenderer(ParameterStore &parameter_store, EventData &event_data, Scrubber *scrubber,
+                               SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                    : parameter_store(parameter_store), event_data(event_data), scrubber(scrubber),
+                      gpu_device(gpu_device)
                 {
 
                     SDL_GPUShaderCreateInfo vs_create_info = {0};
@@ -360,16 +363,14 @@ class Visualizer
 
                 void cpu_update()
                 {
-                    
                 }
 
                 void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
-
                 }
 
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                const glm::mat4 &vp)
+                                 const glm::mat4 &vp)
                 {
 
                     if (scrubber->get_points_buffer_size() == 0)
@@ -383,24 +384,28 @@ class Visualizer
                     SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_binding, 1);
 
                     // Create uniform buffer data for points shader
-                    struct PointsUniforms {
-                        glm::mat4 mvp;
-                        glm::vec4 negative_color;
-                        glm::vec4 positive_color;
-                        float point_size;
+                    struct PointsUniforms
+                    {
+                            glm::mat4 mvp;
+                            glm::vec4 negative_color;
+                            glm::vec4 positive_color;
+                            float point_size;
                     } uniforms;
-                    
+
                     glm::vec2 camera_resolution = scrubber->get_camera_resolution();
                     float lower_depth = scrubber->get_lower_depth();
                     float upper_depth = scrubber->get_upper_depth();
                     float depth_range = upper_depth - lower_depth;
-                    
+
                     // Initialize as an identity matrix
                     glm::mat4 z_translate = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -lower_depth));
-                    glm::mat4 scale_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f / camera_resolution.x, 2.0f / camera_resolution.y, 2.0f / depth_range));
+                    glm::mat4 scale_matrix =
+                        glm::scale(glm::mat4(1.0f), glm::vec3(2.0f / camera_resolution.x, 2.0f / camera_resolution.y,
+                                                              2.0f / depth_range));
                     glm::mat4 translate_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, -1.0f));
-                    glm::mat4 rotate_matrix = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-            
+                    glm::mat4 rotate_matrix =
+                        glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
                     uniforms.mvp = vp * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
                     // Get camera dimensions for scaling
@@ -416,47 +421,310 @@ class Visualizer
                 }
         };
 
+        // very ai generated
         class TextRenderer
         {
             private:
+                // Vertex definition, based on the example
+                struct TextVertex
+                {
+                        glm::vec3 pos;
+                        SDL_FColor colour;
+                        glm::vec2 uv;
+                };
+
+                // Stores info for a single draw call (one per atlas texture)
+                struct TextDrawCall
+                {
+                        SDL_GPUTexture *atlas_texture;
+                        Uint32 index_count;
+                        Uint32 index_offset;
+                        Sint32 base_vertex;
+                };
+
                 ParameterStore &parameter_store;
                 SDL_GPUDevice *gpu_device = nullptr;
                 SDL_GPUGraphicsPipeline *text_pipeline = nullptr;
                 TTF_TextEngine *text_engine = nullptr;
                 TTF_Font *font = nullptr;
+                SDL_GPUSampler *sampler = nullptr;
 
+                SDL_GPUBuffer *vertex_buffer = nullptr;
+                SDL_GPUBuffer *index_buffer = nullptr;
+
+                // CPU-side buffers for geometry
+                std::vector<TextVertex> vertices;
+                std::vector<Uint32> indices;
+
+                // List of draw calls to make
+                std::vector<TextDrawCall> draw_calls;
+
+                // List of text objects to be freed in cpu_update
+                std::vector<TTF_Text *> managed_text_objects;
 
             public:
                 TextRenderer(ParameterStore &parameter_store, SDL_GPUDevice *gpu_device)
                     : parameter_store(parameter_store), gpu_device(gpu_device)
                 {
+                    TTF_Init();
                     text_engine = TTF_CreateGPUTextEngine(gpu_device);
                     SDL_IOStream *io = SDL_IOFromConstMem(CascadiaCode_ttf, sizeof CascadiaCode_ttf);
-                    font = TTF_OpenFontIO(io, true, 16.0f);
+                    font = TTF_OpenFontIO(io, true, 24.0f);
+
+                    // --- Create Shaders (You must provide these files) ---
+                    SDL_GPUShaderCreateInfo vs_create_info = {0};
+                    vs_create_info.code_size = sizeof text_vert;
+                    vs_create_info.code = (const unsigned char *)text_vert;
+                    vs_create_info.entrypoint = "main";
+                    vs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                    vs_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+                    vs_create_info.num_uniform_buffers = 1; // For VP matrix
+                    SDL_GPUShader *vs = SDL_CreateGPUShader(gpu_device, &vs_create_info);
+
+                    SDL_GPUShaderCreateInfo fs_create_info = {0};
+                    fs_create_info.code_size = sizeof text_frag;
+                    fs_create_info.code = (const unsigned char *)text_frag;
+                    fs_create_info.entrypoint = "main";
+                    fs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                    fs_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+                    fs_create_info.num_samplers = 1; // For atlas texture
+                    SDL_GPUShader *fs = SDL_CreateGPUShader(gpu_device, &fs_create_info);
+
+                    // --- Create Pipeline (Based on example and GridRenderer) ---
+                    SDL_GPUVertexAttribute vertex_attributes[] = {
+                        {0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, offsetof(TextVertex, pos)},
+                        {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, offsetof(TextVertex, colour)},
+                        {2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, offsetof(TextVertex, uv)}};
+                    SDL_GPUVertexBufferDescription vertex_buffer_desc = {0, sizeof(TextVertex),
+                                                                         SDL_GPU_VERTEXINPUTRATE_VERTEX, 0};
+                    SDL_GPUColorTargetDescription color_target_desc = {
+                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM, // Match GridRenderer
+                        .blend_state = {                                // From example code
+                                        .enable_blend = true,
+                                        .alpha_blend_op = SDL_GPU_BLENDOP_ADD,
+                                        .color_blend_op = SDL_GPU_BLENDOP_ADD,
+                                        .color_write_mask = 0xF,
+                                        .src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA,
+                                        .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_DST_ALPHA,
+                                        .src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA,
+                                        .dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA}};
+
+                    SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {
+                        .vertex_shader = vs,
+                        .fragment_shader = fs,
+                        .vertex_input_state = {.vertex_buffer_descriptions = &vertex_buffer_desc,
+                                               .num_vertex_buffers = 1,
+                                               .vertex_attributes = vertex_attributes,
+                                               .num_vertex_attributes = 3},
+                        .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+                        .depth_stencil_state = {.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL, // From GridRenderer
+                                                .enable_depth_test = true,
+                                                .enable_depth_write = true},
+                        .target_info = {.color_target_descriptions = &color_target_desc,
+                                        .num_color_targets = 1,
+                                        .depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM, // From GridRenderer
+                                        .has_depth_stencil_target = true}};
+                    text_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &pipeline_info);
+
+                    SDL_ReleaseGPUShader(gpu_device, vs);
+                    SDL_ReleaseGPUShader(gpu_device, fs);
+
+                    // --- Create Sampler (From example code) ---
+                    SDL_GPUSamplerCreateInfo sampler_info = {.min_filter = SDL_GPU_FILTER_LINEAR,
+                                                             .mag_filter = SDL_GPU_FILTER_LINEAR,
+                                                             .mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR,
+                                                             .address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+                                                             .address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+                                                             .address_mode_w =
+                                                                 SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE};
+                    sampler = SDL_CreateGPUSampler(gpu_device, &sampler_info);
                 }
 
                 ~TextRenderer()
                 {
+                    // Clear any remaining text objects
+                    cpu_update();
+
+                    if (sampler)
+                        SDL_ReleaseGPUSampler(gpu_device, sampler);
+                    if (index_buffer)
+                        SDL_ReleaseGPUBuffer(gpu_device, index_buffer);
+                    if (vertex_buffer)
+                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
+                    if (text_pipeline)
+                        SDL_ReleaseGPUGraphicsPipeline(gpu_device, text_pipeline);
+                    if (font)
+                        TTF_CloseFont(font);
+                    if (text_engine)
+                        TTF_DestroyGPUTextEngine(text_engine);
                 }
 
-                void queue_text(const std::string &text, const glm::vec2 &position, const glm::vec4 &color)
+                /**
+                 * @brief Queues text to be rendered in 3D space. Call this after cpu_update() and before copy_pass().
+                 * @param text The string to render.
+                 * @param position The 3D world-space position (translation) for the text.
+                 * @param normal (Currently unused) The normal direction for orientation.
+                 * @param color The color of the text.
+                 */
+                void add_text(const std::string &text, const glm::vec3 &position, const glm::vec3 &normal,
+                              const SDL_FColor &color)
                 {
+                    TTF_Text *text_obj = TTF_CreateText(text_engine, font, text.c_str(), 0);
+                    managed_text_objects.push_back(text_obj); // Add to list for cleanup
+
+                    TTF_GPUAtlasDrawSequence *sequence = TTF_GetGPUTextDrawData(text_obj);
+                    if (!sequence)
+                        return; // Nothing to draw
+
+                    // Scale factor to convert from pixel space to world space
+                    // SDL_ttf coordinates are in pixels, so we need to scale them down for 3D space
+                    // Using a small scale factor so text appears as a reasonable size in 3D
+                    const float pixel_to_world_scale = 0.0025f; // 1000 pixels = 1 world unit
                     
+                    // Build rotation matrix from normal to orient the text plane
+                    // The text plane is in XY, so the normal is Z
+                    glm::vec3 normal_norm = glm::normalize(normal);
+                    
+                    // Build an orthonormal basis where:
+                    // - Z axis is the normal (facing direction)
+                    // - X and Y axes span the plane
+                    glm::vec3 forward = normal_norm;
+                    
+                    // Choose a reference vector - prefer Y-up if normal is not parallel to it
+                    glm::vec3 up_ref = glm::vec3(0.0f, 1.0f, 0.0f);
+                    if (glm::abs(glm::dot(forward, up_ref)) > 0.99f)
+                    {
+                        // Normal is nearly parallel to up, use Z as reference instead
+                        up_ref = glm::vec3(0.0f, 0.0f, 1.0f);
+                    }
+                    
+                    // Use Gram-Schmidt to build orthonormal basis
+                    glm::vec3 right = glm::normalize(glm::cross(forward, up_ref));
+                    glm::vec3 up = glm::normalize(glm::cross(right, forward));
+                    
+                    // Build rotation matrix from the basis vectors
+                    // Column-major order: right, up, forward (negative because camera looks along -Z)
+                    glm::mat4 rotation_matrix = glm::mat4(
+                        right.x, up.x, -forward.x, 0.0f,
+                        right.y, up.y, -forward.y, 0.0f,
+                        right.z, up.z, -forward.z, 0.0f,
+                        0.0f,    0.0f, 0.0f,       1.0f
+                    );
+                    
+                    // Scale first, then rotate, then translate
+                    glm::mat4 model_matrix = glm::translate(glm::mat4(1.0f), position) * rotation_matrix;
+
+                    // Iterate through the sequence linked list (for multiple atlases)
+                    for (TTF_GPUAtlasDrawSequence *seq = sequence; seq != NULL; seq = seq->next)
+                    {
+                        Uint32 current_index_offset = static_cast<Uint32>(indices.size());
+                        Sint32 current_vertex_offset = static_cast<Sint32>(vertices.size());
+
+                        // Add vertices for this sequence
+                        for (int i = 0; i < seq->num_vertices; i++)
+                        {
+                            const SDL_FPoint pos2D = seq->xy[i];
+                            // Transform 2D quad vertex into 3D world space
+                            // Scale pixel coordinates to world space
+                            // Using -pos2D.y to flip Y-axis (SDL_ttf is Y-down, 3D space is Y-up)
+                            glm::vec4 pos3D_world = model_matrix * glm::vec4(-pos2D.x * pixel_to_world_scale, 
+                                                                              pos2D.y * pixel_to_world_scale, 
+                                                                              0.0f, 1.0f);
+
+                            TextVertex vert;
+                            vert.pos = glm::vec3(pos3D_world);
+                            vert.colour = color;
+                            vert.uv = glm::vec2(seq->uv[i].x, seq->uv[i].y);
+                            vertices.push_back(vert);
+                        }
+
+                        // Add indices for this sequence
+                        for (int i = 0; i < seq->num_indices; i++)
+                        {
+                            // Add the base vertex offset to the local index
+                            indices.push_back(current_vertex_offset + seq->indices[i]);
+                        }
+
+                        // Add a draw call for this atlas texture
+                        draw_calls.push_back({.atlas_texture = seq->atlas_texture,
+                                              .index_count = static_cast<Uint32>(seq->num_indices),
+                                              .index_offset = current_index_offset,
+                                              .base_vertex = current_vertex_offset});
+                    }
                 }
 
+                // Call this once per frame *before* queueing new text
                 void cpu_update()
                 {
+                    // Clear data from previous frame
+                    vertices.clear();
+                    indices.clear();
+                    draw_calls.clear();
 
+                    // Free all TTF_Text objects
+                    for (TTF_Text *text_obj : managed_text_objects)
+                    {
+                        TTF_DestroyText(text_obj);
+                    }
+                    managed_text_objects.clear();
                 }
 
                 void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
+                    if (vertices.empty() || indices.empty())
+                        return;
 
+                    // Resize GPU buffers if needed
+                    size_t vertex_buffer_size = vertices.size() * sizeof(TextVertex);
+
+                    if (vertex_buffer)
+                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
+                    SDL_GPUBufferCreateInfo vbf_info = {.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+                                                        .size = static_cast<Uint32>(vertex_buffer_size)};
+                    vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vbf_info);
+
+                    size_t index_buffer_size = indices.size() * sizeof(Uint32);
+
+                    if (index_buffer)
+                        SDL_ReleaseGPUBuffer(gpu_device, index_buffer);
+                    SDL_GPUBufferCreateInfo ibf_info = {.usage = SDL_GPU_BUFFERUSAGE_INDEX,
+                                                        .size = static_cast<Uint32>(index_buffer_size)};
+                    index_buffer = SDL_CreateGPUBuffer(gpu_device, &ibf_info);
+
+                    // Upload data
+                    upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
+                    upload_buffer->upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
                 }
 
-                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass, const glm::mat4 &vp)
+                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
+                                 const glm::mat4 &vp)
                 {
-                    
+                    if (draw_calls.empty() || !vertex_buffer || !index_buffer || !text_pipeline)
+                        return;
+
+                    // Bind pipeline and buffers once
+                    SDL_BindGPUGraphicsPipeline(render_pass, text_pipeline);
+
+                    // Iterate through the draw calls, binding atlases as needed
+                    for (const auto &call : draw_calls)
+                    {
+                        // Push the View-Projection matrix
+                        SDL_PushGPUVertexUniformData(command_buffer, 0, &vp[0][0], sizeof(vp));
+
+                        SDL_GPUBufferBinding v_binding = {vertex_buffer, 0};
+                        SDL_BindGPUVertexBuffers(render_pass, 0, &v_binding, 1);
+
+                        SDL_GPUBufferBinding i_binding = {index_buffer, 0};
+                        SDL_BindGPUIndexBuffer(render_pass, &i_binding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+                        SDL_GPUTextureSamplerBinding sampler_binding = {.texture = call.atlas_texture,
+                                                                        .sampler = sampler};
+                        SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
+
+                        // Draw the primitives for this batch
+                        SDL_DrawGPUIndexedPrimitives(render_pass, call.index_count, 1, call.index_offset,
+                                                     call.base_vertex, 0);
+                    }
                 }
         };
 
@@ -467,15 +735,16 @@ class Visualizer
         ParameterStore &parameter_store;
         std::unordered_map<std::string, RenderTarget> &render_targets;
         EventData &event_data;
+        Scrubber *scrubber = nullptr;
 
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
 
         GridRenderer *grid_renderer = nullptr;
         PointsRenderer *points_renderer = nullptr;
+        TextRenderer *text_renderer = nullptr;
 
         SDL_GPUGraphicsPipeline *frame_pipeline = nullptr;
-        SDL_GPUGraphicsPipeline *text_pipeline = nullptr;
 
         // Mouse state for camera orbiting
         bool is_mouse_dragging = false;
@@ -485,10 +754,10 @@ class Visualizer
 
     public:
         Visualizer(ParameterStore &parameter_store, std::unordered_map<std::string, RenderTarget> &render_targets,
-                   EventData &event_data, Scrubber *scrubber, SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
-                   SDL_GPUCopyPass *copy_pass)
-            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), window(window),
-              gpu_device(gpu_device)
+                   EventData &event_data, Scrubber *scrubber, SDL_Window *window, SDL_GPUDevice *gpu_device,
+                   UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), scrubber(scrubber),
+              window(window), gpu_device(gpu_device)
         {
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
@@ -514,11 +783,13 @@ class Visualizer
             };
             render_targets["VisualizerDepth"] = {SDL_CreateGPUTexture(gpu_device, &depth_create_info),
                                                  depth_create_info.width, depth_create_info.height};
-            
+
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
             grid_renderer = new GridRenderer(parameter_store, gpu_device, upload_buffer, copy_pass);
-            points_renderer = new PointsRenderer(parameter_store, event_data, scrubber, gpu_device, upload_buffer, copy_pass);
+            points_renderer =
+                new PointsRenderer(parameter_store, event_data, scrubber, gpu_device, upload_buffer, copy_pass);
+            text_renderer = new TextRenderer(parameter_store, gpu_device);
         }
 
         ~Visualizer()
@@ -531,7 +802,10 @@ class Visualizer
             {
                 delete points_renderer;
             }
-
+            if (text_renderer)
+            {
+                delete text_renderer;
+            }
             SDL_ReleaseGPUTexture(gpu_device, render_targets["VisualizerDepth"].texture);
             SDL_ReleaseGPUTexture(gpu_device, render_targets["VisualizerColor"].texture);
         }
@@ -608,12 +882,51 @@ class Visualizer
         {
             grid_renderer->cpu_update();
             points_renderer->cpu_update();
+            text_renderer->cpu_update();
+
+            // Add timestamp labels for each z subdivision
+            if (!scrubber)
+                return;
+
+            // Get z subdivisions from parameter store
+            uint32_t z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
+            
+            // Get depth range from scrubber
+            float lower_depth = scrubber->get_lower_depth();
+            float upper_depth = scrubber->get_upper_depth();
+            float depth_range = upper_depth - lower_depth;
+
+            // Position for labels: near the bottom of the grid (Y = -1.0f), slightly offset in X
+            // Normal vector points towards the camera (along Z axis)
+            glm::vec3 text_position = {1.0f, -1.0f, 0.0f};
+            glm::vec3 text_normal = {1.0f, 0.0f, 0.0f};
+            SDL_FColor text_color = {0.0f, 0.0f, 0.0f, 1.0f}; // White color
+
+            // Add labels for each z subdivision
+            for (uint32_t i = 0; i <= z_subdivisions; ++i)
+            {
+                // Calculate normalized Z position [-1, 1]
+                float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(z_subdivisions) - 1.0f;
+                
+                // Convert normalized Z to actual depth value
+                float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
+                
+                // Format timestamp as string with reasonable precision
+                std::string timestamp_str = std::format("{:.2f}", timestamp);
+                
+                // Position text at the corresponding Z subdivision
+                text_position.z = normalized_z;
+                
+                // Add the text
+                text_renderer->add_text(timestamp_str, text_position, text_normal, text_color);
+            }
         }
 
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
             grid_renderer->copy_pass(upload_buffer, copy_pass);
             points_renderer->copy_pass(upload_buffer, copy_pass);
+            text_renderer->copy_pass(upload_buffer, copy_pass);
         }
 
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
@@ -646,16 +959,18 @@ class Visualizer
                 SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
 
             // Calculate MVP matrix for the grid
-            glm::mat4 model = glm::mat4(1.0f); // Identity matrix for now
             glm::mat4 view = camera.getViewMatrix();
             glm::mat4 projection = camera.getProjectionMatrix();
-            glm::mat4 mvp = projection * view * model;
+            glm::mat4 vp = projection * view;
 
             // Render the grid
-            grid_renderer->render_pass(command_buffer, render_pass, mvp);
+            grid_renderer->render_pass(command_buffer, render_pass, vp);
 
             // Render the points
-            points_renderer->render_pass(command_buffer, render_pass, mvp);
+            points_renderer->render_pass(command_buffer, render_pass, vp);
+
+            // Render the text
+            text_renderer->render_pass(command_buffer, render_pass, vp);
 
             SDL_EndGPURenderPass(render_pass);
         }
