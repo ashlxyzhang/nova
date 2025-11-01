@@ -12,8 +12,6 @@ class DataWriter
 
     private:
         std::shared_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
-        int32_t camera_width;
-        int32_t camera_height;
 
         std::mutex writer_lock; // For thread safety
 
@@ -24,9 +22,7 @@ class DataWriter
         std::queue<dv::Frame> writer_frame_queue;
 
     public:
-        DataWriter()
-            : data_writer_ptr{}, camera_width{}, camera_height{}, writer_lock{}, writer_event_queue{},
-              writer_frame_queue{}
+        DataWriter() : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}
         {
         }
 
@@ -37,19 +33,16 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
             data_writer_ptr.reset();
-            camera_width = 0;
-            camera_height = 0;
             // Clear queues
-            while(!writer_event_queue.empty())
+            while (!writer_event_queue.empty())
             {
                 writer_event_queue.pop();
             }
 
-            while(!writer_frame_queue.empty())
+            while (!writer_frame_queue.empty())
             {
                 writer_frame_queue.pop();
             }
-
         }
 
         /**
@@ -58,16 +51,21 @@ class DataWriter
          * @param camera_width Width of camera resolution.
          * @param camera_height Height of camera resolution.
          */
-        bool init_data_writer(const std::string &file_name, int32_t camera_width, int32_t camera_height)
+        bool init_data_writer(const std::string &file_name, int32_t _camera_event_width, int32_t _camera_event_height,
+                              int32_t _camera_frame_width, int32_t _camera_frame_height)
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
-            const auto writer_config{
-                dv::io::MonoCameraWriter::DAVISConfig("DAVISConfig", cv::Size(camera_height, camera_width))};
+            const auto writer_config{dv::io::MonoCameraWriter::DAVISConfig(
+                "DAVISConfig", cv::Size(std::max(_camera_event_width, _camera_frame_width),
+                                        std::max(_camera_event_height, _camera_frame_height)))};
             std::string file_name_appended{file_name};
-            file_name_appended.append(".aedat4");
+            if(!file_name_appended.ends_with(".aedat4"))
+            {
+                file_name_appended.append(".aedat4");
+            }
             data_writer_ptr = std::make_shared<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
 
             writer_lock_ul.unlock();

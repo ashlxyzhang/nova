@@ -88,6 +88,13 @@ class DigitalCodedExposure
         }
         void cpu_update()
         {
+            event_data.lock_data_vectors();
+            if (event_data.get_evt_vector_ref().empty())
+            {
+                event_data.unlock_data_vectors();
+                return;
+            }
+            event_data.unlock_data_vectors();
             bool file_changed = false;
 
             file_changed = parameter_store->exists("streaming") && parameter_store->exists("stream_file_changed") &&
@@ -103,8 +110,8 @@ class DigitalCodedExposure
             if (file_changed)
             {
 
-                width = event_data.get_camera_resolution().x;
-                height = event_data.get_camera_resolution().y;
+                width = event_data.get_camera_event_resolution().x;
+                height = event_data.get_camera_event_resolution().y;
 
                 if (width == 0 || height == 0)
                 {

@@ -12,6 +12,20 @@
 #include "Scrubber.hh"
 
 #include "fonts/CascadiaCode.ttf.h"
+// Declared here to use with callback functions.
+// States that the program is in
+
+namespace
+{
+    enum class PROGRAM_STATE : uint8_t
+    {
+        IDLE = 0, // Program is in idle state doing no reading
+        FILE_READ = 1, // Program is reading from a file
+        FILE_STREAM = 2, // Program is streaming from a file
+        CAMERA_STREAM = 3 // Program is streaming from a camera
+    };
+}
+
 
 // Callback used with SDL_ShowOpenFileDialog in draw_load_file_window
 inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
@@ -24,7 +38,10 @@ inline void SDLCALL load_file_handle_callback(void *param_store, const char *con
             std::string file_name{*data_file_list};
             param_store_ptr->add("load_file_name", file_name);
             param_store_ptr->add("load_file_changed", true);
-            param_store_ptr->add("streaming", false); // Determines if program is streaming
+            param_store_ptr->add("program_state", static_cast<uint8_t>(PROGRAM_STATE::FILE_READ)); // Determines if program is streaming
+            
+            // reset camera streams
+            param_store_ptr->add("camera_changed", true);
         }
     }
     else
@@ -33,7 +50,7 @@ inline void SDLCALL load_file_handle_callback(void *param_store, const char *con
     }
 }
 
-// Callback used with SDL_ShowOpenFileDialog in draw_stream_file_window
+// Callback used with SDL_ShowOpenFileDialog in draw_stream_window
 inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
 {
     ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
@@ -44,7 +61,9 @@ inline void SDLCALL stream_file_handle_callback(void *param_store, const char *c
             std::string file_name{*data_file_list};
             param_store_ptr->add("stream_file_name", file_name);
             param_store_ptr->add("stream_file_changed", true);
-            param_store_ptr->add("streaming", true); // Determines if program is streaming
+            param_store_ptr->add("program_state", static_cast<uint8_t>(PROGRAM_STATE::FILE_STREAM)); // Determines if program is streaming
+
+            param_store_ptr->add("camera_changed", true);
         }
     }
     else
@@ -118,6 +137,36 @@ class GUI
                 }
             }
             return min;
+        }
+
+        // Draw error popup window()
+        void draw_error_popup_window()
+        {
+            
+            if(parameter_store -> exists("pop_up_err_str") && parameter_store -> get<std::string>("pop_up_err_str") != std::string{""})
+            {
+                // Error string found, open pop up
+                ImGui::OpenPopup("Error");
+
+                ImGui::BeginPopup("Error");
+                // Stop loading
+                parameter_store->add("program_state", static_cast<uint8_t>(GUI::PROGRAM_STATE::IDLE));
+
+                std::string pop_up_err_str{parameter_store->get<std::string>("pop_up_err_str")};
+                ImGui::Text("%s", pop_up_err_str.c_str());
+                
+                
+                if(ImGui::Button("Acknowledged"))
+                {
+                    parameter_store->add("pop_up_err_str", std::string{""}); // Reset popup window
+
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+
+            
+
         }
 
         // Recreate info window from old NOVA
@@ -383,10 +432,65 @@ class GUI
             ImGui::End();
         }
 
-        void draw_stream_file_window()
+        void draw_stream_window()
         {
             ImGui::Begin("Streaming");
-            ImGui::Text("Streaming File:");
+            ImGui::Text("Stream From Camera:");
+            if(ImGui::Button("Scan For Cameras"))
+            {
+                parameter_store->add("start_camera_scan", true);
+            }
+
+            if(!parameter_store->exists("camera_index"))
+            {
+                parameter_store->add("camera_index", -1);
+            }
+
+            int32_t camera_index = parameter_store->get<int32_t>("camera_index");
+            int32_t camera_index_copy{camera_index};
+
+            if(!parameter_store->exists("discovered_cameras"))
+            {
+                parameter_store->add("discovered_cameras", std::string{""});
+            }
+
+            std::string discovered_cameras{parameter_store->get<std::string>("discovered_cameras")};
+            ImGui::Combo("Camera", &camera_index, discovered_cameras.c_str());
+
+            if(camera_index_copy != camera_index) // Different camera chosen
+            {
+                parameter_store->add("camera_changed", true);
+            }
+
+            //std::cout << "CAMERA INDEX: " << camera_index << std::endl;
+            parameter_store->add("camera_index", camera_index);
+
+            if(!parameter_store->exists("program_state"))
+            {
+                parameter_store->add("program_state", static_cast<uint8_t>(GUI::PROGRAM_STATE::IDLE));
+            }
+
+            GUI::PROGRAM_STATE program_state{static_cast<GUI::PROGRAM_STATE>(parameter_store->get<uint8_t>("program_state"))};
+
+            if(ImGui::Button(program_state == GUI::PROGRAM_STATE::CAMERA_STREAM ? "Streaming..." : "Stream From Camera"))
+            {
+                parameter_store->add("program_state", static_cast<uint8_t>(GUI::PROGRAM_STATE::CAMERA_STREAM));
+            }
+            
+            if (!parameter_store->exists("camera_stream_paused"))
+            {
+                parameter_store->add("camera_stream_paused", false);
+            }
+
+            bool camera_stream_paused{parameter_store->get<bool>("camera_stream_paused")};
+            // Pause or resume stream
+            if (ImGui::Button(camera_stream_paused ? "Camera Resume" : "Camera Pause"))
+            {
+                parameter_store->add("camera_stream_paused", !camera_stream_paused); // Toggle whether stream is paused
+            }
+
+            ImGui::Separator();
+            ImGui::Text("Stream From File:");
             if (ImGui::Button("Open File To Stream"))
             {
                 SDL_ShowOpenFileDialog(stream_file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
@@ -404,6 +508,7 @@ class GUI
                 parameter_store->add("stream_paused", !stream_paused); // Toggle whether stream is paused
             }
 
+            ImGui::Separator();
             if(!parameter_store->exists("stream_save"))
             {
                 parameter_store->add("stream_save", false);
@@ -778,7 +883,7 @@ class GUI
             ImGui::End();
         }
     public:
-        enum class TIME
+        enum class TIME : uint8_t
         {
             UNIT_S = 0,
             UNIT_MS = 1,
@@ -789,6 +894,14 @@ class GUI
         {
             TIME_BASED = 0,
             EVENT_BASED = 1
+        };
+
+        enum class PROGRAM_STATE : uint8_t
+        {
+            IDLE = 0,
+            FILE_READ = 1, // Program is reading from a file
+            FILE_STREAM = 2, // Program is streaming from a file
+            CAMERA_STREAM = 3 // Program is streaming from a camera
         };
 
         GUI(std::unordered_map<std::string, RenderTarget> &render_targets, ParameterStore *parameter_store,
@@ -866,6 +979,9 @@ class GUI
                 check_for_layout_file = false;
             }
 
+            // draw error popup
+            draw_error_popup_window();
+
             // Draw info block
             draw_info_window();
 
@@ -873,7 +989,7 @@ class GUI
             draw_debug_window(fps);
             draw_load_file_window();
             draw_digital_coded_exposure();
-            draw_stream_file_window();
+            draw_stream_window();
             draw_scrubber_window();
             // Create a simple demo window
             ImGui::ShowDemoWindow();
@@ -939,5 +1055,6 @@ class GUI
             // }
         }
 };
+
 
 #endif // GUI_HH
