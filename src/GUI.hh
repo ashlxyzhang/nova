@@ -13,64 +13,13 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 // Declared here to use with callback functions.
-// States that the program is in
-
-namespace
-{
-    enum class PROGRAM_STATE : uint8_t
-    {
-        IDLE = 0, // Program is in idle state doing no reading
-        FILE_READ = 1, // Program is reading from a file
-        FILE_STREAM = 2, // Program is streaming from a file
-        CAMERA_STREAM = 3 // Program is streaming from a camera
-    };
-}
-
 
 // Callback used with SDL_ShowOpenFileDialog in draw_load_file_window
-inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
-{
-    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
-    if (data_file_list)
-    {
-        if (*data_file_list)
-        {
-            std::string file_name{*data_file_list};
-            param_store_ptr->add("load_file_name", file_name);
-            param_store_ptr->add("load_file_changed", true);
-            param_store_ptr->add("program_state", static_cast<uint8_t>(PROGRAM_STATE::FILE_READ)); // Determines if program is streaming
-            
-            // reset camera streams
-            param_store_ptr->add("camera_changed", true);
-        }
-    }
-    else
-    {
-        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
-    }
-}
+inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused);
 
 // Callback used with SDL_ShowOpenFileDialog in draw_stream_window
-inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
-{
-    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
-    if (data_file_list)
-    {
-        if (*data_file_list)
-        {
-            std::string file_name{*data_file_list};
-            param_store_ptr->add("stream_file_name", file_name);
-            param_store_ptr->add("stream_file_changed", true);
-            param_store_ptr->add("program_state", static_cast<uint8_t>(PROGRAM_STATE::FILE_STREAM)); // Determines if program is streaming
+inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused);
 
-            param_store_ptr->add("camera_changed", true);
-        }
-    }
-    else
-    {
-        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
-    }
-}
 
 class GUI
 {
@@ -150,7 +99,7 @@ class GUI
 
                 ImGui::BeginPopup("Error");
                 // Stop loading
-                parameter_store->add("program_state", static_cast<uint8_t>(GUI::PROGRAM_STATE::IDLE));
+                parameter_store->add("program_state", GUI::PROGRAM_STATE::IDLE);
 
                 std::string pop_up_err_str{parameter_store->get<std::string>("pop_up_err_str")};
                 ImGui::Text("%s", pop_up_err_str.c_str());
@@ -467,14 +416,18 @@ class GUI
 
             if(!parameter_store->exists("program_state"))
             {
-                parameter_store->add("program_state", static_cast<uint8_t>(GUI::PROGRAM_STATE::IDLE));
+                parameter_store->add("program_state", GUI::PROGRAM_STATE::IDLE);
             }
 
-            GUI::PROGRAM_STATE program_state{static_cast<GUI::PROGRAM_STATE>(parameter_store->get<uint8_t>("program_state"))};
+            GUI::PROGRAM_STATE program_state{parameter_store->get<GUI::PROGRAM_STATE>("program_state")};
 
             if(ImGui::Button(program_state == GUI::PROGRAM_STATE::CAMERA_STREAM ? "Streaming..." : "Stream From Camera"))
             {
-                parameter_store->add("program_state", static_cast<uint8_t>(GUI::PROGRAM_STATE::CAMERA_STREAM));
+                if(program_state != GUI::PROGRAM_STATE::CAMERA_STREAM)
+                {
+                    parameter_store->add("camera_changed", true); // Reset reader
+                }
+                parameter_store->add("program_state", GUI::PROGRAM_STATE::CAMERA_STREAM);
             }
             
             if (!parameter_store->exists("camera_stream_paused"))
@@ -509,6 +462,7 @@ class GUI
             }
 
             ImGui::Separator();
+            ImGui::Text("Stream Save Options:");
             if(!parameter_store->exists("stream_save"))
             {
                 parameter_store->add("stream_save", false);
@@ -1056,5 +1010,49 @@ class GUI
         }
 };
 
+// Callback used with SDL_ShowOpenFileDialog in draw_load_file_window
+inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
+{
+    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
+    if (data_file_list)
+    {
+        if (*data_file_list)
+        {
+            std::string file_name{*data_file_list};
+            param_store_ptr->add("load_file_name", file_name);
+            param_store_ptr->add("load_file_changed", true);
+            param_store_ptr->add("program_state", GUI::PROGRAM_STATE::FILE_READ); // Determines if program is streaming
+            
+            // reset camera streams
+            param_store_ptr->add("camera_changed", true);
+        }
+    }
+    else
+    {
+        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
+
+// Callback used with SDL_ShowOpenFileDialog in draw_stream_window
+inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
+{
+    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
+    if (data_file_list)
+    {
+        if (*data_file_list)
+        {
+            std::string file_name{*data_file_list};
+            param_store_ptr->add("stream_file_name", file_name);
+            param_store_ptr->add("stream_file_changed", true);
+            param_store_ptr->add("program_state", GUI::PROGRAM_STATE::FILE_STREAM); // Determines if program is streaming
+
+            param_store_ptr->add("camera_changed", true);
+        }
+    }
+    else
+    {
+        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
 
 #endif // GUI_HH

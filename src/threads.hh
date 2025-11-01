@@ -38,7 +38,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
         if(param_store.exists("program_state"))
         {
             
-            GUI::PROGRAM_STATE prog_state{static_cast<GUI::PROGRAM_STATE>(param_store.get<uint8_t>("program_state"))};
+            GUI::PROGRAM_STATE prog_state{param_store.get<GUI::PROGRAM_STATE>("program_state")};
             switch(prog_state)
             {
                 case GUI::PROGRAM_STATE::FILE_READ: // Case for reading from file
@@ -182,6 +182,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 
                         if(param_store.get<bool>("camera_changed"))
                         {
+                            evt_data.clear();
+                            
                             bool init_success{data_acq.init_camera_reader(param_store.get<int32_t>("camera_index"), param_store)};
 
                             if(init_success)
@@ -235,30 +237,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             data_acq.get_batch_evt_data(evt_data, param_store, data_writer);
                             data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
 
-                            // Test to ensure event/frame data was added and is ordered
-                            // evt_data.lock_data_vectors();
-
-                            // const auto &event_data{evt_data.get_evt_vector_ref()};
-
-                            // for (size_t i = 1; i < event_data.size(); ++i)
-                            // {
-                            //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                            //     // std::cout << "AT i: " << i << " INDEX: " <<
-                            //     // evt_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
-                            // }
-
-                            // const auto &frame_data{evt_data.get_frame_vector_ref()};
-                            // std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
-
-                            // for (size_t i = 1; i < frame_data.size(); ++i)
-                            // {
-                            //     std::cout << "AT i: " << i << " TIMESTAMP: " << frame_data[i].second << std::endl;
-                            //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-                            //     std::cout << "RETRIEVED: " << evt_data.get_frame_index_from_timestamp(frame_data[i].second)
-                            //     << std::endl;
-                            // }
-
-                            // evt_data.unlock_data_vectors();
+                            
                         }
 
 
