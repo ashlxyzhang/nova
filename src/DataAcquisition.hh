@@ -11,7 +11,7 @@ class DataAcquisition
 {
 
     private:
-        std::shared_ptr<dv::io::MonoCameraRecording> data_reader_ptr;
+        std::unique_ptr<dv::io::InputBase> data_reader_ptr;
         int32_t camera_width;
         int32_t camera_height;
 
@@ -33,7 +33,7 @@ class DataAcquisition
          * @param file_name the name of the data file to read.
          * @return false if failed to init reader, true otherwise.
          */
-        bool init_reader(std::string file_name)
+        bool init_file_reader(std::string file_name)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
             // FROM OLD NOVA source code
@@ -46,7 +46,7 @@ class DataAcquisition
                 return false;
             }
 
-            data_reader_ptr = std::make_shared<dv::io::MonoCameraRecording>(file_name);
+            data_reader_ptr = std::make_unique<dv::io::MonoCameraRecording>(file_name);
             camera_width = data_reader_ptr->getEventResolution().value().width;
             camera_height = data_reader_ptr->getEventResolution().value().height;
             acq_lock_ul.unlock();

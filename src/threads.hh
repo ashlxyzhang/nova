@@ -46,7 +46,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 
                     evt_data.clear();
                     data_writer.clear();
-                    bool init_success{data_acq.init_reader(load_file_name)};
+                    bool init_success{data_acq.init_file_reader(load_file_name)};
 
                     if (init_success)
                     {
@@ -85,7 +85,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                 {
                     std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
                     evt_data.clear();
-                    bool init_success{data_acq.init_reader(stream_file_name)};
+                    bool init_success{data_acq.init_file_reader(stream_file_name)};
                     if (init_success)
                     {
                         data_acq.get_camera_resolution(evt_data);
