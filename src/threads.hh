@@ -59,6 +59,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                                 data_acq.get_all_evt_data(evt_data, param_store, data_writer);
                                 data_acq.get_all_frame_data(evt_data, param_store, data_writer);
                                 param_store.add("load_file_changed", false);
+                                param_store.add("resolution_initialized", true); // Need to communicate with DCE
 
                                 // Test to ensure event/frame data was added and is ordered
                                 // evt_data.lock_data_vectors();
@@ -98,6 +99,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                                 data_acq.get_camera_event_resolution(evt_data);
                                 data_acq.get_camera_frame_resolution(evt_data);
                                 param_store.add("stream_file_changed", false);
+                                param_store.add("resolution_initialized", true); // Need to communicate with DCE
                             }
 
                             // If gui indicates writing needs to be done, then set up writer for writing
@@ -187,6 +189,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                                 data_acq.get_camera_event_resolution(evt_data);
                                 data_acq.get_camera_frame_resolution(evt_data);
                                 param_store.add("camera_changed", false);
+                                param_store.add("resolution_initialized", true); // Need to communicate with DCE
                             }
 
                             // If gui indicates writing needs to be done, then set up writer for writing
