@@ -73,8 +73,11 @@ class EventData
             evt_data_vector_relative.clear();
             frame_data_vector_relative.clear();
 
-            camera_width = 0;
-            camera_height = 0;
+            camera_event_width = 0;
+            camera_event_height = 0;
+
+            camera_frame_width = 0;
+            camera_frame_height = 0;
 
             evt_data_vector_need_update = false;
             frame_data_vector_need_update = false;
@@ -107,22 +110,47 @@ class EventData
          * @param width Width of camera.
          * @param height Height of camera.
          */
-        void set_camera_resolution(int32_t width, int32_t height)
+        void set_camera_event_resolution(int32_t width, int32_t height)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            camera_width = width;
-            camera_height = height;
+            camera_event_width = width;
+            camera_event_height = height;
             evt_lock_ul.unlock();
         }
 
         /**
-         * Gets camera resolution.
-         * @return camera resolution as glm::vec2 (width, height).
+         * Sets camera resolution for frame data.
+         * @param width Width of camera.
+         * @param height Height of camera.
          */
-        glm::vec2 get_camera_resolution()
+        void set_camera_frame_resolution(int32_t width, int32_t height)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            glm::vec2 camera_res{static_cast<float>(camera_width), static_cast<float>(camera_height)};
+            camera_frame_width = width;
+            camera_frame_height = height;
+            evt_lock_ul.unlock();
+        }
+
+        /**
+         * Gets event camera resolution.
+         * @return event camera resolution as glm::vec2 (width, height).
+         */
+        glm::vec2 get_camera_event_resolution()
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            glm::vec2 camera_res{static_cast<float>(camera_event_width), static_cast<float>(camera_event_height)};
+            evt_lock_ul.unlock();
+            return camera_res;
+        }
+
+        /**
+         * Gets frame camera resolution.
+         * @return frame camera resolution as glm::vec2 (width, height).
+         */
+        glm::vec2 get_camera_frame_resolution()
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            glm::vec2 camera_res{static_cast<float>(camera_frame_width), static_cast<float>(camera_frame_height)};
             evt_lock_ul.unlock();
             return camera_res;
         }
@@ -384,8 +412,11 @@ class EventData
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
 
         // Set camera resolution
-        int32_t camera_width;
-        int32_t camera_height;
+        int32_t camera_event_width;
+        int32_t camera_event_height;
+
+        int32_t camera_frame_width;
+        int32_t camera_frame_height;
 
         bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
         bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are

@@ -11,9 +11,7 @@ class DataWriter
 {
 
     private:
-        std::shared_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
-        int32_t camera_width;
-        int32_t camera_height;
+        std::unique_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
 
         std::mutex writer_lock; // For thread safety
 
@@ -23,11 +21,39 @@ class DataWriter
         // Queue of frame data
         std::queue<dv::Frame> writer_frame_queue;
 
+        // Determine if writing event or frame data
+        bool writing_frame_data;
+        bool writing_event_data;
+
     public:
         DataWriter()
-            : data_writer_ptr{}, camera_width{}, camera_height{}, writer_lock{}, writer_event_queue{},
-              writer_frame_queue{}
+            : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{},
+              writing_event_data{}
         {
+        }
+
+        /**
+         * @brief Getter for writing_frame_data
+         * @return value of writing_frame_data
+         */
+        bool get_writing_frame_data()
+        {
+            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            bool ret_bool{writing_frame_data};
+            writer_lock_ul.unlock();
+            return ret_bool;
+        }
+
+        /**
+         * @brief Getter for writing_event_data
+         * @return value of writing_event_data
+         */
+        bool get_writing_event_data()
+        {
+            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            bool ret_bool{writing_event_data};
+            writer_lock_ul.unlock();
+            return ret_bool;
         }
 
         /**
@@ -37,38 +63,72 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
             data_writer_ptr.reset();
-            camera_width = 0;
-            camera_height = 0;
             // Clear queues
-            while(!writer_event_queue.empty())
+            while (!writer_event_queue.empty())
             {
                 writer_event_queue.pop();
             }
 
-            while(!writer_frame_queue.empty())
+            while (!writer_frame_queue.empty())
             {
                 writer_frame_queue.pop();
             }
-
+            writer_lock_ul.unlock();
         }
 
         /**
          * @brief Initializes writer with DAVIS camera configs (event, frame, and IMU data).
          * @param file_name Output file of data.
-         * @param camera_width Width of camera resolution.
-         * @param camera_height Height of camera resolution.
+         * @param _camera_event_width Width of camera event resolution.
+         * @param _camera_event_height Height of camera event resolution.
+         * @param _camera_frame_width Width of camera frame resolution.
+         * @param _camera_frame_height Height of camera frame resolution.
+         * @param event_data True if event stream is being written.
+         * @param frame_data True if frame stream is being written.
+         * @param param_store ParameterStore object to store error message into
+         * @return true if successful initialization of data writer, false otherwise.
          */
-        bool init_data_writer(const std::string &file_name, int32_t camera_width, int32_t camera_height)
+        bool init_data_writer(const std::string &file_name, int32_t _camera_event_width, int32_t _camera_event_height,
+                              int32_t _camera_frame_width, int32_t _camera_frame_height, bool event_data,
+                              bool frame_data, ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
-            const auto writer_config{
-                dv::io::MonoCameraWriter::DAVISConfig("DAVISConfig", cv::Size(camera_height, camera_width))};
-            std::string file_name_appended{file_name};
-            file_name_appended.append(".aedat4");
-            data_writer_ptr = std::make_shared<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
+            try
+            {
+                dv::io::MonoCameraWriter::Config writer_config("Save Config");
+
+                cv::Size file_res{std::max(_camera_event_width, _camera_frame_width),
+                                  std::max(_camera_event_height, _camera_frame_height)};
+
+                writing_event_data = event_data;
+                writing_frame_data = frame_data;
+                if (event_data)
+                {
+                    writer_config.addEventStream(file_res);
+                }
+
+                if (frame_data)
+                {
+                    writer_config.addFrameStream(file_res);
+                }
+
+                std::string file_name_appended{file_name};
+                if (!file_name_appended.ends_with(".aedat4"))
+                {
+                    file_name_appended.append(".aedat4");
+                }
+                data_writer_ptr = std::make_unique<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
+            }
+            catch (...)
+            {
+                std::string pop_up_err_str{"Something went wrong initializing file to save to!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                writer_lock_ul.unlock();
+                return false;
+            }
 
             writer_lock_ul.unlock();
 
@@ -104,7 +164,7 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
-            if (writer_event_queue.empty() || !data_writer_ptr)
+            if (writer_event_queue.empty() || !data_writer_ptr || !writing_event_data)
             {
                 writer_lock_ul.unlock();
                 return false;
@@ -128,7 +188,7 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
-            if (writer_frame_queue.empty() || !data_writer_ptr)
+            if (writer_frame_queue.empty() || !data_writer_ptr || !writing_frame_data)
             {
                 writer_lock_ul.unlock();
                 return false;

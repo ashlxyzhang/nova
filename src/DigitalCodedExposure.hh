@@ -88,23 +88,19 @@ class DigitalCodedExposure
         }
         void cpu_update()
         {
-            bool file_changed = false;
-
-            file_changed = parameter_store->exists("streaming") && parameter_store->exists("stream_file_changed") &&
-                           (parameter_store->get<bool>("streaming") &&
-                            (last_file != parameter_store->get<std::string>("stream_file_name")));
-
-            if (parameter_store->exists("load_file_name") &&
-                last_file != parameter_store->get<std::string>("load_file_name"))
+            event_data.lock_data_vectors();
+            if (event_data.get_evt_vector_ref().empty())
             {
-                file_changed = true;
+                event_data.unlock_data_vectors();
+                return;
             }
+            event_data.unlock_data_vectors();
 
-            if (file_changed)
+            if (parameter_store->exists("resolution_initialized") && parameter_store->get<bool>("resolution_initialized"))
             {
 
-                width = event_data.get_camera_resolution().x;
-                height = event_data.get_camera_resolution().y;
+                width = event_data.get_camera_event_resolution().x;
+                height = event_data.get_camera_event_resolution().y;
 
                 if (width == 0 || height == 0)
                 {
@@ -125,6 +121,7 @@ class DigitalCodedExposure
 
                 render_targets["DigitalCodedExposure"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), width,
                                                           height};
+                parameter_store->add("resolution_initialized", false);
             }
         }
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)

@@ -6,14 +6,22 @@
 #include "EventData.hh"
 #include "ParameterStore.hh"
 #include <dv-processing/io/mono_camera_recording.hpp>
+#include <dv-processing/io/camera/discovery.hpp>
+#include <dv-processing/io/camera/usb_device.hpp>
+#include <vector>
 
 class DataAcquisition
 {
 
     private:
-        std::shared_ptr<dv::io::MonoCameraRecording> data_reader_ptr;
-        int32_t camera_width;
-        int32_t camera_height;
+
+        std::vector<dv::io::camera::USBDevice::DeviceDescriptor> scanned_cameras;
+        std::unique_ptr<dv::io::InputBase> data_reader_ptr;
+        int32_t camera_event_width;
+        int32_t camera_event_height;
+
+        int32_t camera_frame_width;
+        int32_t camera_frame_height;
 
         std::mutex acq_lock; // For thread safety
         // From old NOVA source code
@@ -24,16 +32,97 @@ class DataAcquisition
         };
 
     public:
-        DataAcquisition() : data_reader_ptr{}, camera_width{}, camera_height{}, acq_lock{}
+        DataAcquisition() : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{}, acq_lock{}
         {
+        }
+
+        /**
+         * Scan for cameras and populate parameter store with GUI values to choose from.
+         * @param param_store Parameter store to populate.
+         */
+        void discover_cameras(ParameterStore &param_store)
+        {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            // Remove previously scanned cameras
+            scanned_cameras.clear();
+
+            // Discover available cameras
+            // https://dv-processing.inivation.com/master/reading_data.html
+
+            const auto discovered_cameras{dv::io::camera::discover()};
+
+            std::stringstream str_stream{};
+
+            for(const auto &camera : discovered_cameras)
+            {
+                scanned_cameras.push_back(camera);
+                 // To ensure string conversion works
+                str_stream << "Model: " << camera.cameraModel << " ";
+                str_stream << "Serial Number: " << camera.serialNumber << "\0";
+            }
+
+            param_store.add("discovered_cameras", str_stream.str());
+
+            acq_lock_ul.unlock();
+        }
+
+        /**
+         * Loads camera to read. Initializes internal reader with camera.
+         * @param camera_index Index of camera in scanned_cameras vector to stream from.
+         * @param param_store param_store ParameterStore necessary for storing error messages in cases of failure.
+         * @return false if failed to init reader, true otherwise.
+         */
+        bool init_camera_reader(int32_t camera_index, ParameterStore &param_store)
+        {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+
+            if(camera_index < 0 || camera_index >= scanned_cameras.size())
+            {
+                acq_lock_ul.unlock();
+                return false;
+            }
+
+            try
+            {
+                data_reader_ptr = std::move(dv::io::camera::open(scanned_cameras[camera_index])); // Specify move semantics for unique pointer
+            }
+            catch(...)
+            {
+                std::string pop_up_err_str{"Something went wrong with reading the camera!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                acq_lock_ul.unlock();
+                return false;
+            }
+
+            if(data_reader_ptr->isEventStreamAvailable())
+            {
+                auto evt_resolution = data_reader_ptr->getEventResolution();
+                if(evt_resolution.has_value())
+                {
+                    camera_event_width = evt_resolution.value().width;
+                    camera_event_height = evt_resolution.value().height;
+                }
+            }
+            if(data_reader_ptr->isFrameStreamAvailable())
+            {
+                auto frame_resolution = data_reader_ptr->getFrameResolution();
+                if(frame_resolution.has_value())
+                {
+                    camera_frame_width = frame_resolution.value().width;
+                    camera_frame_height = frame_resolution.value().height;
+                }
+            }
+            acq_lock_ul.unlock();
+            return true;
         }
 
         /**
          * Loads file to read. Initializes internal reader with filename.
          * @param file_name the name of the data file to read.
+         * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
          */
-        bool init_reader(std::string file_name)
+        bool init_file_reader(std::string file_name, ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
             // FROM OLD NOVA source code
@@ -41,25 +130,61 @@ class DataAcquisition
             size_t extension_pos = file_name.find_last_of('.');
             if (extension_pos == std::string::npos || file_name.substr(extension_pos) != ".aedat4")
             {
-                std::cerr << "ERROR: File extension is not .aedat4" << std::endl;
+                std::string pop_up_err_str{"File extension is not .aedat4!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
             }
 
-            data_reader_ptr = std::make_shared<dv::io::MonoCameraRecording>(file_name);
-            camera_width = data_reader_ptr->getEventResolution().value().width;
-            camera_height = data_reader_ptr->getEventResolution().value().height;
+            try
+            {
+                data_reader_ptr = std::make_unique<dv::io::MonoCameraRecording>(file_name);
+            }
+            catch(...)
+            {
+                std::string pop_up_err_str{"Something went wrong while initializing file for reading!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                acq_lock_ul.unlock();
+                return false;
+            }
+            if(data_reader_ptr->isEventStreamAvailable())
+            {
+                auto evt_resolution = data_reader_ptr->getEventResolution();
+                if(evt_resolution.has_value())
+                {
+                    camera_event_width = evt_resolution.value().width;
+                    camera_event_height = evt_resolution.value().height;
+                }
+            }
+            if(data_reader_ptr->isFrameStreamAvailable())
+            {
+                auto frame_resolution = data_reader_ptr->getFrameResolution();
+                if(frame_resolution.has_value())
+                {
+                    camera_frame_width = frame_resolution.value().width;
+                    camera_frame_height = frame_resolution.value().height;
+                }
+            }
             acq_lock_ul.unlock();
             return true;
         }
 
         /**
-         * Gives camera resolution to event data.
-         * @param evt_data Event data to give camera resolution to.
+         * Gives event camera resolution to event data.
+         * @param evt_data EventData object to give camera resolution to.
          */
-        void get_camera_resolution(EventData &evt_data)
+        void get_camera_event_resolution(EventData &evt_data)
         {
-            evt_data.set_camera_resolution(camera_width, camera_height);
+            evt_data.set_camera_event_resolution(camera_event_width, camera_event_height);
+        }
+
+        /**
+         * Gives frame camera resolution to event data.
+         * @param evt_data EventData object to give camera resolution to.
+         */
+        void get_camera_frame_resolution(EventData &evt_data)
+        {
+            evt_data.set_camera_frame_resolution(camera_frame_width, camera_frame_height);
         }
 
         /**
@@ -107,34 +232,45 @@ class DataAcquisition
             float threshold{1.0f / param_store.get<float>("event_discard_odds")};
 
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-events-from-a-file
-            if (data_reader_ptr->isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
+
+            try
             {
-                if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
+                if (data_reader_ptr->isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
                 {
-                    // In case of persistent storage
-                    // https://dv-processing.inivation.com/master/event_store.html
-                    dv::EventStore event_store{};
-                    for (auto &evt : events.value())
+                    if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
                     {
-                        if (randFloat() > threshold) // Random discard
+                        // In case of persistent storage
+                        // https://dv-processing.inivation.com/master/event_store.html
+                        dv::EventStore event_store{};
+                        for (auto &evt : events.value())
                         {
-                            continue; // Discard
+                            if (randFloat() > threshold) // Random discard
+                            {
+                                continue; // Discard
+                            }
+                            EventData::EventDatum evt_datum{
+                                .x = evt.x(), .y = evt.y(), .timestamp = evt.timestamp(), .polarity = evt.polarity()};
+
+                            evt_data.write_evt_data(evt_datum);
+                            data_read = true;
+
+                            event_store.emplace_back(evt.timestamp(), evt.x(), evt.y(), evt.polarity());
                         }
-                        EventData::EventDatum evt_datum{
-                            .x = evt.x(), .y = evt.y(), .timestamp = evt.timestamp(), .polarity = evt.polarity()};
 
-                        evt_data.write_evt_data(evt_datum);
-                        data_read = true;
-
-                        event_store.emplace_back(evt.timestamp(), evt.x(), evt.y(), evt.polarity());
-                    }
-
-                    // Add to queue for persistent storage in case of persistent storage
-                    if (param_store.get<bool>("stream_save"))
-                    {
-                        data_writer.add_event_store(event_store);
+                        // Add to queue for persistent storage in case of persistent storage
+                        if (data_writer.get_writing_event_data())
+                        {
+                            data_writer.add_event_store(event_store);
+                        }
                     }
                 }
+            }
+            catch(...)
+            {
+                std::string pop_up_err_str{"Something went wrong with reading the data file!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                acq_lock_ul.unlock();
+                return false;
             }
             acq_lock_ul.unlock();
             return data_read;
@@ -156,53 +292,88 @@ class DataAcquisition
                 return false;
             }
             bool data_read = false;
+
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-frames-from-a-file
-            if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
-            {
-                if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
+
+            try{
+                if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
                 {
-                    cv::Mat out;
-                    // Convert frame data from BGR to RGB
-                    cv::cvtColor(frame_data->image, out, cv::COLOR_BGR2RGB);
-
-                    // CLone to ensure tightly packed frame bytes
-                    EventData::FrameDatum frame_datum{.frameData = out.clone(), .timestamp = frame_data->timestamp};
-
-                    evt_data.write_frame_data(frame_datum);
-                    data_read = true;
-
-                    // If saving stream, add to queue to write
-                    if (param_store.get<bool>("stream_save"))
+                    if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
                     {
-                        dv::Frame frame_datum(frame_data->timestamp, frame_data->image);
-                        data_writer.add_frame_data(frame_datum);
+                        cv::Mat out;
+                        // Convert frame data from BGR to RGB
+                        cv::cvtColor(frame_data->image, out, cv::COLOR_BGR2RGB);
+
+                        // CLone to ensure tightly packed frame bytes
+                        EventData::FrameDatum frame_datum{.frameData = out.clone(), .timestamp = frame_data->timestamp};
+
+                        evt_data.write_frame_data(frame_datum);
+                        data_read = true;
+
+                        // If saving stream, add to queue to write
+                        if (data_writer.get_writing_frame_data())
+                        {
+                            dv::Frame frame_datum(frame_data->timestamp, frame_data->image);
+                            data_writer.add_frame_data(frame_datum);
+                        }
                     }
                 }
+            }
+            catch(...)
+            {
+                std::string pop_up_err_str{"Something went wrong with reading the data file!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                acq_lock_ul.unlock();
+                return false;
             }
             acq_lock_ul.unlock();
             return data_read;
         }
 
         /**
-         * @brief Returns camera width.
-         * @return camera_width
+         * @brief Returns event camera width.
+         * @return event_camera_width
          */
-        int32_t get_camera_width()
+        int32_t get_camera_event_width()
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            int32_t ret_camera_width{camera_width};
+            int32_t ret_camera_width{camera_event_width};
             acq_lock_ul.unlock();
             return ret_camera_width;
         }
 
         /**
-         * @brief Returns camera height.
-         * @return camera_height
+         * @brief Returns frame camera width.
+         * @return frame_camera_width
          */
-        int32_t get_camera_height()
+        int32_t get_camera_frame_width()
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            int32_t ret_camera_height{camera_height};
+            int32_t ret_camera_width{camera_frame_width};
+            acq_lock_ul.unlock();
+            return ret_camera_width;
+        }
+
+        /**
+         * @brief Returns event camera height.
+         * @return event_camera_height
+         */
+        int32_t get_camera_event_height()
+        {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            int32_t ret_camera_height{camera_event_height};
+            acq_lock_ul.unlock();
+            return ret_camera_height;
+        }
+
+        /**
+         * @brief Returns frame camera height.
+         * @return frame_camera_height
+         */
+        int32_t get_camera_frame_height()
+        {
+            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            int32_t ret_camera_height{camera_frame_height};
             acq_lock_ul.unlock();
             return ret_camera_height;
         }

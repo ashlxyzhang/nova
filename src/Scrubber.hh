@@ -246,9 +246,14 @@ class Scrubber
                 return;
             }
 
+            if (lower_index >= evt_vector.size() || current_index >= evt_vector.size())
+            {
+                return;
+            }
+            
             lower_depth = evt_vector[lower_index].z;
             upper_depth = evt_vector[current_index].z;
-            camera_resolution = event_data->get_camera_resolution();
+            camera_resolution = event_data->get_camera_event_resolution();
 
             // Delete old buffer if it exists
             if (points_buffer)

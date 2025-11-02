@@ -199,6 +199,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     g_data_acquisition_running = false;
     g_data_acquisition_thread_ptr->join();
 
+    // Flush file write buffer?
+    g_data_writer.clear();
+
     delete g_writer_thread_ptr;
     delete g_data_acquisition_thread_ptr;
 
