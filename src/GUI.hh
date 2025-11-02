@@ -20,6 +20,8 @@ inline void SDLCALL load_file_handle_callback(void *param_store, const char *con
 // Callback used with SDL_ShowOpenFileDialog in draw_stream_window
 inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused);
 
+// Callback used with SDL_ShowSaveFileDialog in draw_stream_window
+inline void SDLCALL save_stream_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused);
 
 class GUI
 {
@@ -475,27 +477,43 @@ class GUI
 
             if(!parameter_store->exists("stream_save_file_name"))
             {
-                std::string stream_save_file_name{"out"}; // Default out file name
+                std::string stream_save_file_name{""}; // No filename
                 parameter_store->add("stream_save_file_name", stream_save_file_name);
             }
 
             std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
-            // From old NOVA source code
-            const unsigned int max_length = 50; 
-            char buf[max_length];
-            memset(buf, 0, max_length);
-            memcpy(buf, stream_save_file_name.c_str(), stream_save_file_name.size());
-            ImGui::InputText("Stream Output Name", buf, max_length);
-            stream_save_file_name = buf;
 
-            if(stream_save_file_name.length() == 0)
+            if(stream_save && stream_save_file_name != "")
             {
-                stream_save_file_name = "out";
+                ImGui::Text("Saving Streamed Data To: %s", stream_save_file_name.c_str());
+            }
+            else
+            {
+                ImGui::Text("Nothing Being Saved");
             }
 
-            if(!parameter_store->get<bool>("stream_save"))
+            //std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
+            // From old NOVA source code
+            // const unsigned int max_length = 50; 
+            // char buf[max_length];
+            // memset(buf, 0, max_length);
+            // memcpy(buf, stream_save_file_name.c_str(), stream_save_file_name.size());
+            // ImGui::InputText("Stream Output Name", buf, max_length);
+            // stream_save_file_name = buf;
+
+            // if(stream_save_file_name.length() == 0)
+            // {
+            //     stream_save_file_name = "out";
+            // }
+
+            // if(!parameter_store->get<bool>("stream_save"))
+            // {
+            //     parameter_store->add("stream_save_file_name", stream_save_file_name);
+            // }
+
+            if (ImGui::Button("Open File To Save Stream To (Will Stop Streaming)"))
             {
-                parameter_store->add("stream_save_file_name", stream_save_file_name);
+                SDL_ShowSaveFileDialog(save_stream_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr);
             }
 
 
@@ -1047,6 +1065,25 @@ inline void SDLCALL stream_file_handle_callback(void *param_store, const char *c
             param_store_ptr->add("program_state", GUI::PROGRAM_STATE::FILE_STREAM); // Determines if program is streaming
 
             param_store_ptr->add("camera_changed", true);
+        }
+    }
+    else
+    {
+        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
+
+// Callback used with SDL_ShowSaveFileDialog in draw_stream_window
+inline void SDLCALL save_stream_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
+{
+    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
+    if (data_file_list)
+    {
+        if (*data_file_list)
+        {
+            std::string file_name{*data_file_list};
+            param_store_ptr->add("stream_save_file_name", file_name);
+            param_store_ptr->add("program_state", GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
         }
     }
     else

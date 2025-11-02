@@ -11,7 +11,7 @@ class DataWriter
 {
 
     private:
-        std::shared_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
+        std::unique_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
 
         std::mutex writer_lock; // For thread safety
 
@@ -43,6 +43,7 @@ class DataWriter
             {
                 writer_frame_queue.pop();
             }
+            writer_lock_ul.unlock();
         }
 
         /**
@@ -66,7 +67,7 @@ class DataWriter
             {
                 file_name_appended.append(".aedat4");
             }
-            data_writer_ptr = std::make_shared<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
+            data_writer_ptr = std::make_unique<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
 
             writer_lock_ul.unlock();
 
