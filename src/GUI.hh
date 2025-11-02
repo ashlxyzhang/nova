@@ -465,15 +465,28 @@ class GUI
 
             ImGui::Separator();
             ImGui::Text("Stream Save Options:");
-            if(!parameter_store->exists("stream_save"))
+            if(!parameter_store->exists("stream_save_frames"))
             {
-                parameter_store->add("stream_save", false);
+                parameter_store->add("stream_save_frames", false);
             }
 
-            bool stream_save{parameter_store->get<bool>("stream_save")};
-            // Save or stop saving stream
-            ImGui::Checkbox("Saving", &stream_save);
-            parameter_store->add("stream_save", stream_save);
+            bool stream_save_frames{parameter_store->get<bool>("stream_save_frames")};
+            // Save or stop saving stream frames
+            ImGui::Checkbox("Save Frames", &stream_save_frames);
+            parameter_store->add("stream_save_frames", stream_save_frames);
+
+
+            if(!parameter_store->exists("stream_save_events"))
+            {
+                parameter_store->add("stream_save_events", false);
+            }
+
+            bool stream_save_events{parameter_store->get<bool>("stream_save_events")};
+
+            // Save or stop saving stream events
+            ImGui::Checkbox("Save Events", &stream_save_events);
+
+            parameter_store->add("stream_save_events", stream_save_events);
 
             if(!parameter_store->exists("stream_save_file_name"))
             {
@@ -483,7 +496,7 @@ class GUI
 
             std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
 
-            if(stream_save && stream_save_file_name != "")
+            if((stream_save_frames || stream_save_events) && stream_save_file_name != "")
             {
                 ImGui::Text("Saving Streamed Data To: %s", stream_save_file_name.c_str());
             }

@@ -86,7 +86,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 
             case GUI::PROGRAM_STATE::FILE_STREAM: // Case for streaming from file
                 if (param_store.exists("stream_file_name") && param_store.exists("stream_file_changed") &&
-                    param_store.exists("stream_paused") && param_store.exists("stream_save_file_name"))
+                    param_store.exists("stream_paused") && param_store.exists("stream_save_file_name") &&
+                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames"))
                 {
                     // If stream file changed, reset reader to read from new file and clear previously read event data
                     if (param_store.get<bool>("stream_file_changed"))
@@ -124,14 +125,16 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             {
                                 size_t aedat_index{stream_save_file_name.find(".aedat4")};
                                 stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
-                                
                             }
                             param_store.add("stream_save_file_name", stream_save_file_name);
-
-                            data_writer.init_data_writer(stream_save_file_name, data_acq.get_camera_event_width(),
-                                                         data_acq.get_camera_event_height(),
-                                                         data_acq.get_camera_frame_width(),
-                                                         data_acq.get_camera_frame_height());
+                            if(param_store.get<bool>("stream_save_events") || param_store.get<bool>("stream_save_frames"))
+                            {
+                                data_writer.init_data_writer(
+                                    stream_save_file_name, data_acq.get_camera_event_width(),
+                                    data_acq.get_camera_event_height(), data_acq.get_camera_frame_width(),
+                                    data_acq.get_camera_frame_height(), param_store.get<bool>("stream_save_events"),
+                                    param_store.get<bool>("stream_save_frames"));
+                            }
                         }
                     }
 
@@ -174,10 +177,9 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
             case GUI::PROGRAM_STATE::CAMERA_STREAM: // Case for streaming from camera
                 if (param_store.exists("start_camera_scan") && param_store.exists("camera_index") &&
                     param_store.exists("camera_changed") && param_store.exists("camera_stream_paused") &&
-                    param_store.exists("stream_save_file_name"))
+                    param_store.exists("stream_save_file_name") && param_store.exists("stream_save_events") &&
+                    param_store.exists("stream_save_frames"))
                 {
-
-                    
 
                     if (param_store.get<bool>("start_camera_scan"))
                     {
@@ -222,14 +224,14 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             {
                                 size_t aedat_index{stream_save_file_name.find(".aedat4")};
                                 stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
-                                
                             }
                             param_store.add("stream_save_file_name", stream_save_file_name);
 
-                            data_writer.init_data_writer(stream_save_file_name, data_acq.get_camera_event_width(),
-                                                         data_acq.get_camera_event_height(),
-                                                         data_acq.get_camera_frame_width(),
-                                                         data_acq.get_camera_frame_height());
+                            data_writer.init_data_writer(
+                                stream_save_file_name, data_acq.get_camera_event_width(),
+                                data_acq.get_camera_event_height(), data_acq.get_camera_frame_width(),
+                                data_acq.get_camera_frame_height(), param_store.get<bool>("stream_save_events"),
+                                param_store.get<bool>("stream_save_frames"));
                         }
                     }
 

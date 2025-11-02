@@ -258,7 +258,7 @@ class DataAcquisition
                         }
 
                         // Add to queue for persistent storage in case of persistent storage
-                        if (param_store.get<bool>("stream_save"))
+                        if (data_writer.get_writing_event_data())
                         {
                             data_writer.add_event_store(event_store);
                         }
@@ -311,7 +311,7 @@ class DataAcquisition
                         data_read = true;
 
                         // If saving stream, add to queue to write
-                        if (param_store.get<bool>("stream_save"))
+                        if (data_writer.get_writing_frame_data())
                         {
                             dv::Frame frame_datum(frame_data->timestamp, frame_data->image);
                             data_writer.add_frame_data(frame_datum);

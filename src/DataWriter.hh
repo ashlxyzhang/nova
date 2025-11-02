@@ -21,9 +21,38 @@ class DataWriter
         // Queue of frame data
         std::queue<dv::Frame> writer_frame_queue;
 
+        // Determine if writing event or frame data
+        bool writing_frame_data;
+        bool writing_event_data;
+
     public:
-        DataWriter() : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}
+        DataWriter() : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{},
+        writing_frame_data{}, writing_event_data{}
         {
+        }
+
+        /**
+         * @brief Getter for writing_frame_data
+         * @return value of writing_frame_data
+         */
+        bool get_writing_frame_data()
+        {
+            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            bool ret_bool{writing_frame_data};
+            writer_lock_ul.unlock();
+            return ret_bool;
+        }
+
+        /**
+         * @brief Getter for writing_event_data
+         * @return value of writing_event_data
+         */
+        bool get_writing_event_data()
+        {
+            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            bool ret_bool{writing_event_data};
+            writer_lock_ul.unlock();
+            return ret_bool;
         }
 
         /**
@@ -53,15 +82,29 @@ class DataWriter
          * @param camera_height Height of camera resolution.
          */
         bool init_data_writer(const std::string &file_name, int32_t _camera_event_width, int32_t _camera_event_height,
-                              int32_t _camera_frame_width, int32_t _camera_frame_height)
+                              int32_t _camera_frame_width, int32_t _camera_frame_height, bool event_data, bool frame_data)
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
-            const auto writer_config{dv::io::MonoCameraWriter::DAVISConfig(
-                "DAVISConfig", cv::Size(std::max(_camera_event_width, _camera_frame_width),
-                                        std::max(_camera_event_height, _camera_frame_height)))};
+            dv::io::MonoCameraWriter::Config writer_config("Save Config");
+              
+            cv::Size file_res{std::max(_camera_event_width, _camera_frame_width),
+                                        std::max(_camera_event_height, _camera_frame_height)};  
+            
+            writing_event_data = event_data;
+            writing_frame_data = frame_data;
+            if(event_data)
+            {
+                writer_config.addEventStream(file_res);
+            }    
+
+            if(frame_data)
+            {
+                writer_config.addFrameStream(file_res);
+            }
+
             std::string file_name_appended{file_name};
             if(!file_name_appended.ends_with(".aedat4"))
             {
@@ -103,7 +146,7 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
-            if (writer_event_queue.empty() || !data_writer_ptr)
+            if (writer_event_queue.empty() || !data_writer_ptr || !writing_event_data)
             {
                 writer_lock_ul.unlock();
                 return false;
@@ -127,7 +170,7 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
-            if (writer_frame_queue.empty() || !data_writer_ptr)
+            if (writer_frame_queue.empty() || !data_writer_ptr || !writing_frame_data)
             {
                 writer_lock_ul.unlock();
                 return false;
