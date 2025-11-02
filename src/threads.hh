@@ -127,13 +127,14 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                                 stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
                             }
                             param_store.add("stream_save_file_name", stream_save_file_name);
-                            if(param_store.get<bool>("stream_save_events") || param_store.get<bool>("stream_save_frames"))
+                            if (param_store.get<bool>("stream_save_events") ||
+                                param_store.get<bool>("stream_save_frames"))
                             {
                                 data_writer.init_data_writer(
                                     stream_save_file_name, data_acq.get_camera_event_width(),
                                     data_acq.get_camera_event_height(), data_acq.get_camera_frame_width(),
                                     data_acq.get_camera_frame_height(), param_store.get<bool>("stream_save_events"),
-                                    param_store.get<bool>("stream_save_frames"));
+                                    param_store.get<bool>("stream_save_frames"), param_store);
                             }
                         }
                     }
@@ -231,7 +232,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                                 stream_save_file_name, data_acq.get_camera_event_width(),
                                 data_acq.get_camera_event_height(), data_acq.get_camera_frame_width(),
                                 data_acq.get_camera_frame_height(), param_store.get<bool>("stream_save_events"),
-                                param_store.get<bool>("stream_save_frames"));
+                                param_store.get<bool>("stream_save_frames"), param_store);
                         }
                     }
 

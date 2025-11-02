@@ -26,8 +26,9 @@ class DataWriter
         bool writing_event_data;
 
     public:
-        DataWriter() : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{},
-        writing_frame_data{}, writing_event_data{}
+        DataWriter()
+            : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{},
+              writing_event_data{}
         {
         }
 
@@ -78,39 +79,56 @@ class DataWriter
         /**
          * @brief Initializes writer with DAVIS camera configs (event, frame, and IMU data).
          * @param file_name Output file of data.
-         * @param camera_width Width of camera resolution.
-         * @param camera_height Height of camera resolution.
+         * @param _camera_event_width Width of camera event resolution.
+         * @param _camera_event_height Height of camera event resolution.
+         * @param _camera_frame_width Width of camera frame resolution.
+         * @param _camera_frame_height Height of camera frame resolution.
+         * @param event_data True if event stream is being written.
+         * @param frame_data True if frame stream is being written.
+         * @param param_store ParameterStore object to store error message into
+         * @return true if successful initialization of data writer, false otherwise.
          */
         bool init_data_writer(const std::string &file_name, int32_t _camera_event_width, int32_t _camera_event_height,
-                              int32_t _camera_frame_width, int32_t _camera_frame_height, bool event_data, bool frame_data)
+                              int32_t _camera_frame_width, int32_t _camera_frame_height, bool event_data,
+                              bool frame_data, ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
-            dv::io::MonoCameraWriter::Config writer_config("Save Config");
-              
-            cv::Size file_res{std::max(_camera_event_width, _camera_frame_width),
-                                        std::max(_camera_event_height, _camera_frame_height)};  
-            
-            writing_event_data = event_data;
-            writing_frame_data = frame_data;
-            if(event_data)
+            try
             {
-                writer_config.addEventStream(file_res);
-            }    
+                dv::io::MonoCameraWriter::Config writer_config("Save Config");
 
-            if(frame_data)
-            {
-                writer_config.addFrameStream(file_res);
-            }
+                cv::Size file_res{std::max(_camera_event_width, _camera_frame_width),
+                                  std::max(_camera_event_height, _camera_frame_height)};
 
-            std::string file_name_appended{file_name};
-            if(!file_name_appended.ends_with(".aedat4"))
-            {
-                file_name_appended.append(".aedat4");
+                writing_event_data = event_data;
+                writing_frame_data = frame_data;
+                if (event_data)
+                {
+                    writer_config.addEventStream(file_res);
+                }
+
+                if (frame_data)
+                {
+                    writer_config.addFrameStream(file_res);
+                }
+
+                std::string file_name_appended{file_name};
+                if (!file_name_appended.ends_with(".aedat4"))
+                {
+                    file_name_appended.append(".aedat4");
+                }
+                data_writer_ptr = std::make_unique<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
             }
-            data_writer_ptr = std::make_unique<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
+            catch (...)
+            {
+                std::string pop_up_err_str{"Something went wrong initializing file to save to!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                writer_lock_ul.unlock();
+                return false;
+            }
 
             writer_lock_ul.unlock();
 
