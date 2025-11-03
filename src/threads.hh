@@ -68,7 +68,6 @@ inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, Par
 }
 } // namespace
 
-
 // Program threads
 namespace program_thread
 {
@@ -102,6 +101,14 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 {
     while (running)
     {
+        // These always run
+        // To be responsive when scanning for camera
+        if (param_store.exists("start_camera_scan") && param_store.get<bool>("start_camera_scan"))
+        {
+            data_acq.discover_cameras(param_store);
+            param_store.add("start_camera_scan", false);
+        }
+
         // DATA ACQUISITION CODE
         if (param_store.exists("program_state"))
         {
@@ -219,17 +226,10 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                 break;
 
             case GUI::PROGRAM_STATE::CAMERA_STREAM: // Case for streaming from camera
-                if (param_store.exists("start_camera_scan") && param_store.exists("camera_index") &&
-                    param_store.exists("camera_changed") && param_store.exists("camera_stream_paused") &&
-                    param_store.exists("stream_save_file_name") && param_store.exists("stream_save_events") &&
-                    param_store.exists("stream_save_frames"))
+                if (param_store.exists("camera_index") && param_store.exists("camera_changed") &&
+                    param_store.exists("camera_stream_paused") && param_store.exists("stream_save_file_name") &&
+                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames"))
                 {
-
-                    if (param_store.get<bool>("start_camera_scan"))
-                    {
-                        data_acq.discover_cameras(param_store);
-                        param_store.add("start_camera_scan", false);
-                    }
 
                     if (param_store.get<bool>("camera_changed"))
                     {

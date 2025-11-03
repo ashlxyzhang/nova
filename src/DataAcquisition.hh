@@ -5,16 +5,15 @@
 #include "DataWriter.hh"
 #include "EventData.hh"
 #include "ParameterStore.hh"
-#include <dv-processing/io/mono_camera_recording.hpp>
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
+#include <dv-processing/io/mono_camera_recording.hpp>
 #include <vector>
 
 class DataAcquisition
 {
 
     private:
-
         std::vector<dv::io::camera::USBDevice::DeviceDescriptor> scanned_cameras;
         std::unique_ptr<dv::io::InputBase> data_reader_ptr;
         int32_t camera_event_width;
@@ -32,7 +31,9 @@ class DataAcquisition
         };
 
     public:
-        DataAcquisition() : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{}, acq_lock{}
+        DataAcquisition()
+            : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
+              camera_frame_height{}, acq_lock{}
         {
         }
 
@@ -53,10 +54,10 @@ class DataAcquisition
 
             std::stringstream str_stream{};
 
-            for(const auto &camera : discovered_cameras)
+            for (const auto &camera : discovered_cameras)
             {
                 scanned_cameras.push_back(camera);
-                 // To ensure string conversion works
+                // To ensure string conversion works
                 str_stream << "Model: " << camera.cameraModel << " ";
                 str_stream << "Serial Number: " << camera.serialNumber << "\0";
             }
@@ -76,7 +77,8 @@ class DataAcquisition
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
 
-            if(camera_index < 0 || camera_index >= scanned_cameras.size())
+            // Sanity check
+            if (scanned_cameras.empty() || camera_index < 0 || camera_index >= scanned_cameras.size())
             {
                 acq_lock_ul.unlock();
                 return false;
@@ -84,9 +86,10 @@ class DataAcquisition
 
             try
             {
-                data_reader_ptr = std::move(dv::io::camera::open(scanned_cameras[camera_index])); // Specify move semantics for unique pointer
+                data_reader_ptr = std::move(
+                    dv::io::camera::open(scanned_cameras[camera_index])); // Specify move semantics for unique pointer
             }
-            catch(...)
+            catch (...)
             {
                 std::string pop_up_err_str{"Something went wrong with the camera for reading!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
@@ -94,19 +97,19 @@ class DataAcquisition
                 return false;
             }
 
-            if(data_reader_ptr->isEventStreamAvailable())
+            if (data_reader_ptr->isEventStreamAvailable())
             {
                 auto evt_resolution = data_reader_ptr->getEventResolution();
-                if(evt_resolution.has_value())
+                if (evt_resolution.has_value())
                 {
                     camera_event_width = evt_resolution.value().width;
                     camera_event_height = evt_resolution.value().height;
                 }
             }
-            if(data_reader_ptr->isFrameStreamAvailable())
+            if (data_reader_ptr->isFrameStreamAvailable())
             {
                 auto frame_resolution = data_reader_ptr->getFrameResolution();
-                if(frame_resolution.has_value())
+                if (frame_resolution.has_value())
                 {
                     camera_frame_width = frame_resolution.value().width;
                     camera_frame_height = frame_resolution.value().height;
@@ -140,26 +143,26 @@ class DataAcquisition
             {
                 data_reader_ptr = std::make_unique<dv::io::MonoCameraRecording>(file_name);
             }
-            catch(...)
+            catch (...)
             {
                 std::string pop_up_err_str{"Something went wrong while initializing file for reading!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
             }
-            if(data_reader_ptr->isEventStreamAvailable())
+            if (data_reader_ptr->isEventStreamAvailable())
             {
                 auto evt_resolution = data_reader_ptr->getEventResolution();
-                if(evt_resolution.has_value())
+                if (evt_resolution.has_value())
                 {
                     camera_event_width = evt_resolution.value().width;
                     camera_event_height = evt_resolution.value().height;
                 }
             }
-            if(data_reader_ptr->isFrameStreamAvailable())
+            if (data_reader_ptr->isFrameStreamAvailable())
             {
                 auto frame_resolution = data_reader_ptr->getFrameResolution();
-                if(frame_resolution.has_value())
+                if (frame_resolution.has_value())
                 {
                     camera_frame_width = frame_resolution.value().width;
                     camera_frame_height = frame_resolution.value().height;
@@ -265,7 +268,7 @@ class DataAcquisition
                     }
                 }
             }
-            catch(...)
+            catch (...)
             {
                 std::string pop_up_err_str{"Something went wrong with reading event data!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
@@ -295,7 +298,8 @@ class DataAcquisition
 
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-frames-from-a-file
 
-            try{
+            try
+            {
                 if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
                 {
                     if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
@@ -319,7 +323,7 @@ class DataAcquisition
                     }
                 }
             }
-            catch(...)
+            catch (...)
             {
                 std::string pop_up_err_str{"Something went wrong with reading frame data!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
