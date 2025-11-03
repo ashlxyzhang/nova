@@ -2,12 +2,12 @@
 
 #include "DataAcquisition.hh"
 #include "DataWriter.hh"
+#include "DigitalCodedExposure.hh"
 #include "GUI.hh"
 #include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "SpinningCube.hh"
-#include "DigitalCodedExposure.hh"
 #include "UploadBuffer.hh"
 #include "Visualizer.hh"
 #include "threads.hh" // For data writer and data acquisition threads
@@ -89,16 +89,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     g_gui = new GUI(g_render_targets, g_parameter_store, g_window, g_gpu_device, g_scrubber);
     g_visualizer = new Visualizer(*g_parameter_store, g_render_targets, g_event_data, g_scrubber, g_window,
                                   g_gpu_device, g_upload_buffer, copy_pass);
-    g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window, g_gpu_device, g_upload_buffer, g_scrubber, copy_pass);
+    g_digital_coded_exposure = new DigitalCodedExposure(g_parameter_store, g_render_targets, g_event_data, g_window,
+                                                        g_gpu_device, g_upload_buffer, g_scrubber, copy_pass);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
     // Initialize threads
-    g_writer_thread_ptr = new std::thread(program_thread::writer_thread, std::ref(g_writer_running), std::ref(g_data_writer), std::ref(*g_parameter_store));
-    g_data_acquisition_thread_ptr =
-        new std::thread(program_thread::data_acquisition_thread, std::ref(g_data_acquisition_running), std::ref(g_data_acq),
-                        std::ref(*g_parameter_store), std::ref(g_event_data), std::ref(g_data_writer));
+    g_writer_thread_ptr = new std::thread(program_thread::writer_thread, std::ref(g_writer_running),
+                                          std::ref(g_data_writer), std::ref(*g_parameter_store));
+    g_data_acquisition_thread_ptr = new std::thread(
+        program_thread::data_acquisition_thread, std::ref(g_data_acquisition_running), std::ref(g_data_acq),
+        std::ref(*g_parameter_store), std::ref(g_event_data), std::ref(g_data_writer));
 
     return SDL_APP_CONTINUE;
 }

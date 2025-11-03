@@ -27,7 +27,7 @@ inline bool frame_less_vec4_t(const std::pair<cv::Mat, float> &a, const std::pai
 
 class EventData
 {
-    // Internal structs
+        // Internal structs
     public:
         // Represents single event datum
         struct EventDatum
@@ -45,7 +45,7 @@ class EventData
                 int64_t timestamp;
         };
 
-    // Member variables
+        // Member variables
     private:
         std::multiset<EventDatum> evt_data; // Ensures ordered event data
 
@@ -443,7 +443,7 @@ class EventData
             return ret_index;
         }
 
-    // Helper functions
+        // Helper functions
     private:
         // Hashmaps contains thread id mapped to boolean that indicates if new data was read
         // since the thread called the get_*_vectors functions. This was added because

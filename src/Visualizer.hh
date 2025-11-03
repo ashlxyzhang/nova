@@ -580,16 +580,16 @@ class Visualizer
                     // SDL_ttf coordinates are in pixels, so we need to scale them down for 3D space
                     // Using a small scale factor so text appears as a reasonable size in 3D
                     const float pixel_to_world_scale = 0.0025f; // 1000 pixels = 1 world unit
-                    
+
                     // Build rotation matrix from normal to orient the text plane
                     // The text plane is in XY, so the normal is Z
                     glm::vec3 normal_norm = glm::normalize(normal);
-                    
+
                     // Build an orthonormal basis where:
                     // - Z axis is the normal (facing direction)
                     // - X and Y axes span the plane
                     glm::vec3 forward = normal_norm;
-                    
+
                     // Choose a reference vector - prefer Y-up if normal is not parallel to it
                     glm::vec3 up_ref = glm::vec3(0.0f, 1.0f, 0.0f);
                     if (glm::abs(glm::dot(forward, up_ref)) > 0.99f)
@@ -597,20 +597,17 @@ class Visualizer
                         // Normal is nearly parallel to up, use Z as reference instead
                         up_ref = glm::vec3(0.0f, 0.0f, 1.0f);
                     }
-                    
+
                     // Use Gram-Schmidt to build orthonormal basis
                     glm::vec3 right = glm::normalize(glm::cross(forward, up_ref));
                     glm::vec3 up = glm::normalize(glm::cross(right, forward));
-                    
+
                     // Build rotation matrix from the basis vectors
                     // Column-major order: right, up, forward (negative because camera looks along -Z)
-                    glm::mat4 rotation_matrix = glm::mat4(
-                        right.x, up.x, -forward.x, 0.0f,
-                        right.y, up.y, -forward.y, 0.0f,
-                        right.z, up.z, -forward.z, 0.0f,
-                        0.0f,    0.0f, 0.0f,       1.0f
-                    );
-                    
+                    glm::mat4 rotation_matrix =
+                        glm::mat4(right.x, up.x, -forward.x, 0.0f, right.y, up.y, -forward.y, 0.0f, right.z, up.z,
+                                  -forward.z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
                     // Scale first, then rotate, then translate
                     glm::mat4 model_matrix = glm::translate(glm::mat4(1.0f), position) * rotation_matrix;
 
@@ -627,9 +624,9 @@ class Visualizer
                             // Transform 2D quad vertex into 3D world space
                             // Scale pixel coordinates to world space
                             // Using -pos2D.y to flip Y-axis (SDL_ttf is Y-down, 3D space is Y-up)
-                            glm::vec4 pos3D_world = model_matrix * glm::vec4(-pos2D.x * pixel_to_world_scale, 
-                                                                              pos2D.y * pixel_to_world_scale, 
-                                                                              0.0f, 1.0f);
+                            glm::vec4 pos3D_world =
+                                model_matrix *
+                                glm::vec4(-pos2D.x * pixel_to_world_scale, pos2D.y * pixel_to_world_scale, 0.0f, 1.0f);
 
                             TextVertex vert;
                             vert.pos = glm::vec3(pos3D_world);
@@ -756,8 +753,8 @@ class Visualizer
         Visualizer(ParameterStore &parameter_store, std::unordered_map<std::string, RenderTarget> &render_targets,
                    EventData &event_data, Scrubber *scrubber, SDL_Window *window, SDL_GPUDevice *gpu_device,
                    UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
-            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), scrubber(scrubber),
-              window(window), gpu_device(gpu_device)
+            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data),
+              scrubber(scrubber), window(window), gpu_device(gpu_device)
         {
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
@@ -890,7 +887,7 @@ class Visualizer
 
             // Get z subdivisions from parameter store
             uint32_t z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
-            
+
             // Get depth range from scrubber
             float lower_depth = scrubber->get_lower_depth();
             float upper_depth = scrubber->get_upper_depth();
@@ -907,16 +904,16 @@ class Visualizer
             {
                 // Calculate normalized Z position [-1, 1]
                 float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(z_subdivisions) - 1.0f;
-                
+
                 // Convert normalized Z to actual depth value
                 float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
-                
+
                 // Format timestamp as string with reasonable precision
                 std::string timestamp_str = std::format("{:.2f}", timestamp);
-                
+
                 // Position text at the corresponding Z subdivision
                 text_position.z = normalized_z;
-                
+
                 // Add the text
                 text_renderer->add_text(timestamp_str, text_position, text_normal, text_color);
             }

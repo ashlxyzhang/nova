@@ -171,7 +171,7 @@ class DataWriter
                 writer_lock_ul.unlock();
                 return false;
             }
-            
+
             dv::EventStore evt_store{writer_event_queue.front()};
             writer_event_queue.pop();
 
@@ -179,7 +179,7 @@ class DataWriter
             {
                 data_writer_ptr->writeEvents(evt_store);
             }
-            catch(...)
+            catch (...)
             {
                 std::string pop_up_err_str{"Something went wrong with saving event data!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
@@ -215,7 +215,7 @@ class DataWriter
             {
                 data_writer_ptr->writeFrame(frame_data);
             }
-            catch(...)
+            catch (...)
             {
                 std::string pop_up_err_str{"Something went wrong with saving frame data!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
