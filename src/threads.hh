@@ -147,7 +147,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         data_acq.get_batch_evt_data(evt_data, param_store, data_writer);
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
 
-                        // Test to ensure event/frame data was added and is ordered
+                        //Test to ensure event/frame data was added and is ordered
                         // evt_data.lock_data_vectors();
 
                         // const auto &event_data{evt_data.get_evt_vector_ref()};
@@ -155,8 +155,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         // for (size_t i = 1; i < event_data.size(); ++i)
                         // {
                         //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                        //     // std::cout << "AT i: " << i << " INDEX: " <<
-                        //     // evt_data.get_index_from_timestamp(event_data[i][2]) << std::endl;
+                        //     std::cout << "AT i: " << i << " INDEX: " <<
+                        //     evt_data.get_event_index_from_timestamp(event_data[i][2]) << std::endl;
                         // }
 
                         // const auto &frame_data{evt_data.get_frame_vector_ref()};

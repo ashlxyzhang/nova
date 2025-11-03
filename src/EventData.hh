@@ -384,6 +384,13 @@ class EventData
                 evt_lock_ul.unlock();
                 return -1; // Vector is empty, return -1
             }
+
+            // Ensure sorted
+            if (evt_data_vector_need_update)
+            {
+                update_evt_data_vectors();
+            }
+
             glm::vec4 timestampVec4(0.0f, 0.0f, timestamp, 0.0f);
 
             // evt_data_vector_relative should be sorted by the way EventData class is setup.
@@ -414,6 +421,13 @@ class EventData
                 evt_lock_ul.unlock();
                 return -1; // Vector is empty, return -1
             }
+
+            // Ensure sorted
+            if (frame_data_vector_need_update)
+            {
+                update_frame_data_vectors();
+            }
+
             std::pair<cv::Mat, float> timestampPair{cv::Mat{}, timestamp};
 
             // frame_data_vector_relative should be sorted by the way EventData class is setup.
