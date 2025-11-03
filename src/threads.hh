@@ -1,9 +1,77 @@
+#pragma once
+#ifndef THREADS_HH
+#define THREADS_HH
+
 #include "DataAcquisition.hh"
 #include "DataWriter.hh"
 #include "EventData.hh"
 #include "GUI.hh"
 #include "ParameterStore.hh"
 
+// Anonymous helper functions
+namespace
+{
+inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store)
+{
+    data_writer.clear();
+    std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
+    std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
+
+    if (!stream_save_file_name.ends_with(".aedat4"))
+    {
+        stream_save_file_name.append(".aedat4");
+    }
+
+    if (!stream_file_name.ends_with(".aedat4"))
+    {
+        stream_file_name.append(".aedat4");
+    }
+
+    // Attempting to write to file while reading from it will lead to disaster
+    if (stream_save_file_name == stream_file_name)
+    {
+        size_t aedat_index{stream_save_file_name.find(".aedat4")};
+        stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
+    }
+    param_store.add("stream_save_file_name", stream_save_file_name);
+    if (param_store.get<bool>("stream_save_events") || param_store.get<bool>("stream_save_frames"))
+    {
+        bool init_data_writer_success{data_writer.init_data_writer(
+            stream_save_file_name, data_acq.get_camera_event_width(), data_acq.get_camera_event_height(),
+            data_acq.get_camera_frame_width(), data_acq.get_camera_frame_height(),
+            param_store.get<bool>("stream_save_events"), param_store.get<bool>("stream_save_frames"), param_store)};
+
+        if (init_data_writer_success)
+        {
+            bool saving_frames{data_writer.get_writing_frame_data()};
+            bool saving_events{data_writer.get_writing_event_data()};
+
+            std::string saving_message{"Currently Saving "};
+            if (saving_events)
+            {
+                saving_message.append("Event Data ");
+            }
+            if (saving_frames)
+            {
+                saving_message.append(saving_events ? "And Frame Data " : "Frame Data ");
+            }
+            saving_message.append("To ");
+            saving_message.append(stream_save_file_name);
+            param_store.add("saving_message", saving_message);
+        }
+        else
+        {
+            std::string saving_message{"Nothing Being Saved Currently"};
+            param_store.add("saving_message", saving_message);
+        }
+    }
+}
+} // namespace
+
+
+// Program threads
+namespace program_thread
+{
 /**
  * @brief Thread for writing data back to persistent storage when streaming.
  * @param running Atomic boolean that determines if thread is running or not.
@@ -61,6 +129,9 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("load_file_changed", false);
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
 
+                            // Nothing should be saving from streamed data, indicate as such
+                            std::string saving_message{"Nothing Being Saved Currently"};
+                            param_store.add("saving_message", saving_message);
                             // Test to ensure event/frame data was added and is ordered
                             // evt_data.lock_data_vectors();
 
@@ -103,39 +174,10 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
                         }
 
+                        // If gui indicates writing needs to be done, then set up writer for writing
                         if (param_store.get<std::string>("stream_save_file_name") != "")
                         {
-                            // If gui indicates writing needs to be done, then set up writer for writing
-                            data_writer.clear();
-                            std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
-                            std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
-
-                            if (!stream_save_file_name.ends_with(".aedat4"))
-                            {
-                                stream_save_file_name.append(".aedat4");
-                            }
-
-                            if (!stream_file_name.ends_with(".aedat4"))
-                            {
-                                stream_file_name.append(".aedat4");
-                            }
-
-                            // Attempting to write to file while reading from it will lead to disaster
-                            if (stream_save_file_name == stream_file_name)
-                            {
-                                size_t aedat_index{stream_save_file_name.find(".aedat4")};
-                                stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
-                            }
-                            param_store.add("stream_save_file_name", stream_save_file_name);
-                            if (param_store.get<bool>("stream_save_events") ||
-                                param_store.get<bool>("stream_save_frames"))
-                            {
-                                data_writer.init_data_writer(
-                                    stream_save_file_name, data_acq.get_camera_event_width(),
-                                    data_acq.get_camera_event_height(), data_acq.get_camera_frame_width(),
-                                    data_acq.get_camera_frame_height(), param_store.get<bool>("stream_save_events"),
-                                    param_store.get<bool>("stream_save_frames"), param_store);
-                            }
+                            setup_writer(data_acq, data_writer, param_store);
                         }
                     }
 
@@ -147,8 +189,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         data_acq.get_batch_evt_data(evt_data, param_store, data_writer);
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
 
-                        //Test to ensure event/frame data was added and is ordered
-                        // evt_data.lock_data_vectors();
+                        // Test to ensure event/frame data was added and is ordered
+                        //  evt_data.lock_data_vectors();
 
                         // const auto &event_data{evt_data.get_evt_vector_ref()};
 
@@ -175,6 +217,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     }
                 }
                 break;
+
             case GUI::PROGRAM_STATE::CAMERA_STREAM: // Case for streaming from camera
                 if (param_store.exists("start_camera_scan") && param_store.exists("camera_index") &&
                     param_store.exists("camera_changed") && param_store.exists("camera_stream_paused") &&
@@ -203,36 +246,10 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
                         }
 
+                        // If gui indicates writing needs to be done, then set up writer for writing
                         if (param_store.get<std::string>("stream_save_file_name") != "")
                         {
-                            // If gui indicates writing needs to be done, then set up writer for writing
-                            data_writer.clear();
-                            std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
-                            std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
-
-                            if (!stream_save_file_name.ends_with(".aedat4"))
-                            {
-                                stream_save_file_name.append(".aedat4");
-                            }
-
-                            if (!stream_file_name.ends_with(".aedat4"))
-                            {
-                                stream_file_name.append(".aedat4");
-                            }
-
-                            // Attempting to write to file while reading from it will lead to disaster
-                            if (stream_save_file_name == stream_file_name)
-                            {
-                                size_t aedat_index{stream_save_file_name.find(".aedat4")};
-                                stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
-                            }
-                            param_store.add("stream_save_file_name", stream_save_file_name);
-
-                            data_writer.init_data_writer(
-                                stream_save_file_name, data_acq.get_camera_event_width(),
-                                data_acq.get_camera_event_height(), data_acq.get_camera_frame_width(),
-                                data_acq.get_camera_frame_height(), param_store.get<bool>("stream_save_events"),
-                                param_store.get<bool>("stream_save_frames"), param_store);
+                            setup_writer(data_acq, data_writer, param_store);
                         }
                     }
 
@@ -245,9 +262,17 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
                     }
                 }
-            default:
+                break;
+
+            case GUI::PROGRAM_STATE::IDLE:
+                // Nothing being saved
+                std::string saving_message{"Nothing Being Saved Currently"};
+                param_store.add("saving_message", saving_message);
                 break;
             }
         }
     }
 }
+} // namespace program_thread
+
+#endif // THREADS_HH

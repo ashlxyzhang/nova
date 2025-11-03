@@ -465,6 +465,16 @@ class GUI
 
             ImGui::Separator();
             ImGui::Text("Stream Save Options:");
+
+            if(!parameter_store->exists("saving_message"))
+            {
+                std::string saving_message{"Nothing Being Saved Currently"};
+                parameter_store->add("saving_message", saving_message);
+            }
+
+            std::string saving_message{parameter_store->get<std::string>("saving_message")};
+            ImGui::Text("%s", saving_message.c_str());
+
             if(!parameter_store->exists("stream_save_frames"))
             {
                 parameter_store->add("stream_save_frames", false);
@@ -472,7 +482,7 @@ class GUI
 
             bool stream_save_frames{parameter_store->get<bool>("stream_save_frames")};
             // Save or stop saving stream frames
-            ImGui::Checkbox("Save Frames", &stream_save_frames);
+            ImGui::Checkbox("Save Frames On Next Stream", &stream_save_frames);
             parameter_store->add("stream_save_frames", stream_save_frames);
 
 
@@ -484,7 +494,7 @@ class GUI
             bool stream_save_events{parameter_store->get<bool>("stream_save_events")};
 
             // Save or stop saving stream events
-            ImGui::Checkbox("Save Events", &stream_save_events);
+            ImGui::Checkbox("Save Events On Next Stream", &stream_save_events);
 
             parameter_store->add("stream_save_events", stream_save_events);
 
@@ -498,11 +508,23 @@ class GUI
 
             if((stream_save_frames || stream_save_events) && stream_save_file_name != "")
             {
-                ImGui::Text("Saving Streamed Data To: %s", stream_save_file_name.c_str());
+                std::string will_save_message{"Will Save Streamed "};
+                if(stream_save_events)
+                {
+                    will_save_message.append("Event Data ");
+                }
+                if(stream_save_frames)
+                {
+                    will_save_message.append(stream_save_events ? "And Frame Data " : "Frame Data ");
+                }
+                will_save_message.append("To \n");
+                will_save_message.append(stream_save_file_name);
+                will_save_message.append(" On Next Stream");
+                ImGui::Text("%s", will_save_message.c_str());
             }
             else
             {
-                ImGui::Text("Nothing Being Saved");
+                ImGui::Text("Nothing Being Saved On Next Stream");
             }
 
             //std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
