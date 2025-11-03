@@ -11,13 +11,13 @@
  *
  */
 
-inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer)
+inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer, ParameterStore &param_store)
 {
     // For now let us spin
     while (running)
     {
-        data_writer.write_event_store();
-        data_writer.write_frame_data();
+        data_writer.write_event_store(param_store);
+        data_writer.write_frame_data(param_store);
     }
 }
 

@@ -158,9 +158,11 @@ class DataWriter
         /**
          * @brief Pops an event data store from queue and writes
          *        it to persistent storage.
+         * @param param_store ParameterStore object to store popup error message into
+         *                    in case writing fails.
          * @return false if write failed, true otherwise.
          */
-        bool write_event_store()
+        bool write_event_store(ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
@@ -169,11 +171,21 @@ class DataWriter
                 writer_lock_ul.unlock();
                 return false;
             }
-
+            
             dv::EventStore evt_store{writer_event_queue.front()};
             writer_event_queue.pop();
 
-            data_writer_ptr->writeEvents(evt_store);
+            try
+            {
+                data_writer_ptr->writeEvents(evt_store);
+            }
+            catch(...)
+            {
+                std::string pop_up_err_str{"Something went wrong with saving event data!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                writer_lock_ul.unlock();
+                return false;
+            }
 
             writer_lock_ul.unlock();
             return true;
@@ -182,9 +194,11 @@ class DataWriter
         /**
          * @brief Pops an frame data from queue and writes
          *        it to persistent storage.
+         * @param param_store ParameterStore object to store popup error message into
+         *                    in case writing fails.
          * @return false if write failed, true otherwise.
          */
-        bool write_frame_data()
+        bool write_frame_data(ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
 
@@ -197,7 +211,17 @@ class DataWriter
             dv::Frame frame_data{writer_frame_queue.front()};
             writer_frame_queue.pop();
 
-            data_writer_ptr->writeFrame(frame_data);
+            try
+            {
+                data_writer_ptr->writeFrame(frame_data);
+            }
+            catch(...)
+            {
+                std::string pop_up_err_str{"Something went wrong with saving frame data!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                writer_lock_ul.unlock();
+                return false;
+            }
 
             writer_lock_ul.unlock();
             return true;

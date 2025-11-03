@@ -88,7 +88,7 @@ class DataAcquisition
             }
             catch(...)
             {
-                std::string pop_up_err_str{"Something went wrong with reading the camera!"};
+                std::string pop_up_err_str{"Something went wrong with the camera for reading!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
@@ -267,7 +267,7 @@ class DataAcquisition
             }
             catch(...)
             {
-                std::string pop_up_err_str{"Something went wrong with reading the data file!"};
+                std::string pop_up_err_str{"Something went wrong with reading event data!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
@@ -321,7 +321,7 @@ class DataAcquisition
             }
             catch(...)
             {
-                std::string pop_up_err_str{"Something went wrong with reading the data file!"};
+                std::string pop_up_err_str{"Something went wrong with reading frame data!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
