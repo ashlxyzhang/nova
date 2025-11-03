@@ -27,7 +27,7 @@ inline bool frame_less_vec4_t(const std::pair<cv::Mat, float> &a, const std::pai
 
 class EventData
 {
-
+    // Internal structs
     public:
         // Represents single event datum
         struct EventDatum
@@ -45,14 +45,40 @@ class EventData
                 int64_t timestamp;
         };
 
+    // Member variables
+    private:
+        std::multiset<EventDatum> evt_data; // Ensures ordered event data
+
+        std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
+
+        std::vector<glm::vec4> evt_data_vector_relative;
+        std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
+
+        // Set camera resolution
+        int32_t camera_event_width{};
+        int32_t camera_event_height{};
+
+        int32_t camera_frame_width{};
+        int32_t camera_frame_height{};
+
+        bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
+        bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are
+                                            // exposed.
+
+        float max_element_percentage;  // What percentage of max size of vector should number of elements populate
+        float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they
+                                       // exceed max_element_percentage
+        std::recursive_mutex evt_lock;
+
+    public:
         /**
          * @brief Default constructor for event data.
          */
         EventData()
-            : evt_data{}, frame_data{}, evt_data_vector_relative{}, frame_data_vector_relative{},
-              evt_data_vector_need_update{false}, frame_data_vector_need_update{false}, max_element_percentage{0.8f},
-              cull_element_percentage{0.5f}, evt_lock{}
-
+            : evt_data{}, frame_data{}, evt_data_vector_relative{}, frame_data_vector_relative{}, camera_event_height{},
+              camera_event_width{}, camera_frame_height{}, camera_frame_width{}, evt_data_vector_need_update{false},
+              frame_data_vector_need_update{false}, max_element_percentage{0.8f}, cull_element_percentage{0.5f},
+              evt_lock{}
         // changed_evt_thread_map{}, changed_evt_thread_map_lock{}, changed_frame_thread_map{},
         // changed_frame_thread_map_lock{}
         {
@@ -403,29 +429,8 @@ class EventData
             return ret_index;
         }
 
+    // Helper functions
     private:
-        std::multiset<EventDatum> evt_data; // Ensures ordered event data
-
-        std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
-
-        std::vector<glm::vec4> evt_data_vector_relative;
-        std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
-
-        // Set camera resolution
-        int32_t camera_event_width;
-        int32_t camera_event_height;
-
-        int32_t camera_frame_width;
-        int32_t camera_frame_height;
-
-        bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
-        bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are
-                                            // exposed.
-
-        float max_element_percentage;  // What percentage of max size of vector should number of elements populate
-        float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they
-                                       // exceed max_element_percentage
-        std::recursive_mutex evt_lock;
         // Hashmaps contains thread id mapped to boolean that indicates if new data was read
         // since the thread called the get_*_vectors functions. This was added because
         // calling these functions is expensive and should only be done

@@ -32,18 +32,17 @@ class DigitalCodedExposure
         SDL_GPUDevice *gpu_device = nullptr;
 
         SDL_GPUComputePipeline *compute_pipeline = nullptr;
-
-        std::string last_file = "";
-        unsigned int width;
-        unsigned int height;
+        
+        unsigned int width{};
+        unsigned int height{};
 
     public:
         DigitalCodedExposure(ParameterStore *parameter_store,
                              std::unordered_map<std::string, RenderTarget> &render_targets, EventData &event_data,
                              SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
                              Scrubber *scrubber, SDL_GPUCopyPass *copy_pass)
-            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), window(window),
-              gpu_device(gpu_device), scrubber(scrubber)
+            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), scrubber(scrubber), window(window),
+              gpu_device(gpu_device), width{}, height{} // Make sure to zero width and height
         {
             // create the color texture, this is the texture that will store the color data
             SDL_GPUTextureCreateInfo color_create_info = {
@@ -51,7 +50,7 @@ class DigitalCodedExposure
                 .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
                 .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
                 .width = 1920,
-                .height = 1080,
+                .height = 1200,
                 .layer_count_or_depth = 1,
                 .num_levels = 1,
                 .sample_count = SDL_GPU_SAMPLECOUNT_1,
@@ -96,13 +95,15 @@ class DigitalCodedExposure
             }
             event_data.unlock_data_vectors();
 
+            // Only generate textures when a new file has been loaded with new resolution
             if (parameter_store->exists("resolution_initialized") && parameter_store->get<bool>("resolution_initialized"))
             {
 
                 width = event_data.get_camera_event_resolution().x;
                 height = event_data.get_camera_event_resolution().y;
-
-                if (width == 0 || height == 0)
+                
+                // Sanity check
+                if (width == 0 || height == 0 || width > 1920.0f || height > 1200.0f)
                 {
                     return;
                 }
@@ -129,6 +130,7 @@ class DigitalCodedExposure
         }
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
         {
+            // Ensure there is data
             event_data.lock_data_vectors();
             if (event_data.get_evt_vector_ref().empty())
             {
@@ -136,6 +138,12 @@ class DigitalCodedExposure
                 return;
             }
             event_data.unlock_data_vectors();
+            // Sanity check resolution
+            if(width == 0.0f || height == 0.0f || width > 1920.0f || height > 1200.0f)
+            {
+                return;
+            }
+            
             SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings = {0};
 
             texture_buffer_bindings.texture = render_targets["DigitalCodedExposure"].texture;
