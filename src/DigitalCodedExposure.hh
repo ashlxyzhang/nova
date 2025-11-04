@@ -44,9 +44,8 @@ class DigitalCodedExposure
         SDL_GPUTexture *negative_values_texture = nullptr;
 
 
-        std::string last_file = "";
-        unsigned int width;
-        unsigned int height;
+        unsigned int width{};
+        unsigned int height{};
 
         SDL_GPUTexture* create_intermediate_texture(unsigned int width, unsigned int height) {
             SDL_GPUTextureCreateInfo color_create_info = {
@@ -68,8 +67,9 @@ class DigitalCodedExposure
                              std::unordered_map<std::string, RenderTarget> &render_targets, EventData &event_data,
                              SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
                              Scrubber *scrubber, SDL_GPUCopyPass *copy_pass)
-            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data), window(window),
-              gpu_device(gpu_device), scrubber(scrubber)
+            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data),
+              scrubber(scrubber), window(window), gpu_device(gpu_device), width{},
+              height{} // Make sure to zero width and height
         {
             // create the color texture, this is the texture that will store the color data
             SDL_GPUTextureCreateInfo color_create_info = {
@@ -77,7 +77,7 @@ class DigitalCodedExposure
                 .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
                 .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
                 .width = 1920,
-                .height = 1080,
+                .height = 1200,
                 .layer_count_or_depth = 1,
                 .num_levels = 1,
                 .sample_count = SDL_GPU_SAMPLECOUNT_1,
@@ -156,25 +156,24 @@ class DigitalCodedExposure
         }
         void cpu_update()
         {
-            bool file_changed = false;
-
-            file_changed = parameter_store->exists("streaming") && parameter_store->exists("stream_file_changed") &&
-                           (parameter_store->get<bool>("streaming") &&
-                            (last_file != parameter_store->get<std::string>("stream_file_name")));
-
-            if (parameter_store->exists("load_file_name") &&
-                last_file != parameter_store->get<std::string>("load_file_name"))
+            event_data.lock_data_vectors();
+            if (event_data.get_evt_vector_ref().empty())
             {
-                file_changed = true;
+                event_data.unlock_data_vectors();
+                return;
             }
+            event_data.unlock_data_vectors();
 
-            if (file_changed)
+            // Only generate textures when a new file has been loaded with new resolution
+            if (parameter_store->exists("resolution_initialized") &&
+                parameter_store->get<bool>("resolution_initialized"))
             {
 
-                width = event_data.get_camera_resolution().x;
-                height = event_data.get_camera_resolution().y;
+                width = event_data.get_camera_event_resolution().x;
+                height = event_data.get_camera_event_resolution().y;
 
-                if (width == 0 || height == 0)
+                // Sanity check
+                if (width == 0 || height == 0 || width > 1920.0f || height > 1200.0f)
                 {
                     return;
                 }
@@ -199,6 +198,7 @@ class DigitalCodedExposure
     
                 positive_values_texture = create_intermediate_texture(width, height);
                 negative_values_texture = create_intermediate_texture(width, height);
+                parameter_store->add("resolution_initialized", false);
             }
         }
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
@@ -206,6 +206,7 @@ class DigitalCodedExposure
         }
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
         {
+            // Ensure there is data
             event_data.lock_data_vectors();
             if (event_data.get_evt_vector_ref().empty())
             {
@@ -213,6 +214,11 @@ class DigitalCodedExposure
                 return;
             }
             event_data.unlock_data_vectors();
+            // Sanity check resolution
+            if (width == 0.0f || height == 0.0f || width > 1920.0f || height > 1200.0f)
+            {
+                return;
+            }
 
             SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
 

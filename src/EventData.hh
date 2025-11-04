@@ -12,15 +12,22 @@
 #include <set>
 
 // From previous NOVA source code
-// Used for timestamp comparisons
-inline bool less_vec4_t(const glm::vec4 &a, const glm::vec4 &b)
+// Used for timestamp comparisons of event data
+inline bool event_less_vec4_t(const glm::vec4 &a, const glm::vec4 &b)
 {
     return a.z < b.z;
 }
 
+// From previous NOVA source code
+// Used for timestamp comparisons of frame data
+inline bool frame_less_vec4_t(const std::pair<cv::Mat, float> &a, const std::pair<cv::Mat, float> &b)
+{
+    return a.second < b.second;
+}
+
 class EventData
 {
-
+        // Internal structs
     public:
         // Represents single event datum
         struct EventDatum
@@ -38,14 +45,40 @@ class EventData
                 int64_t timestamp;
         };
 
+        // Member variables
+    private:
+        std::multiset<EventDatum> evt_data; // Ensures ordered event data
+
+        std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
+
+        std::vector<glm::vec4> evt_data_vector_relative;
+        std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
+
+        // Set camera resolution
+        int32_t camera_event_width{};
+        int32_t camera_event_height{};
+
+        int32_t camera_frame_width{};
+        int32_t camera_frame_height{};
+
+        bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
+        bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are
+                                            // exposed.
+
+        float max_element_percentage;  // What percentage of max size of vector should number of elements populate
+        float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they
+                                       // exceed max_element_percentage
+        std::recursive_mutex evt_lock;
+
+    public:
         /**
          * @brief Default constructor for event data.
          */
         EventData()
-            : evt_data{}, frame_data{}, evt_data_vector_relative{}, frame_data_vector_relative{},
-              evt_data_vector_need_update{false}, frame_data_vector_need_update{false}, max_element_percentage{0.8f},
-              cull_element_percentage{0.5f}, evt_lock{}
-
+            : evt_data{}, frame_data{}, evt_data_vector_relative{}, frame_data_vector_relative{}, camera_event_height{},
+              camera_event_width{}, camera_frame_height{}, camera_frame_width{}, evt_data_vector_need_update{false},
+              frame_data_vector_need_update{false}, max_element_percentage{0.8f}, cull_element_percentage{0.5f},
+              evt_lock{}
         // changed_evt_thread_map{}, changed_evt_thread_map_lock{}, changed_frame_thread_map{},
         // changed_frame_thread_map_lock{}
         {
@@ -66,8 +99,11 @@ class EventData
             evt_data_vector_relative.clear();
             frame_data_vector_relative.clear();
 
-            camera_width = 0;
-            camera_height = 0;
+            camera_event_width = 0;
+            camera_event_height = 0;
+
+            camera_frame_width = 0;
+            camera_frame_height = 0;
 
             evt_data_vector_need_update = false;
             frame_data_vector_need_update = false;
@@ -100,22 +136,47 @@ class EventData
          * @param width Width of camera.
          * @param height Height of camera.
          */
-        void set_camera_resolution(int32_t width, int32_t height)
+        void set_camera_event_resolution(int32_t width, int32_t height)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            camera_width = width;
-            camera_height = height;
+            camera_event_width = width;
+            camera_event_height = height;
             evt_lock_ul.unlock();
         }
 
         /**
-         * Gets camera resolution.
-         * @return camera resolution as glm::vec2 (width, height).
+         * Sets camera resolution for frame data.
+         * @param width Width of camera.
+         * @param height Height of camera.
          */
-        glm::vec2 get_camera_resolution()
+        void set_camera_frame_resolution(int32_t width, int32_t height)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            glm::vec2 camera_res{static_cast<float>(camera_width), static_cast<float>(camera_height)};
+            camera_frame_width = width;
+            camera_frame_height = height;
+            evt_lock_ul.unlock();
+        }
+
+        /**
+         * Gets event camera resolution.
+         * @return event camera resolution as glm::vec2 (width, height).
+         */
+        glm::vec2 get_camera_event_resolution()
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            glm::vec2 camera_res{static_cast<float>(camera_event_width), static_cast<float>(camera_event_height)};
+            evt_lock_ul.unlock();
+            return camera_res;
+        }
+
+        /**
+         * Gets frame camera resolution.
+         * @return frame camera resolution as glm::vec2 (width, height).
+         */
+        glm::vec2 get_camera_frame_resolution()
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            glm::vec2 camera_res{static_cast<float>(camera_frame_width), static_cast<float>(camera_frame_height)};
             evt_lock_ul.unlock();
             return camera_res;
         }
@@ -314,7 +375,7 @@ class EventData
          * @param timestamp Provided timestamp.
          * @return -1 if relative event data vector is empty, index otherwise.
          */
-        int64_t get_index_from_timestamp(float timestamp)
+        int64_t get_event_index_from_timestamp(float timestamp)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
@@ -323,11 +384,18 @@ class EventData
                 evt_lock_ul.unlock();
                 return -1; // Vector is empty, return -1
             }
+
+            // Ensure sorted
+            if (evt_data_vector_need_update)
+            {
+                update_evt_data_vectors();
+            }
+
             glm::vec4 timestampVec4(0.0f, 0.0f, timestamp, 0.0f);
 
             // evt_data_vector_relative should be sorted by the way EventData class is setup.
             auto lb = std::lower_bound(evt_data_vector_relative.begin(), evt_data_vector_relative.end(), timestampVec4,
-                                       less_vec4_t);
+                                       event_less_vec4_t);
             if (lb == evt_data_vector_relative.end())
             {
                 return evt_data_vector_relative.size() - 1;
@@ -338,26 +406,45 @@ class EventData
             return ret_index;
         }
 
+        /**
+         * @brief Gets index of first frame data in relative event data vector with timestamp that is equal or greater
+         *        than provided timestamp.
+         * @param timestamp Provided timestamp.
+         * @return -1 if relative frame data vector is empty, index otherwise.
+         */
+        int64_t get_frame_index_from_timestamp(float timestamp)
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+
+            if (frame_data_vector_relative.empty())
+            {
+                evt_lock_ul.unlock();
+                return -1; // Vector is empty, return -1
+            }
+
+            // Ensure sorted
+            if (frame_data_vector_need_update)
+            {
+                update_frame_data_vectors();
+            }
+
+            std::pair<cv::Mat, float> timestampPair{cv::Mat{}, timestamp};
+
+            // frame_data_vector_relative should be sorted by the way EventData class is setup.
+            auto lb = std::lower_bound(frame_data_vector_relative.begin(), frame_data_vector_relative.end(),
+                                       timestampPair, frame_less_vec4_t);
+            if (lb == frame_data_vector_relative.end())
+            {
+                return frame_data_vector_relative.size() - 1;
+            }
+            int64_t ret_index{static_cast<int64_t>(std::distance(frame_data_vector_relative.begin(), lb))};
+
+            evt_lock_ul.unlock();
+            return ret_index;
+        }
+
+        // Helper functions
     private:
-        std::multiset<EventDatum> evt_data; // Ensures ordered event data
-
-        std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
-
-        std::vector<glm::vec4> evt_data_vector_relative;
-        std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
-
-        // Set camera resolution
-        int32_t camera_width;
-        int32_t camera_height;
-
-        bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
-        bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are
-                                            // exposed.
-
-        float max_element_percentage;  // What percentage of max size of vector should number of elements populate
-        float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they
-                                       // exceed max_element_percentage
-        std::recursive_mutex evt_lock;
         // Hashmaps contains thread id mapped to boolean that indicates if new data was read
         // since the thread called the get_*_vectors functions. This was added because
         // calling these functions is expensive and should only be done

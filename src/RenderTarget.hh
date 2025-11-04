@@ -7,10 +7,10 @@
 
 struct RenderTarget
 {
-    SDL_GPUTexture *texture = nullptr;
-    unsigned width = 0;
-    unsigned height = 0;
-    bool is_focused = false;
+        SDL_GPUTexture *texture = nullptr;
+        unsigned width = 0;
+        unsigned height = 0;
+        bool is_focused = false;
 };
 
 #endif

@@ -10,6 +10,7 @@ file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.hh")
 
 find_package(sdl3 REQUIRED)
+find_package(sdl3_ttf REQUIRED)
 find_package(glm REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(dv-processing CONFIG REQUIRED)
@@ -34,6 +35,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
+    SDL3_ttf::SDL3_ttf
     glm::glm
     Eigen3::Eigen
     dv::processing
