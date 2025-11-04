@@ -114,7 +114,7 @@ class DigitalCodedExposure
             compute_pipeline_info.num_readonly_storage_buffers = 1;
             compute_pipeline_info.num_readwrite_storage_textures = 3;
             compute_pipeline_info.num_readwrite_storage_buffers = 0;
-            compute_pipeline_info.num_uniform_buffers = 0;
+            compute_pipeline_info.num_uniform_buffers = 1;
             compute_pipeline_info.threadcount_x = 1;
             compute_pipeline_info.threadcount_y = 1;
             compute_pipeline_info.threadcount_z = 1;

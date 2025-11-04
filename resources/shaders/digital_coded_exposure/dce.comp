@@ -10,6 +10,14 @@ layout(set = 1, binding = 0, rgba8) uniform image2D out_image;
 layout(set = 1, binding = 1, r32ui) uniform uimage2D positive_texture;
 layout(set = 1, binding = 2, r32ui) uniform uimage2D negative_texture;
 
+layout(set = 2, binding = 0) uniform Uniforms {
+    vec4 posCol;
+    vec4 neutCol;
+    vec4 negCol;
+    vec4 floatFlags; // x: color option, y: scale
+    vec4 flags;      // x: posOnly?, y: morlet (unused)
+} ubo;
+
 void write_to_intermediate_texture(int eventIndex) {
     vec4 evt = event_buffer.data[eventIndex];
     float x = evt.x;
@@ -19,9 +27,9 @@ void write_to_intermediate_texture(int eventIndex) {
     // Convert to ivec2 coords; ensure these coords are valid for your texture at dispatch time
     ivec2 coord = ivec2(int(x), int(y));
 
-    if (polarity == 0.0) {
+    if (polarity == 1.0) {
         imageAtomicAdd(positive_texture, coord, uint(1));
-    } else {
+    } else if(ubo.flags.x < 0.5) {
         imageAtomicAdd(negative_texture, coord, uint(1));
     }
 }
