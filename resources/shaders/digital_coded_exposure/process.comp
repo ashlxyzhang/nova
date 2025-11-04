@@ -23,9 +23,9 @@ void main() {
     
 
     float scale = 0.5;
-    vec4 colorNeg = vec4(1.0, 0.0, 0.0, 1.0);
-    vec4 colorPos = vec4(0.0, 1.0, 0.0, 1.0);
-    vec4 colorNeut = vec4(0.0, 0.0, 0.0, 1.0);
+    vec4 colorNeg = ubo.negCol;
+    vec4 colorPos = ubo.posCol;
+    vec4 colorNeut = ubo.neutCol;
     float colorScale = 1/(1+exp(scale*(float(positive_events) - float(negative_events))));
     float negScale = 1.0 - colorScale;
     vec4 color;
