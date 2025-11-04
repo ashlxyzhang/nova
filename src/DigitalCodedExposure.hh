@@ -10,7 +10,10 @@
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
-#include "shaders/digital_coded_exposure/dce_comp.h"
+#include "shaders/digital_coded_exposure/dceo_comp.h"
+#include "shaders/digital_coded_exposure/clear_comp.h"
+#include "shaders/digital_coded_exposure/process_comp.h"
+
 
 #include <iostream>
 
@@ -34,10 +37,31 @@ class DigitalCodedExposure
         SDL_GPUDevice *gpu_device = nullptr;
 
         SDL_GPUComputePipeline *compute_pipeline = nullptr;
+        SDL_GPUComputePipeline *clear_compute_pipeline = nullptr;
+        SDL_GPUComputePipeline *process_compute_pipeline = nullptr;
+
+        SDL_GPUTexture *positive_values_texture = nullptr;
+        SDL_GPUTexture *negative_values_texture = nullptr;
+
 
         std::string last_file = "";
         unsigned int width;
         unsigned int height;
+
+        SDL_GPUTexture* create_intermediate_texture(unsigned int width, unsigned int height) {
+            SDL_GPUTextureCreateInfo color_create_info = {
+                .type = SDL_GPU_TEXTURETYPE_2D,
+                .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
+                .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                .width = width,
+                .height = height,
+                .layer_count_or_depth = 1,
+                .num_levels = 1,
+                .sample_count = SDL_GPU_SAMPLECOUNT_1,
+            };
+
+            return SDL_CreateGPUTexture(gpu_device, &color_create_info);
+        }
 
     public:
         DigitalCodedExposure(ParameterStore *parameter_store,
@@ -59,16 +83,36 @@ class DigitalCodedExposure
                 .sample_count = SDL_GPU_SAMPLECOUNT_1,
             };
             render_targets["DigitalCodedExposure"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), 1920, 1080};
+            
+            positive_values_texture = create_intermediate_texture(1920, 1080);
+            negative_values_texture = create_intermediate_texture(1920, 1080);
+
+            SDL_GPUComputePipelineCreateInfo clear_compute_pipeline_info = {0};
+            clear_compute_pipeline_info.code_size = sizeof(clear_comp);
+            clear_compute_pipeline_info.code = (Uint8 *)clear_comp;
+            clear_compute_pipeline_info.entrypoint = "main";
+            clear_compute_pipeline_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+            clear_compute_pipeline_info.num_samplers = 0;
+            clear_compute_pipeline_info.num_readonly_storage_textures = 0;
+            clear_compute_pipeline_info.num_readonly_storage_buffers = 0;
+            clear_compute_pipeline_info.num_readwrite_storage_textures = 3;
+            clear_compute_pipeline_info.num_readwrite_storage_buffers = 0;
+            clear_compute_pipeline_info.num_uniform_buffers = 0;
+            clear_compute_pipeline_info.threadcount_x = 1;
+            clear_compute_pipeline_info.threadcount_y = 1;
+            clear_compute_pipeline_info.threadcount_z = 1;
+
+            clear_compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &clear_compute_pipeline_info);
 
             SDL_GPUComputePipelineCreateInfo compute_pipeline_info = {0};
-            compute_pipeline_info.code_size = sizeof(dce_comp);
-            compute_pipeline_info.code = (Uint8 *)dce_comp;
+            compute_pipeline_info.code_size = sizeof(dceo_comp);
+            compute_pipeline_info.code = (Uint8 *)dceo_comp;
             compute_pipeline_info.entrypoint = "main";
             compute_pipeline_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
             compute_pipeline_info.num_samplers = 0;
             compute_pipeline_info.num_readonly_storage_textures = 0;
             compute_pipeline_info.num_readonly_storage_buffers = 1;
-            compute_pipeline_info.num_readwrite_storage_textures = 1;
+            compute_pipeline_info.num_readwrite_storage_textures = 3;
             compute_pipeline_info.num_readwrite_storage_buffers = 0;
             compute_pipeline_info.num_uniform_buffers = 1;
             compute_pipeline_info.threadcount_x = 1;
@@ -76,12 +120,34 @@ class DigitalCodedExposure
             compute_pipeline_info.threadcount_z = 1;
 
             compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &compute_pipeline_info);
+
+            SDL_GPUComputePipelineCreateInfo process_compute_pipeline_info = {0};
+            process_compute_pipeline_info.code_size = sizeof(process_comp);
+            process_compute_pipeline_info.code = (Uint8 *)process_comp;
+            process_compute_pipeline_info.entrypoint = "main";
+            process_compute_pipeline_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+            process_compute_pipeline_info.num_samplers = 0;
+            process_compute_pipeline_info.num_readonly_storage_textures = 0;
+            process_compute_pipeline_info.num_readonly_storage_buffers = 0;
+            process_compute_pipeline_info.num_readwrite_storage_textures = 3;
+            process_compute_pipeline_info.num_readwrite_storage_buffers = 0;
+            process_compute_pipeline_info.num_uniform_buffers = 0;
+            process_compute_pipeline_info.threadcount_x = 1;
+            process_compute_pipeline_info.threadcount_y = 1;
+            process_compute_pipeline_info.threadcount_z = 1;
+
+            process_compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &process_compute_pipeline_info);
         }
 
         ~DigitalCodedExposure()
         {
             SDL_ReleaseGPUComputePipeline(gpu_device, compute_pipeline);
+            SDL_ReleaseGPUComputePipeline(gpu_device, clear_compute_pipeline);
+            SDL_ReleaseGPUComputePipeline(gpu_device, process_compute_pipeline);
+
             SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
+            SDL_ReleaseGPUTexture(gpu_device, positive_values_texture);
+            SDL_ReleaseGPUTexture(gpu_device, negative_values_texture);
         }
 
         bool event_handler(SDL_Event *event)
@@ -127,6 +193,12 @@ class DigitalCodedExposure
 
                 render_targets["DigitalCodedExposure"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), width,
                                                           height};
+
+                SDL_ReleaseGPUTexture(gpu_device, positive_values_texture);
+                SDL_ReleaseGPUTexture(gpu_device, negative_values_texture);
+    
+                positive_values_texture = create_intermediate_texture(width, height);
+                negative_values_texture = create_intermediate_texture(width, height);
             }
         }
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
@@ -141,19 +213,39 @@ class DigitalCodedExposure
                 return;
             }
             event_data.unlock_data_vectors();
-            SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings = {0};
 
-            texture_buffer_bindings.texture = render_targets["DigitalCodedExposure"].texture;
-            texture_buffer_bindings.mip_level = 0;
-            texture_buffer_bindings.layer = 0;
-            texture_buffer_bindings.cycle = false;
+            SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
+
+            // First texture: DigitalCodedExposure
+            texture_buffer_bindings[0].texture   = render_targets["DigitalCodedExposure"].texture;
+            texture_buffer_bindings[0].mip_level = 0;
+            texture_buffer_bindings[0].layer     = 0;
+            texture_buffer_bindings[0].cycle     = false;
+
+            texture_buffer_bindings[1].texture   = positive_values_texture;
+            texture_buffer_bindings[1].mip_level = 0;
+            texture_buffer_bindings[1].layer     = 0;
+            texture_buffer_bindings[1].cycle     = false;
+
+            texture_buffer_bindings[2].texture   = negative_values_texture;
+            texture_buffer_bindings[2].mip_level = 0;
+            texture_buffer_bindings[2].layer     = 0;
+            texture_buffer_bindings[2].cycle     = false;
 
             SDL_GPUComputePass *compute_pass =
-                SDL_BeginGPUComputePass(command_buffer, &texture_buffer_bindings, 1, nullptr, 0);
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+
+            SDL_BindGPUComputeStorageTextures(compute_pass, 0, &render_targets["DigitalCodedExposure"].texture, 1);
+            SDL_BindGPUComputeStorageTextures(compute_pass, 1, &positive_values_texture, 1);
+            SDL_BindGPUComputeStorageTextures(compute_pass, 2, &negative_values_texture, 1);
+            SDL_BindGPUComputePipeline(compute_pass, clear_compute_pipeline);
+
+            SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
             SDL_GPUBuffer *points_buffer = scrubber->get_points_buffer();
+            int point_count = scrubber->get_points_buffer_size();
+
             SDL_BindGPUComputeStorageBuffers(compute_pass, 0, &points_buffer, 1);
-            SDL_BindGPUComputeStorageTextures(compute_pass, 1, &render_targets["DigitalCodedExposure"].texture, 1);
             SDL_BindGPUComputePipeline(compute_pass, compute_pipeline);
 
             if (!parameter_store->exists("dce_color"))
@@ -249,6 +341,9 @@ class DigitalCodedExposure
             pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
             SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_DispatchGPUCompute(compute_pass, point_count, 1, 1);
+
+            SDL_BindGPUComputePipeline(compute_pass, process_compute_pipeline);
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
             SDL_EndGPUComputePass(compute_pass);

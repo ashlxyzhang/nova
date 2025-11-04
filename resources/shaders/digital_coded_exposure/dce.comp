@@ -9,11 +9,7 @@ layout(std430, set = 0, binding = 0) readonly buffer EventBuffer {
 layout(set = 1, binding = 0, rgba8) uniform writeonly image2D out_image;
 
 layout(set = 2, binding = 0) uniform Uniforms {
-    vec4 posCol;
-    vec4 neutCol;
-    vec4 negCol;
-    vec4 floatFlags; // x: two color?, 
-    vec4 flags; // x: posOnly?, y: morlet (unused)
+    vec4 color;
 } ubo;
 
 int countEvents(int x, int y, inout int dataArray[2]) {
@@ -21,7 +17,7 @@ int countEvents(int x, int y, inout int dataArray[2]) {
     for (int i = 0; i < len; i++) {
         vec4 evt = event_buffer.data[i];
         if (evt.x == float(x) && evt.y == float(y)) {
-            if (evt.w == 0.0 && ubo.flags.x < 0.5) {
+            if (evt.w == 0.0) {
                 dataArray[0] += 1;
             } else {
                 dataArray[1] += 1;
@@ -35,24 +31,10 @@ void main() {
     uvec3 gid = gl_GlobalInvocationID;
     int events[2] = int[2](0, 0);
 
-    int total = countEvents(int(gid.x), int(gid.y), events);
-    float scale = ubo.floatFlags.y; //scaling factor for sigmoid
-    vec4 colorNeg = ubo.negCol;
-    vec4 colorPos = ubo.posCol;
-    vec4 colorNeut = ubo.neutCol;
-    vec4 mixColor = mix(colorNeg, colorPos, 0.5); 
-    if (ubo.floatFlags.x < 0.9 || ubo.floatFlags.x > 1.1) {
-        colorNeut = mixColor;
-    }
-    float colorScale = 1/(1+exp(scale*(-float(events[1]) + float(events[0]))));
-    float negScale = 1.0 - colorScale;
-    vec4 color;
-    if (colorScale > 0.5) {
-        color = mix(colorNeut, colorPos, (colorScale - 0.5) * 2.0);
-    } else {
-        color = mix(colorNeut, colorNeg, (negScale - 0.5) * 2.0);
+    // int total = countEvents(int(gid.x), int(gid.y), events);
+    // float scale = 0.5;
+    // float color = 0.5 + 0.5/(1+exp(scale*(float(events[1]) - float(events[0]))));
+    vec4 newColor = vec4(0.0, 0.0, 0.0, 0.5);
 
-    }
-    vec4 newColor = color;
     imageStore(out_image, ivec2(gid.xy), newColor);
 }

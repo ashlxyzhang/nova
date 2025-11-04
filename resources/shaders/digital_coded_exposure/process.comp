@@ -1,0 +1,21 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 1, binding = 0, rgba8) uniform image2D out_image;
+layout(set = 1, binding = 1, r32ui) uniform uimage2D positive_texture;
+layout(set = 1, binding = 2, r32ui) uniform uimage2D negative_texture;
+
+
+void main() {
+    uvec3 gid = gl_GlobalInvocationID;
+    uint positive_events = imageLoad(positive_texture, ivec2(gid.xy))[0];
+    uint negative_events = imageLoad(negative_texture, ivec2(gid.xy))[0];
+
+
+    float scale = 0.5;
+    float color = 0.5 + 0.5/(1+exp(scale*(float(positive_events) - float(negative_events))));
+    vec4 newColor = vec4(color, color, color, 0.5);
+
+    imageStore(out_image, ivec2(gid.xy), newColor);
+}
