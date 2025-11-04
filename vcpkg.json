@@ -1,0 +1,12 @@
+{
+  "dependencies": [
+    "dv-processing",
+    "eigen3",
+    "glm",
+    {
+      "name": "sdl3",
+      "features" : ["vulkan"]
+    },
+    "sdl3-ttf"
+  ]
+}
