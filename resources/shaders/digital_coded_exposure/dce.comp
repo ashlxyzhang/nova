@@ -6,35 +6,29 @@ layout(std430, set = 0, binding = 0) readonly buffer EventBuffer {
     vec4 data[];
 } event_buffer;
 
-layout(set = 1, binding = 0, rgba8) uniform writeonly image2D out_image;
+layout(set = 1, binding = 0, rgba8) uniform image2D out_image;
+layout(set = 1, binding = 1, r32ui) uniform uimage2D positive_texture;
+layout(set = 1, binding = 2, r32ui) uniform uimage2D negative_texture;
 
-layout(set = 2, binding = 0) uniform Uniforms {
-    vec4 color;
-} ubo;
+void write_to_intermediate_texture(int eventIndex) {
+    vec4 evt = event_buffer.data[eventIndex];
+    float x = evt.x;
+    float y = evt.y;
+    float polarity = evt.w;
 
-int countEvents(int x, int y, inout int dataArray[2]) {
-    int len = event_buffer.data.length(); // or pass len as uniform
-    for (int i = 0; i < len; i++) {
-        vec4 evt = event_buffer.data[i];
-        if (evt.x == float(x) && evt.y == float(y)) {
-            if (evt.w == 0.0) {
-                dataArray[0] += 1;
-            } else {
-                dataArray[1] += 1;
-            }
-        }
+    // Convert to ivec2 coords; ensure these coords are valid for your texture at dispatch time
+    ivec2 coord = ivec2(int(x), int(y));
+
+    if (polarity == 0.0) {
+        imageAtomicAdd(positive_texture, coord, uint(1));
+    } else {
+        imageAtomicAdd(negative_texture, coord, uint(1));
     }
-    return len;
 }
 
 void main() {
     uvec3 gid = gl_GlobalInvocationID;
-    int events[2] = int[2](0, 0);
 
-    // int total = countEvents(int(gid.x), int(gid.y), events);
-    // float scale = 0.5;
-    // float color = 0.5 + 0.5/(1+exp(scale*(float(events[1]) - float(events[0]))));
-    vec4 newColor = vec4(0.0, 0.0, 0.0, 0.5);
-
-    imageStore(out_image, ivec2(gid.xy), newColor);
+    // explicit cast from uint -> int
+    write_to_intermediate_texture(int(gid.x));
 }

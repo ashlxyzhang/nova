@@ -10,7 +10,7 @@
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
-#include "shaders/digital_coded_exposure/dceo_comp.h"
+#include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/clear_comp.h"
 #include "shaders/digital_coded_exposure/process_comp.h"
 
@@ -105,8 +105,8 @@ class DigitalCodedExposure
             clear_compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &clear_compute_pipeline_info);
 
             SDL_GPUComputePipelineCreateInfo compute_pipeline_info = {0};
-            compute_pipeline_info.code_size = sizeof(dceo_comp);
-            compute_pipeline_info.code = (Uint8 *)dceo_comp;
+            compute_pipeline_info.code_size = sizeof(dce_comp);
+            compute_pipeline_info.code = (Uint8 *)dce_comp;
             compute_pipeline_info.entrypoint = "main";
             compute_pipeline_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
             compute_pipeline_info.num_samplers = 0;

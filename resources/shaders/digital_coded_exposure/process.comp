@@ -6,16 +6,36 @@ layout(set = 1, binding = 0, rgba8) uniform image2D out_image;
 layout(set = 1, binding = 1, r32ui) uniform uimage2D positive_texture;
 layout(set = 1, binding = 2, r32ui) uniform uimage2D negative_texture;
 
+layout(set = 2, binding = 0) uniform Uniforms {
+    vec4 posCol;
+    vec4 neutCol;
+    vec4 negCol;
+    vec4 floatFlags; // x: two color?
+    vec4 flags;      // x: posOnly?, y: morlet (unused)
+} ubo;
+
 
 void main() {
     uvec3 gid = gl_GlobalInvocationID;
     uint positive_events = imageLoad(positive_texture, ivec2(gid.xy))[0];
     uint negative_events = imageLoad(negative_texture, ivec2(gid.xy))[0];
 
+    
 
     float scale = 0.5;
-    float color = 0.5 + 0.5/(1+exp(scale*(float(positive_events) - float(negative_events))));
-    vec4 newColor = vec4(color, color, color, 0.5);
+    vec4 colorNeg = vec4(1.0, 0.0, 0.0, 1.0);
+    vec4 colorPos = vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 colorNeut = vec4(0.0, 0.0, 0.0, 1.0);
+    float colorScale = 1/(1+exp(scale*(float(positive_events) - float(negative_events))));
+    float negScale = 1.0 - colorScale;
+    vec4 color;
+    if (colorScale > 0.5 || ubo.flags.x > 0.5) {
+        color = mix(colorNeut, colorPos, (colorScale - 0.5) * 2.0);
+    } else {
+        color = mix(colorNeut, colorNeg, (negScale - 0.5) * 2.0);
+
+    }
+    vec4 newColor = color;
 
     imageStore(out_image, ivec2(gid.xy), newColor);
 }
