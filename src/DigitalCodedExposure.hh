@@ -240,10 +240,6 @@ class DigitalCodedExposure
 
             SDL_GPUComputePass *compute_pass =
                 SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-
-            SDL_BindGPUComputeStorageTextures(compute_pass, 0, &render_targets["DigitalCodedExposure"].texture, 1);
-            SDL_BindGPUComputeStorageTextures(compute_pass, 1, &positive_values_texture, 1);
-            SDL_BindGPUComputeStorageTextures(compute_pass, 2, &negative_values_texture, 1);
             SDL_BindGPUComputePipeline(compute_pass, clear_compute_pipeline);
 
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);

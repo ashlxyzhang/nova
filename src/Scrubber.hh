@@ -13,13 +13,13 @@
 class Scrubber
 {
     public:
-        enum class ScrubberType : uint8_t
+        enum class ScrubberType : std::uint8_t
         {
             EVENT,
             TIME,
         };
 
-        enum class ScrubberMode : uint8_t
+        enum class ScrubberMode : std::uint8_t
         {
             PAUSED,
             PLAYING,
@@ -55,8 +55,9 @@ class Scrubber
         float upper_depth = 0.0f;
         glm::vec2 camera_resolution = glm::vec2(0.0f, 0.0f);
 
-        SDL_GPUTexture *textures = nullptr;
-        SDL_GPUBuffer *textures_timestamps = nullptr;
+        SDL_GPUTexture *frames = nullptr;
+        std::array<float, 2> frame_timestamps;
+        std::size_t frame_width = 0, frame_height = 0;
 
     public:
         Scrubber(ParameterStore &parameter_store, EventData *event_data, SDL_GPUDevice *gpu_device)
@@ -84,13 +85,9 @@ class Scrubber
             {
                 SDL_ReleaseGPUBuffer(gpu_device, points_buffer);
             }
-            if (textures)
+            if (frames)
             {
-                SDL_ReleaseGPUTexture(gpu_device, textures);
-            }
-            if (textures_timestamps)
-            {
-                SDL_ReleaseGPUBuffer(gpu_device, textures_timestamps);
+                SDL_ReleaseGPUTexture(gpu_device, frames);
             }
         }
 
@@ -102,9 +99,9 @@ class Scrubber
 
             event_data->lock_data_vectors();
 
-            if(event_data -> get_evt_vector_ref().empty())
+            if (event_data->get_evt_vector_ref().empty())
             {
-                event_data -> unlock_data_vectors();
+                event_data->unlock_data_vectors();
                 return;
             }
 
@@ -250,7 +247,7 @@ class Scrubber
             {
                 return;
             }
-            
+
             lower_depth = evt_vector[lower_index].z;
             upper_depth = evt_vector[current_index].z;
             camera_resolution = event_data->get_camera_event_resolution();
@@ -275,6 +272,144 @@ class Scrubber
             event_data->lock_data_vectors();
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
             upload_buffer->upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
+
+            // recreate frame if necessary
+            glm::vec2 current_frame_dimensions = event_data->get_camera_frame_resolution();
+            if (frame_width != current_frame_dimensions.x || frame_height != current_frame_dimensions.y)
+            {
+                if (frames != nullptr)
+                {
+                    SDL_ReleaseGPUTexture(gpu_device, frames);
+                    frames = nullptr;
+                }
+                frame_width = current_frame_dimensions.x;
+                frame_height = current_frame_dimensions.y;
+
+                SDL_GPUTextureCreateInfo frames_create_info = {};
+                frames_create_info.type = SDL_GPU_TEXTURETYPE_2D_ARRAY;
+                frames_create_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+                frames_create_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+                frames_create_info.width = frame_width;
+                frames_create_info.height = frame_height;
+                frames_create_info.layer_count_or_depth = 2;
+                frames_create_info.num_levels = 1;
+                frames = SDL_CreateGPUTexture(gpu_device, &frames_create_info);
+            }
+
+            // Find frames within the time window [lower_depth, upper_depth]
+            // and determine which 2 frames should be used for interpolation
+            // If there's only one in the window, use that but set the second timestamp to -1
+            // If there are no frames in the window, make both -1
+            const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data->get_frame_vector_ref();
+            
+            // Initialize both timestamps to -1 (invalid)
+            frame_timestamps[0] = -1.0f;
+            frame_timestamps[1] = -1.0f;
+            
+            if (frame_vector.empty())
+            {
+                event_data->unlock_data_vectors();
+                return;
+            }
+            
+            // Since frame_vector is sorted by timestamp, use binary search to find frames
+            // that bracket upper_depth (the current time we're interpolating at)
+            std::pair<cv::Mat, float> target_pair{cv::Mat{}, upper_depth};
+            auto lb = std::lower_bound(frame_vector.begin(), frame_vector.end(), target_pair, 
+                                       frame_less_vec4_t);
+            
+            std::size_t frame_idx_0 = 0;
+            std::size_t frame_idx_1 = 0;
+            bool found_valid_frames = false;
+            
+            // Determine which two frames to use for interpolation
+            if (lb == frame_vector.end())
+            {
+                // upper_depth is after all frames - use the last two frames
+                if (frame_vector.size() >= 2)
+                {
+                    frame_idx_0 = frame_vector.size() - 2;
+                    frame_idx_1 = frame_vector.size() - 1;
+                    found_valid_frames = true;
+                }
+                else if (frame_vector.size() == 1)
+                {
+                    frame_idx_0 = 0;
+                    found_valid_frames = true;
+                }
+            }
+            else if (lb == frame_vector.begin())
+            {
+                // upper_depth is before all frames - use the first two frames
+                if (frame_vector.size() >= 2)
+                {
+                    frame_idx_0 = 0;
+                    frame_idx_1 = 1;
+                    found_valid_frames = true;
+                }
+                else if (frame_vector.size() == 1)
+                {
+                    frame_idx_0 = 0;
+                    found_valid_frames = true;
+                }
+            }
+            else
+            {
+                // upper_depth is between frames - find the frame before and after
+                std::size_t after_idx = std::distance(frame_vector.begin(), lb);
+                std::size_t before_idx = after_idx - 1;
+                
+                // Check if frames are within the time window
+                bool before_in_window = (frame_vector[before_idx].second >= lower_depth && 
+                                        frame_vector[before_idx].second <= upper_depth);
+                bool after_in_window = (frame_vector[after_idx].second >= lower_depth && 
+                                       frame_vector[after_idx].second <= upper_depth);
+                
+                if (before_in_window && after_in_window)
+                {
+                    // Both frames are in window - use them
+                    frame_idx_0 = before_idx;
+                    frame_idx_1 = after_idx;
+                    found_valid_frames = true;
+                }
+                else if (before_in_window)
+                {
+                    // Only before frame is in window
+                    frame_idx_0 = before_idx;
+                    found_valid_frames = true;
+                }
+                else if (after_in_window)
+                {
+                    // Only after frame is in window
+                    frame_idx_0 = after_idx;
+                    found_valid_frames = true;
+                }
+                else
+                {
+                    // Neither frame is in window, but use them anyway for interpolation
+                    frame_idx_0 = before_idx;
+                    frame_idx_1 = after_idx;
+                    found_valid_frames = true;
+                }
+            }
+            
+            // Upload frames and set timestamps
+            if (found_valid_frames)
+            {
+                upload_buffer->upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_0].first, 0);
+                frame_timestamps[0] = frame_vector[frame_idx_0].second;
+                
+                if (frame_idx_1 != frame_idx_0 && frame_idx_1 < frame_vector.size())
+                {
+                    upload_buffer->upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_1].first, 1);
+                    frame_timestamps[1] = frame_vector[frame_idx_1].second;
+                }
+                else
+                {
+                    frame_timestamps[1] = -1.0f;
+                }
+            }
+
             event_data->unlock_data_vectors();
         }
 
@@ -282,6 +417,21 @@ class Scrubber
         SDL_GPUBuffer *get_points_buffer()
         {
             return points_buffer;
+        }
+
+        SDL_GPUTexture *get_frames_texture()
+        {
+            return frames;
+        }
+
+        std::array<float, 2> get_frames_timestamps()
+        {
+            return frame_timestamps;
+        }
+
+        std::array<std::size_t, 2> get_frame_dimensions()
+        {
+            return {frame_width, frame_height};
         }
 
         // return the size of the points buffer

@@ -38,4 +38,6 @@
 #include <backends/imgui_impl_sdlgpu3_shaders.h>
 #include <imgui.h>
 
+#include <opencv2/opencv.hpp>
+
 #endif // PCH_HH
