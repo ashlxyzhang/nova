@@ -12,6 +12,8 @@
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
 
+#include "shaders/visualizer/frames/frames_frag.h"
+#include "shaders/visualizer/frames/frames_vert.h"
 #include "shaders/visualizer/grid/grid_frag.h"
 #include "shaders/visualizer/grid/grid_vert.h"
 #include "shaders/visualizer/points/points_frag.h"
@@ -405,8 +407,10 @@ class Visualizer
                     glm::mat4 translate_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, -1.0f));
                     glm::mat4 rotate_matrix =
                         glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                    glm::mat4 z_switch =
+                        glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-                    uniforms.mvp = vp * rotate_matrix * translate_matrix * scale_matrix * z_translate;
+                    uniforms.mvp = vp * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
                     // Get camera dimensions for scaling
                     uniforms.negative_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_neg_color"), 1.0f);
@@ -725,6 +729,128 @@ class Visualizer
                 }
         };
 
+        class FramesRenderer
+        {
+            private:
+                ParameterStore *parameter_store = nullptr;
+                SDL_GPUDevice *gpu_device = nullptr;
+                Scrubber *scrubber = nullptr;
+                SDL_GPUGraphicsPipeline *frames_pipeline = nullptr;
+                SDL_GPUSampler *sampler = nullptr;
+
+            public:
+                FramesRenderer(ParameterStore *parameter_store, SDL_GPUDevice *gpu_device, Scrubber *scrubber)
+                    : parameter_store(parameter_store), gpu_device(gpu_device), scrubber(scrubber)
+                {
+                    SDL_GPUShaderCreateInfo vs_create_info = {0};
+                    vs_create_info.code_size = sizeof frames_vert;
+                    vs_create_info.code = (const unsigned char *)frames_vert;
+                    vs_create_info.entrypoint = "main";
+                    vs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                    vs_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+                    vs_create_info.num_samplers = 0;
+                    vs_create_info.num_storage_textures = 0;
+                    vs_create_info.num_storage_buffers = 0;
+                    vs_create_info.num_uniform_buffers = 1;
+                    SDL_GPUShader *vs = SDL_CreateGPUShader(gpu_device, &vs_create_info);
+
+                    SDL_GPUShaderCreateInfo fs_create_info = {0};
+                    fs_create_info.code_size = sizeof frames_frag;
+                    fs_create_info.code = (const unsigned char *)frames_frag;
+                    fs_create_info.entrypoint = "main";
+                    fs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                    fs_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+                    fs_create_info.num_samplers = 1;
+                    fs_create_info.num_storage_textures = 0;
+                    fs_create_info.num_storage_buffers = 0;
+                    fs_create_info.num_uniform_buffers = 1;
+                    SDL_GPUShader *fs = SDL_CreateGPUShader(gpu_device, &fs_create_info);
+
+                    SDL_GPUColorTargetDescription color_target_desc = {SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM};
+                    SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {
+                        .vertex_shader = vs,
+                        .fragment_shader = fs,
+                        .vertex_input_state = {.vertex_buffer_descriptions = nullptr,
+                                               .num_vertex_buffers = 0,
+                                               .vertex_attributes = nullptr,
+                                               .num_vertex_attributes = 0},
+                        .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+                        .depth_stencil_state = {.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
+                                                .enable_depth_test = true,
+                                                .enable_depth_write = true},
+                        .target_info = {.color_target_descriptions = &color_target_desc,
+                                        .num_color_targets = 1,
+                                        .depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+                                        .has_depth_stencil_target = true}};
+
+                    frames_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &pipeline_info);
+
+                    // Clean up shader resources
+                    SDL_ReleaseGPUShader(gpu_device, vs);
+                    SDL_ReleaseGPUShader(gpu_device, fs);
+
+                    SDL_GPUSamplerCreateInfo sampler_info = {};
+                    sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
+                    sampler_info.mag_filter = SDL_GPU_FILTER_LINEAR;
+                    sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+                    sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+                    sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+                    sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+                    sampler_info.mip_lod_bias = 0.0f;
+                    sampler_info.min_lod = -1000.0f;
+                    sampler_info.max_lod = 1000.0f;
+                    sampler_info.enable_anisotropy = false;
+                    sampler_info.max_anisotropy = 1.0f;
+                    sampler_info.enable_compare = false;
+                    sampler = SDL_CreateGPUSampler(gpu_device, &sampler_info);
+                }
+
+                ~FramesRenderer()
+                {
+                    if (sampler)
+                    {
+                        SDL_ReleaseGPUSampler(gpu_device, sampler);
+                    }
+                    if (frames_pipeline)
+                    {
+                        SDL_ReleaseGPUGraphicsPipeline(gpu_device, frames_pipeline);
+                    }
+                }
+
+                void cpu_update()
+                {
+                }
+
+                void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                {
+                }
+
+                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
+                                 const glm::mat4 &vp)
+                {
+                    if (!frames_pipeline || scrubber->get_frames_timestamps()[0] < 0.0f)
+                    {
+                        return;
+                    }
+
+                    SDL_BindGPUGraphicsPipeline(render_pass, frames_pipeline);
+
+                    glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+                    glm::mat4 mvp = vp * rotate;
+                    SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
+
+                    SDL_GPUTextureSamplerBinding sampler_binding = {};
+                    sampler_binding.texture = scrubber->get_frames_texture();
+                    sampler_binding.sampler = sampler;
+                    SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
+
+                    glm::vec4 frame_data = {scrubber->get_frames_timestamps()[0], scrubber->get_frames_timestamps()[1], scrubber->get_upper_depth(), 0.0f};
+                    SDL_PushGPUFragmentUniformData(command_buffer, 0, &frame_data, sizeof(frame_data));
+
+                    SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
+                }
+        };
+
         Camera camera;
         glm::vec3 box_min;
         glm::vec3 box_max;
@@ -740,8 +866,7 @@ class Visualizer
         GridRenderer *grid_renderer = nullptr;
         PointsRenderer *points_renderer = nullptr;
         TextRenderer *text_renderer = nullptr;
-
-        SDL_GPUGraphicsPipeline *frame_pipeline = nullptr;
+        FramesRenderer *frames_renderer = nullptr;
 
         // Mouse state for camera orbiting
         bool is_mouse_dragging = false;
@@ -787,10 +912,15 @@ class Visualizer
             points_renderer =
                 new PointsRenderer(parameter_store, event_data, scrubber, gpu_device, upload_buffer, copy_pass);
             text_renderer = new TextRenderer(parameter_store, gpu_device);
+            frames_renderer = new FramesRenderer(&parameter_store, gpu_device, scrubber);
         }
 
         ~Visualizer()
         {
+            if (frames_renderer)
+            {
+                delete frames_renderer;
+            }
             if (grid_renderer)
             {
                 delete grid_renderer;
@@ -880,6 +1010,7 @@ class Visualizer
             grid_renderer->cpu_update();
             points_renderer->cpu_update();
             text_renderer->cpu_update();
+            frames_renderer->cpu_update();
 
             // Add timestamp labels for each z subdivision
             if (!scrubber)
@@ -924,6 +1055,7 @@ class Visualizer
             grid_renderer->copy_pass(upload_buffer, copy_pass);
             points_renderer->copy_pass(upload_buffer, copy_pass);
             text_renderer->copy_pass(upload_buffer, copy_pass);
+            frames_renderer->copy_pass(upload_buffer, copy_pass);
         }
 
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
@@ -932,6 +1064,25 @@ class Visualizer
 
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
+            // auto ts = scrubber->get_frames_timestamps();
+            // if (ts[0] > 0.0f)
+            // {
+            //     // debug blit the frame to the back to test it
+            //     auto frame_texture = scrubber->get_frames_texture();
+            //     auto dims = scrubber->get_frame_dimensions();
+            //     SDL_GPUBlitInfo blit_info = {};
+            //     blit_info.source = SDL_GPUBlitRegion{frame_texture, 0, 0, 0, 0, (uint32_t)dims[0],
+            //     (uint32_t)dims[1]}; blit_info.destination = SDL_GPUBlitRegion{
+            //         render_targets["VisualizerColor"].texture, 0, 0, 0, 0, render_targets["VisualizerColor"].width,
+            //         render_targets["VisualizerColor"].height};
+            //     blit_info.load_op = SDL_GPU_LOADOP_DONT_CARE;
+            //     blit_info.clear_color = {};
+            //     blit_info.flip_mode = SDL_FLIP_NONE;
+            //     blit_info.filter = SDL_GPU_FILTER_NEAREST;
+            //     blit_info.cycle = false;
+            //     SDL_BlitGPUTexture(command_buffer, &blit_info);
+            // }
+
             // create the color target info, this is the texture that will store the color data
             SDL_GPUColorTargetInfo color_target_info = {0};
             color_target_info.texture = render_targets["VisualizerColor"].texture;
@@ -965,6 +1116,9 @@ class Visualizer
 
             // Render the points
             points_renderer->render_pass(command_buffer, render_pass, vp);
+
+            // Render the frames
+            frames_renderer->render_pass(command_buffer, render_pass, vp);
 
             // Render the text
             text_renderer->render_pass(command_buffer, render_pass, vp);
