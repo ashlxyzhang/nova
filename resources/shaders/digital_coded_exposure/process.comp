@@ -12,6 +12,8 @@ layout(set = 2, binding = 0) uniform Uniforms {
     vec4 negCol;
     vec4 floatFlags; // x: color option, y: scale, z: activation function
     vec4 flags;      // x: posOnly?, y: morlet (unused)
+    vec4 morletParams; // x: frequency, y: width, z: amplitude
+
 } ubo;
 
 
@@ -29,7 +31,7 @@ void main() {
     vec4 colorPos = ubo.posCol;
     vec4 colorNeut = ubo.neutCol;
     vec4 colorMix = mix(colorNeg, colorPos, 0.5);
-    float eventDiff = float(positive_events) - float(negative_events);
+    float eventDiff = (float(positive_events) - float(negative_events))/100000.0;
 
     if(ubo.floatFlags.x < 0.9 || ubo.floatFlags.x > 1.1) {
         colorNeut = colorMix;

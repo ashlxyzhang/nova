@@ -407,6 +407,23 @@ class GUI
 
             parameter_store->add("activation_function", activation_function);
 
+            ImGui::Separator();
+
+            if (!parameter_store->exists("morlet_frequency"))
+            {
+                parameter_store->add("morlet_frequency", 0.0f);
+            }
+            float morlet_frequency{parameter_store->get<float>("morlet_frequency")};
+            ImGui::SliderFloat("Morlet Frequency", &morlet_frequency, 0.0f, 10000.0f);
+            parameter_store->add("morlet_frequency", morlet_frequency);
+            
+            if (!parameter_store->exists("morlet_width"))
+            {
+                parameter_store->add("morlet_width", 0.01f);
+            }
+            float morlet_width{parameter_store->get<float>("morlet_width")};
+            ImGui::SliderFloat("Morlet Width", &morlet_width, 0.001f, 100000.0f);
+            parameter_store->add("morlet_width", morlet_width);
 
             // TODO implement video recording
             // Video (ffmpeg) controls
