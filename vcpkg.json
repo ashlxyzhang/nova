@@ -1,7 +1,6 @@
 {
   "dependencies": [
     "dv-processing",
-    "eigen3",
     "glm",
     {
       "name": "sdl3",
