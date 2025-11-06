@@ -238,22 +238,17 @@ class DigitalCodedExposure
             texture_buffer_bindings[2].layer     = 0;
             texture_buffer_bindings[2].cycle     = false;
 
-            SDL_GPUComputePass *clear_compute_pass =
+            SDL_GPUComputePass *compute_pass =
                 SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-            SDL_BindGPUComputePipeline(clear_compute_pass, clear_compute_pipeline);
+            SDL_BindGPUComputePipeline(compute_pass, clear_compute_pipeline);
 
-            SDL_DispatchGPUCompute(clear_compute_pass, width, height, 1);
-
-            SDL_EndGPUComputePass(clear_compute_pass);
-
-            SDL_GPUComputePass *main_compute_pass =
-                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
             SDL_GPUBuffer *points_buffer = scrubber->get_points_buffer();
             int point_count = scrubber->get_points_buffer_size();
 
-            SDL_BindGPUComputeStorageBuffers(main_compute_pass, 0, &points_buffer, 1);
-            SDL_BindGPUComputePipeline(main_compute_pass, compute_pipeline);
+            SDL_BindGPUComputeStorageBuffers(compute_pass, 0, &points_buffer, 1);
+            SDL_BindGPUComputePipeline(compute_pass, compute_pipeline);
 
             if (!parameter_store->exists("dce_color"))
             {
@@ -347,20 +342,13 @@ class DigitalCodedExposure
             pass_data.negCol = negCol;
             pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
-            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-            SDL_DispatchGPUCompute(main_compute_pass, point_count, 1, 1);
+            SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_DispatchGPUCompute(compute_pass, point_count, 1, 1);
 
-            SDL_EndGPUComputePass(main_compute_pass);
+            SDL_BindGPUComputePipeline(compute_pass, process_compute_pipeline);
+            SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
-            SDL_GPUComputePass *process_compute_pass =
-                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-            
-            SDL_BindGPUComputePipeline(process_compute_pass, process_compute_pipeline);
-            SDL_DispatchGPUCompute(process_compute_pass, width, height, 1);
-
-            SDL_EndGPUComputePass(process_compute_pass);
-
-            
+            SDL_EndGPUComputePass(compute_pass);
         }
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
