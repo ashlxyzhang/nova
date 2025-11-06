@@ -502,16 +502,15 @@ class Visualizer
                     SDL_GPUVertexBufferDescription vertex_buffer_desc = {0, sizeof(TextVertex),
                                                                          SDL_GPU_VERTEXINPUTRATE_VERTEX, 0};
                     SDL_GPUColorTargetDescription color_target_desc = {
-                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM, // Match GridRenderer
-                        .blend_state = {                                // From example code
-                                        .enable_blend = true,
-                                        .alpha_blend_op = SDL_GPU_BLENDOP_ADD,
+                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,                         // Match GridRenderer
+                        .blend_state = {.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA, // From example code
+                                        .dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
                                         .color_blend_op = SDL_GPU_BLENDOP_ADD,
-                                        .color_write_mask = 0xF,
                                         .src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA,
                                         .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_DST_ALPHA,
-                                        .src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA,
-                                        .dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA}};
+                                        .alpha_blend_op = SDL_GPU_BLENDOP_ADD,
+                                        .color_write_mask = 0xF,
+                                        .enable_blend = true}};
 
                     SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {
                         .vertex_shader = vs,
@@ -844,7 +843,8 @@ class Visualizer
                     sampler_binding.sampler = sampler;
                     SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
 
-                    glm::vec4 frame_data = {scrubber->get_frames_timestamps()[0], scrubber->get_frames_timestamps()[1], scrubber->get_upper_depth(), 0.0f};
+                    glm::vec4 frame_data = {scrubber->get_frames_timestamps()[0], scrubber->get_frames_timestamps()[1],
+                                            scrubber->get_upper_depth(), 0.0f};
                     SDL_PushGPUFragmentUniformData(command_buffer, 0, &frame_data, sizeof(frame_data));
 
                     SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
