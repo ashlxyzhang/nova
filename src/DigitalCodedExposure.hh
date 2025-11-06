@@ -160,6 +160,13 @@ class DigitalCodedExposure
             if (event_data.get_evt_vector_ref().empty())
             {
                 event_data.unlock_data_vectors();
+                // Delete old texture
+                if(render_targets["DigitalCodedExposure"].texture)
+                {
+                    SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
+                    render_targets["DigitalCodedExposure"].texture = nullptr;
+                }
+                
                 return;
             }
             event_data.unlock_data_vectors();
