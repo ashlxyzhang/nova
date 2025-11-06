@@ -103,6 +103,21 @@ class Scrubber
             if (event_data->get_evt_vector_ref().empty())
             {
                 event_data->unlock_data_vectors();
+
+                // No event data? Scrubber has nothing to scrub.
+                parameter_store.add("scrubber.current_index", 0ULL);
+                parameter_store.add("scrubber.index_window", 0ULL);
+                parameter_store.add("scrubber.index_step", 0ULL);
+                parameter_store.add("scrubber.min_index", 0ULL);
+                parameter_store.add("scrubber.max_index", 0ULL);
+
+                parameter_store.add("scrubber.current_time", 0.0f);
+                parameter_store.add("scrubber.time_window", 0.0f);
+                parameter_store.add("scrubber.time_step", 0.0f);
+                parameter_store.add("scrubber.min_time", 0.0f);
+                parameter_store.add("scrubber.max_time", 0.0f);
+                parameter_store.add("scrubber.show_frame_data", false);
+
                 return;
             }
 

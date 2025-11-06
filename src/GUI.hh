@@ -159,13 +159,15 @@ class GUI
 
             if (!parameter_store->exists("unit_type"))
             {
-                parameter_store->add("unit_type", 1);
+                parameter_store->add("unit_type", static_cast<uint8_t>(TIME::UNIT_US));
             }
-            int32_t unit_type{parameter_store->get<int32_t>("unit_type")};
+            uint8_t unit_type{parameter_store->get<uint8_t>("unit_type")};
 
-            const int32_t units[] = {1000000000, 1000, 1};
-
-            ImGui::Combo("Time Unit", &unit_type, "s\0ms\0us\0");
+            const float units[] = {1000000000.0f, 1000.0f, 1.0f};
+            
+            int32_t unit_type_copy{unit_type};
+            ImGui::Combo("Time Unit", &unit_type_copy, "s\0ms\0us\0");
+            unit_type = static_cast<uint8_t>(unit_type_copy);
             parameter_store->add("unit_time_conversion_factor", units[unit_type]);
             parameter_store->add("unit_type", unit_type);
 
@@ -762,8 +764,23 @@ class GUI
             else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
             {
                 // Get time unit information
-                int32_t unit_type = parameter_store->get<int32_t>("unit_type");
+                uint8_t unit_type = parameter_store->get<uint8_t>("unit_type");
                 std::string time_unit_suffix = time_units[unit_type];
+
+                // Determine format string based on time unit
+                std::string time_format_str{};
+                switch(static_cast<TIME>(unit_type))
+                {
+                    case TIME::UNIT_US:
+                        time_format_str = std::string{"%.2f"};
+                        break;
+                    case TIME::UNIT_MS:
+                        time_format_str = std::string{"%.4f"};
+                        break;
+                    case TIME::UNIT_S:
+                        time_format_str = std::string{"%.8f"};
+                        break;
+                }   
 
                 // Current Time
                 if (!parameter_store->exists("scrubber.current_time"))
@@ -771,6 +788,14 @@ class GUI
                     parameter_store->add("scrubber.current_time", 0.0f);
                 }
                 float current_time = parameter_store->get<float>("scrubber.current_time");
+
+                if(!parameter_store->exists("unit_time_conversion_factor"))
+                {
+                    parameter_store->add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
+                }
+                float unit_time_conversion_factor{parameter_store->get<float>("unit_time_conversion_factor")};
+                float current_time_unit_adjusted = current_time / unit_time_conversion_factor;
+
 
                 // Get min/max time values from scrubber if available
                 float min_time = 0.0f;
@@ -781,11 +806,20 @@ class GUI
                     max_time = parameter_store->get<float>("scrubber.max_time");
                 }
 
+                float min_time_unit_adjusted = min_time / unit_time_conversion_factor;
+                float max_time_unit_adjusted = max_time / unit_time_conversion_factor;
+
                 std::string current_time_label = "Current Time " + time_unit_suffix;
-                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time, min_time, max_time, "%.4f"))
+                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted, time_format_str.c_str()))
                 {
-                    current_time = std::clamp(current_time, min_time, max_time);
-                    parameter_store->add("scrubber.current_time", current_time);
+                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
+                    if(max_time_unit_adjusted > min_time_unit_adjusted)
+                    {
+                        current_time_unit_adjusted = std::clamp(current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted);
+                        current_time = current_time_unit_adjusted * unit_time_conversion_factor; // Revert conversion to store back into scrubber
+                        // Scrubber deals in us time unit
+                        parameter_store->add("scrubber.current_time", current_time);
+                    }
                 }
 
                 // Time Window
@@ -794,15 +828,24 @@ class GUI
                     parameter_store->add("scrubber.time_window", 1.0f);
                 }
                 float time_window = parameter_store->get<float>("scrubber.time_window");
+                float time_window_unit_adjusted = time_window / unit_time_conversion_factor;
 
                 // Calculate maximum window size (half of total time range, minimum 0.001)
-                float max_window_time = std::max(0.001f, (max_time - min_time) * 0.5f);
+                float max_window_time = std::max(0.00001f, (max_time - min_time) * 0.5f);
+                float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
+
 
                 std::string time_window_label = "Time Window " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window, 0.001f, max_window_time, "%.4f"))
+                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted, time_format_str.c_str()))
                 {
-                    time_window = std::clamp(time_window, 0.001f, max_window_time);
-                    parameter_store->add("scrubber.time_window", time_window);
+                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
+                    if (max_window_time_unit_adjusted > 0.00001f)
+                    {
+                        time_window_unit_adjusted = std::clamp(time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted);
+                        // Adjust back to us to store into scrubber
+                        time_window = time_window_unit_adjusted * unit_time_conversion_factor;
+                        parameter_store->add("scrubber.time_window", time_window);
+                    }
                 }
 
                 // Time Step
@@ -811,16 +854,21 @@ class GUI
                     parameter_store->add("scrubber.time_step", 0.1f);
                 }
                 float time_step = parameter_store->get<float>("scrubber.time_step");
+                float time_step_unit_adjusted = time_step / unit_time_conversion_factor;
 
                 // Calculate maximum step size (total time range)
                 float max_step_time = max_time - min_time;
+                float max_step_time_unit_adjusted = max_step_time / unit_time_conversion_factor;
 
                 std::string time_step_label = "Time Step " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step, 0.001f, max_step_time, "%.4f"))
+                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted, time_format_str.c_str()))
                 {
-                    if (max_step_time > 0.001f)
+                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
+                    if (max_step_time_unit_adjusted > 0.00001f)
                     {
-                        time_step = std::clamp(time_step, 0.001f, max_step_time);
+                        time_step_unit_adjusted = std::clamp(time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted);
+                        // Adjust back to us to store into data scrubber
+                        time_step = time_step_unit_adjusted * unit_time_conversion_factor;
                         parameter_store->add("scrubber.time_step", time_step);
                     }
                 }
