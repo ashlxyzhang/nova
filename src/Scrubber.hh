@@ -77,6 +77,7 @@ class Scrubber
             parameter_store.add("scrubber.time_step", time_step);
             parameter_store.add("scrubber.min_time", 0.0f);
             parameter_store.add("scrubber.max_time", 0.0f);
+            parameter_store.add("scrubber.show_frame_data", false);
         }
 
         ~Scrubber()
@@ -273,6 +274,17 @@ class Scrubber
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
             upload_buffer->upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
 
+            // Below is frame texture generation code, skip if user does not want frames
+            if (!parameter_store.get<bool>("scrubber.show_frame_data"))
+            {
+                event_data->unlock_data_vectors();
+
+                // To prevent drawing of frames
+                frame_timestamps[0] = -1.0f;
+                frame_timestamps[1] = -1.0f;
+                return;
+            }
+
             // recreate frame if necessary
             glm::vec2 current_frame_dimensions = event_data->get_camera_frame_resolution();
             if (frame_width != current_frame_dimensions.x || frame_height != current_frame_dimensions.y)
@@ -301,27 +313,26 @@ class Scrubber
             // If there's only one in the window, use that but set the second timestamp to -1
             // If there are no frames in the window, make both -1
             const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data->get_frame_vector_ref();
-            
+
             // Initialize both timestamps to -1 (invalid)
             frame_timestamps[0] = -1.0f;
             frame_timestamps[1] = -1.0f;
-            
+
             if (frame_vector.empty())
             {
                 event_data->unlock_data_vectors();
                 return;
             }
-            
+
             // Since frame_vector is sorted by timestamp, use binary search to find frames
             // that bracket upper_depth (the current time we're interpolating at)
             std::pair<cv::Mat, float> target_pair{cv::Mat{}, upper_depth};
-            auto lb = std::lower_bound(frame_vector.begin(), frame_vector.end(), target_pair, 
-                                       frame_less_vec4_t);
-            
+            auto lb = std::lower_bound(frame_vector.begin(), frame_vector.end(), target_pair, frame_less_vec4_t);
+
             std::size_t frame_idx_0 = 0;
             std::size_t frame_idx_1 = 0;
             bool found_valid_frames = false;
-            
+
             // Determine which two frames to use for interpolation
             if (lb == frame_vector.end())
             {
@@ -358,13 +369,13 @@ class Scrubber
                 // upper_depth is between frames - find the frame before and after
                 std::size_t after_idx = std::distance(frame_vector.begin(), lb);
                 std::size_t before_idx = after_idx - 1;
-                
+
                 // Check if frames are within the time window
-                bool before_in_window = (frame_vector[before_idx].second >= lower_depth && 
-                                        frame_vector[before_idx].second <= upper_depth);
-                bool after_in_window = (frame_vector[after_idx].second >= lower_depth && 
-                                       frame_vector[after_idx].second <= upper_depth);
-                
+                bool before_in_window =
+                    (frame_vector[before_idx].second >= lower_depth && frame_vector[before_idx].second <= upper_depth);
+                bool after_in_window =
+                    (frame_vector[after_idx].second >= lower_depth && frame_vector[after_idx].second <= upper_depth);
+
                 if (before_in_window && after_in_window)
                 {
                     // Both frames are in window - use them
@@ -392,13 +403,13 @@ class Scrubber
                     found_valid_frames = true;
                 }
             }
-            
+
             // Upload frames and set timestamps
             if (found_valid_frames)
             {
                 upload_buffer->upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_0].first, 0);
                 frame_timestamps[0] = frame_vector[frame_idx_0].second;
-                
+
                 if (frame_idx_1 != frame_idx_0 && frame_idx_1 < frame_vector.size())
                 {
                     upload_buffer->upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_1].first, 1);

@@ -169,15 +169,6 @@ class GUI
             parameter_store->add("unit_time_conversion_factor", units[unit_type]);
             parameter_store->add("unit_type", unit_type);
 
-            // Control if frame data shows up with event data
-            if (!parameter_store->exists("show_frame_data"))
-            {
-                parameter_store->add("show_frame_data", false);
-            }
-            bool show_frame_data{parameter_store->get<bool>("show_frame_data")};
-            ImGui::Checkbox("Show Frame Data", &show_frame_data);
-            parameter_store->add("show_frame_data", show_frame_data);
-
             // ImGui::Separator();
 
             ImGui::End();
@@ -373,18 +364,18 @@ class GUI
                 parameter_store->add("polarity_pos_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
             }
             glm::vec3 polarity_pos_color_dce{parameter_store->get<glm::vec3>("polarity_pos_color_dce")};
-            
+
             if (!parameter_store->exists("polarity_neut_color_dce"))
             {
                 parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 0.0f, 0.0f)); // Default particle scale
             }
             glm::vec3 polarity_neut_color_dce{parameter_store->get<glm::vec3>("polarity_neut_color_dce")};
 
-            if(dce_color > 0 ) // Only allow editing colors if using visualizer colors
+            if (dce_color > 0) // Only allow editing colors if using visualizer colors
             {
                 ImGui::ColorEdit3("Negative Color", (float *)&polarity_neg_color_dce);
                 ImGui::ColorEdit3("Positive Color", (float *)&polarity_pos_color_dce);
-                if(dce_color == 1)
+                if (dce_color == 1)
                 {
                     ImGui::ColorEdit3("Neutral Color", (float *)&polarity_neut_color_dce);
                 }
@@ -834,6 +825,15 @@ class GUI
                     }
                 }
             }
+
+            // Control if frame data shows up with event data
+            if (!parameter_store->exists("scrubber.show_frame_data"))
+            {
+                parameter_store->add("scrubber.show_frame_data", false);
+            }
+            bool show_frame_data{parameter_store->get<bool>("scrubber.show_frame_data")};
+            ImGui::Checkbox("Show Frame Data", &show_frame_data);
+            parameter_store->add("scrubber.show_frame_data", show_frame_data);
 
             ImGui::End();
         }
