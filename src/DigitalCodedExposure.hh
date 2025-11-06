@@ -160,6 +160,13 @@ class DigitalCodedExposure
             if (event_data.get_evt_vector_ref().empty())
             {
                 event_data.unlock_data_vectors();
+                // Delete old texture
+                if(render_targets["DigitalCodedExposure"].texture)
+                {
+                    SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
+                    render_targets["DigitalCodedExposure"].texture = nullptr;
+                }
+                
                 return;
             }
             event_data.unlock_data_vectors();
@@ -348,7 +355,7 @@ class DigitalCodedExposure
             pass_data.negCol = negCol;
             pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
-            SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
             SDL_DispatchGPUCompute(compute_pass, point_count, 1, 1);
 
             SDL_BindGPUComputePipeline(compute_pass, process_compute_pipeline);

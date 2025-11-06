@@ -163,7 +163,7 @@ class GUI
             }
             uint8_t unit_type{parameter_store->get<uint8_t>("unit_type")};
 
-            const float units[] = {1000000000.0f, 1000.0f, 1.0f};
+            const float units[] = {1000000.0f, 1000.0f, 1.0f};
             
             int32_t unit_type_copy{unit_type};
             ImGui::Combo("Time Unit", &unit_type_copy, "s\0ms\0us\0");
@@ -945,7 +945,7 @@ class GUI
                 }
                 else
                 {
-                    ImGui::Text("Texture for 'DigitalCodedExposure' is null.");
+                    ImGui::Text("No Event Data."); // Null texture should indicate no event data
                 }
             }
             else
