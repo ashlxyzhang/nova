@@ -1222,7 +1222,7 @@ class GUI
                                         &dock_id_main); // split window 75% left, 25% right
 
             ImGuiID dock_id_left_bottom; // bottom left for scrubber
-            ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.20f, &dock_id_left_bottom, &dock_id_main);
+            ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.25f, &dock_id_left_bottom, &dock_id_main);
 
             ImGuiID dock_id_right_top = dock_id_right; // top right for info/DCEcontrols, debug/load/stream windows
             ImGuiID dock_id_right_bottom; // bottom right for 3d visualizer 
