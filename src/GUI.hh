@@ -751,8 +751,14 @@ class GUI
             {
                 parameter_store->add("scrubber.cap_mode", cap_mode_int);
             }
-
-            bool capped = (cap_mode_int == 0);
+            int window_div_factor = 100; // Default to 100 for capped mode
+            int step_div_factor = 100; // Default to 1 for step size
+            if(cap_mode_int != 0) // Uncapped mode
+            {
+                window_div_factor = 2; // Use 2 for uncapped mode
+                step_div_factor = 10; // Use 10 for uncapped mode
+            }
+        
             ImGui::Separator();
 
             // Current Index (for EVENT type)
@@ -791,7 +797,7 @@ class GUI
                 {
                     int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") -
                                                      parameter_store->get<std::size_t>("scrubber.min_index") + 1);
-                    max_window_size = std::max(1, data_size / (capped ? 100 : 2));
+                    max_window_size = std::max(1, data_size / window_div_factor);
                 }
 
                 if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
@@ -873,12 +879,9 @@ class GUI
                 float time_window = parameter_store->get<float>("scrubber.time_window");
                 float time_window_unit_adjusted = time_window / unit_time_conversion_factor;
 
-                // Calculate maximum window size (half of total time range, minimum 0.001)
-                float max_window_time = std::max(0.00001f, (max_time - min_time) * 0.5f);
-                float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
-
                 // Calculate maximum window size (1/2 or 1/100 of total time range, minimum 0.001)
-                // float max_window_time = std::max(0.001f, (max_time - min_time) / (capped ? 100.0f : 2.0f));
+                float max_window_time = std::max(0.00001f, (max_time - min_time) / window_div_factor);
+                float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
 
                 std::string time_window_label = "Time Window " + time_unit_suffix;
                 if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted, time_format_str.c_str()))
@@ -902,9 +905,8 @@ class GUI
                 float time_step_unit_adjusted = time_step / unit_time_conversion_factor;
 
                 // Calculate maximum step size (total time range)
-                float max_step_time = max_time - min_time;
+                float max_step_time = (max_time - min_time) / step_div_factor;
                 float max_step_time_unit_adjusted = max_step_time / unit_time_conversion_factor;
-                // float max_step_time = (max_time - min_time) / (capped ? 100.0f : 10.0f);
 
                 std::string time_step_label = "Time Step " + time_unit_suffix;
                 if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted, time_format_str.c_str()))
@@ -1184,40 +1186,39 @@ class GUI
 
         void reset_layout_with_dockbuilder()
         {
-            // ImGuiID dockspace_id = ImGui::GetID("My Dockspace");
-            // ImGuiViewport* viewport = ImGui::GetMainViewport();
             ImGuiID dockspace_id = ImGui::GetMainViewport()->ID;
             ImGui::DockBuilderRemoveNode(dockspace_id);
             ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
             ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
 
-            // if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
-            // {
-            // ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
-            // ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
-            ImGuiID dock_id_right; // right side for info and debug/load/stream windows
-            ImGuiID dock_id_main = dockspace_id;
-            ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Right, 0.40f, &dock_id_right,
-                                        &dock_id_main); // split window 60% left, 40% right
+            ImGuiID dock_id_right; // right side for info, DCE controls, debug, load/stream, 3d visualizer windows
+            ImGuiID dock_id_main = dockspace_id; // left side for DCE and scrubber
+            ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Right, 0.25f, &dock_id_right,
+                                        &dock_id_main); // split window 75% left, 25% right
 
             ImGuiID dock_id_left_bottom; // bottom left for scrubber
             ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.20f, &dock_id_left_bottom, &dock_id_main);
 
-            ImGuiID dock_id_right_top = dock_id_right; // top right for info
-            ImGuiID dock_id_right_bottom;              // top bottom for debug/load/stream
-            ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.20f, &dock_id_right_bottom,
+            ImGuiID dock_id_right_top = dock_id_right; // top right for info/DCEcontrols, debug/load/stream windows
+            ImGuiID dock_id_right_bottom; // bottom right for 3d visualizer 
+            ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.35f, &dock_id_right_bottom,
                                         &dock_id_right_top);
 
-            ImGui::DockBuilderDockWindow("Info", dock_id_right_top);
-            ImGui::DockBuilderDockWindow("Debug", dock_id_right_bottom);
-            ImGui::DockBuilderDockWindow("Load", dock_id_right_bottom);
-            ImGui::DockBuilderDockWindow("Streaming", dock_id_right_bottom);
+            ImGuiID dock_id_right_top_top = dock_id_right_top; // top for debug/load/stream windows
+            ImGuiID dock_id_right_top_bottom; // bottom  for info/DCEcontrols,
+            ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom,
+                                        &dock_id_right_top_top);
+
+            ImGui::DockBuilderDockWindow("Digital Coded Exposure Controls", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("Info", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
+            ImGui::DockBuilderDockWindow("Load", dock_id_right_top_top);
+            ImGui::DockBuilderDockWindow("Streaming", dock_id_right_top_top);
             ImGui::DockBuilderDockWindow("Frame", dock_id_main); // DCE window
-            ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
+            ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_right_bottom);
             ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
 
             ImGui::DockBuilderFinish(dockspace_id);
-            // }
         }
 };
 
