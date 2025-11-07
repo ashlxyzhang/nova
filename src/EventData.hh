@@ -47,12 +47,15 @@ class EventData
 
         // Member variables
     private:
-        std::multiset<EventDatum> evt_data; // Ensures ordered event data
-
-        std::multiset<FrameDatum> frame_data; // Ensures ordered frame data
-
         std::vector<glm::vec4> evt_data_vector_relative;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
+
+        // Earliest event/frame timestamps
+        int64_t evt_data_earliest_timestamp{-1};
+        int64_t frame_data_earliest_timestamp{-1};
+
+        int64_t evt_data_latest_timestamp{-1};
+        int64_t frame_data_latest_timestamp{-1};
 
         // Set camera resolution
         int32_t camera_event_width{};
@@ -61,13 +64,10 @@ class EventData
         int32_t camera_frame_width{};
         int32_t camera_frame_height{};
 
-        bool evt_data_vector_need_update; // Flag to indicate if update is needed when vector of event data are exposed.
-        bool frame_data_vector_need_update; // Flag to indicate if update is needed when vector of frame data are
-                                            // exposed.
-
         float max_element_percentage;  // What percentage of max size of vector should number of elements populate
         float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they
                                        // exceed max_element_percentage
+
         std::recursive_mutex evt_lock;
 
     public:
@@ -75,12 +75,10 @@ class EventData
          * @brief Default constructor for event data.
          */
         EventData()
-            : evt_data{}, frame_data{}, evt_data_vector_relative{}, frame_data_vector_relative{}, camera_event_height{},
-              camera_event_width{}, camera_frame_height{}, camera_frame_width{}, evt_data_vector_need_update{false},
-              frame_data_vector_need_update{false}, max_element_percentage{0.8f}, cull_element_percentage{0.5f},
-              evt_lock{}
-        // changed_evt_thread_map{}, changed_evt_thread_map_lock{}, changed_frame_thread_map{},
-        // changed_frame_thread_map_lock{}
+            : evt_data_vector_relative{}, frame_data_vector_relative{}, evt_data_earliest_timestamp{-1},
+              frame_data_earliest_timestamp{-1}, evt_data_latest_timestamp{-1}, frame_data_latest_timestamp{-1},
+              camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{},
+              max_element_percentage{0.8f}, cull_element_percentage{0.5f}, evt_lock{}
         {
         }
 
@@ -91,22 +89,21 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
-            // Clear raw ordered data
-            evt_data.clear();
-            frame_data.clear();
-
             // Clear ref vectors
             evt_data_vector_relative.clear();
             frame_data_vector_relative.clear();
+
+            evt_data_earliest_timestamp = -1;
+            frame_data_earliest_timestamp = -1;
+
+            evt_data_latest_timestamp = -1;
+            frame_data_latest_timestamp = -1;
 
             camera_event_width = 0;
             camera_event_height = 0;
 
             camera_frame_width = 0;
             camera_frame_height = 0;
-
-            evt_data_vector_need_update = false;
-            frame_data_vector_need_update = false;
 
             evt_lock_ul.unlock();
         }
@@ -182,72 +179,82 @@ class EventData
         }
 
         /**
-         * @brief Inserts event data into internel ordered set of event data. Data will be added to an internel ordered
-         * multiset. The cost will be log(n) for insertion into the ordered multiset. If the program detects data is
-         * inserted out of order, on the next call of get_*_vector_ref, the returned internal data vectors will be
-         * repopulated with data in order of timestamp from the multiset at the cost of nlog(n). Otherwise, data is also
-         * appended to the internal data vector and the next call of get_*_vector_ref will just return the reference to
-         * the internal data vector without updating.
+         * @brief Inserts event data into the event data vector with relative timestamps (absolute timestamp - absolute
+         * earliest timestamp). Following documentation of the AEDAT formats
+         * (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
+         * monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
+         * reset/syncronization is assumed where timestamps are reset to 0.
          * @param raw_evt_data Raw event data to add.
          */
         void write_evt_data(EventDatum raw_evt_data)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            evt_data.insert(raw_evt_data);
 
             // If this condition is met, then we only need to push back event data since it is ordered
-            // New data is latest data and vector is already ordered (due to evt_data_vector_need_update being
-            // false). Just push back to ref vectors in this case.
-            if (!evt_data_vector_need_update && raw_evt_data.timestamp >= (*(--evt_data.end())).timestamp &&
-                !cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage))
+            if (raw_evt_data.timestamp >= evt_data_latest_timestamp)
             {
+                // cull elements to avoid overflowing memory
+                cull_elements(evt_data_vector_relative, max_element_percentage, cull_element_percentage);
                 float x{static_cast<float>(raw_evt_data.x)};
                 float y{static_cast<float>(raw_evt_data.y)};
-                float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - get_earliest_evt_timestamp())};
+                float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - evt_data_earliest_timestamp)};
                 float polarity{static_cast<float>(raw_evt_data.polarity)};
                 evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
+
+                // update earliest and latest timestamps
+                if (evt_data_vector_relative.size() == 1)
+                {
+                    evt_data_earliest_timestamp = raw_evt_data.timestamp;
+                }
+                evt_data_latest_timestamp = raw_evt_data.timestamp;
             }
             else
             {
-                evt_data_vector_need_update = true;
+                // Reset assumed, timestamps are all back to zero, clear data
+                evt_data_earliest_timestamp = 0;
+                frame_data_earliest_timestamp = 0;
+                evt_data_vector_relative.clear();
+                frame_data_vector_relative.clear();
             }
             evt_lock_ul.unlock();
-            /*std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
-            changed_evt_thread_map.clear();
-            changed_evt_map_ul.unlock();*/
         }
 
         /**
-         * @brief Inserts frame data into internal ordered set of frame data. Data will be added to an internel ordered
-         * multiset. The cost will be log(n) for insertion into the ordered multiset. If the program detects data is
-         * inserted out of order, on the next call of get_*_vector_ref, the returned internal data vectors will be
-         * repopulated with data in order of timestamp from the multiset at the cost of nlog(n). Otherwise, data is also
-         * appended to the internal data vector and the next call of get_*_vector_ref will just return the reference to
-         * the internal data vector without updating.
+         * @brief Inserts frame data into the frame data vector with relative timestamps (absolute timestamp - absolute
+         * earliest timestamp). Following documentation of the AEDAT formats
+         * (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
+         * monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
+         * reset/syncronization is assumed where timestamps are reset to 0.
          * @param raw_frame_data Raw frame data to add.
-         *
          */
         void write_frame_data(FrameDatum raw_frame_data)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            frame_data.insert(raw_frame_data);
 
-            if (!frame_data_vector_need_update && raw_frame_data.timestamp >= (*(--frame_data.end())).timestamp &&
-                !cull_elements(frame_data_vector_relative, frame_data, max_element_percentage, cull_element_percentage))
+            // If this condition is met, then we only need to push back event data since it is ordered
+            if (raw_frame_data.timestamp >= frame_data_latest_timestamp)
             {
-                float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - get_earliest_frame_timestamp())};
+                // cull elements to avoid overflowing memory
+                cull_elements(frame_data_vector_relative, max_element_percentage, cull_element_percentage);
+                float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - frame_data_earliest_timestamp)};
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
+
+                // update earliest and latest timestamps
+                if (frame_data_vector_relative.size() == 1)
+                {
+                    frame_data_earliest_timestamp = raw_frame_data.timestamp;
+                }
+                frame_data_latest_timestamp = raw_frame_data.timestamp;
             }
             else
             {
-                frame_data_vector_need_update = true;
+                // Reset assumed, timestamps are all back to zero, clear data
+                evt_data_earliest_timestamp = 0;
+                frame_data_earliest_timestamp = 0;
+                evt_data_vector_relative.clear();
+                frame_data_vector_relative.clear();
             }
-
             evt_lock_ul.unlock();
-
-            /*std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
-            changed_frame_thread_map.clear();
-            changed_frame_map_ul.unlock();*/
         }
 
         /**
@@ -260,16 +267,6 @@ class EventData
          */
         const std::vector<glm::vec4> &get_evt_vector_ref()
         {
-            // Update changed_thread_map to indicate this thread has up-to-date data
-            /*std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
-            changed_evt_thread_map[tid] = false;
-            changed_evt_map_ul.unlock();*/
-            // Expensive call
-            if (evt_data_vector_need_update)
-            {
-                update_evt_data_vectors();
-            }
-
             return evt_data_vector_relative;
         }
 
@@ -283,49 +280,8 @@ class EventData
          */
         const std::vector<std::pair<cv::Mat, float>> &get_frame_vector_ref()
         {
-            // Update changed_thread_map to indicate this thread has up-to-date data
-            /*std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
-            changed_frame_thread_map[tid] = false;
-            changed_frame_map_ul.unlock();*/
-            if (frame_data_vector_need_update)
-            {
-                update_frame_data_vectors();
-            }
-
             return frame_data_vector_relative;
         }
-
-        /**
-         * @brief For a given thread, determine if event data changed since last call to get_*_vectors
-         */
-        /*bool is_evt_data_changed(std::thread::id tid)
-        {
-            std::unique_lock<std::mutex> changed_evt_map_ul{changed_evt_thread_map_lock};
-            if (!changed_evt_thread_map.contains(tid))
-            {
-                changed_evt_map_ul.unlock();
-                return true;
-            }
-
-            changed_evt_map_ul.unlock();
-            return changed_evt_thread_map.at(tid);
-        }*/
-
-        /**
-         * @brief For a given thread, determine if frame data changed since last call to get_*_vectors
-         */
-        /*bool is_frame_data_changed(std::thread::id tid)
-        {
-            std::unique_lock<std::mutex> changed_frame_map_ul{changed_frame_thread_map_lock};
-            if (!changed_frame_thread_map.contains(tid))
-            {
-                changed_frame_map_ul.unlock();
-                return true;
-            }
-
-            changed_frame_map_ul.unlock();
-            return changed_frame_thread_map.at(tid);
-        }*/
 
         /**
          * @brief Gets the earliest event timestamp.
@@ -335,13 +291,13 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
-            if (evt_data.empty())
+            if (evt_data_vector_relative.empty())
             {
                 evt_lock_ul.unlock();
                 return -1; // No evt data
             }
 
-            int64_t earliest_timestamp{(*evt_data.begin()).timestamp};
+            int64_t earliest_timestamp{evt_data_earliest_timestamp};
 
             evt_lock_ul.unlock();
 
@@ -356,13 +312,13 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
-            if (frame_data.empty())
+            if (frame_data_vector_relative.empty())
             {
                 evt_lock_ul.unlock();
                 return -1; // No frame data
             }
 
-            int64_t timestamp{(*frame_data.begin()).timestamp};
+            int64_t timestamp{frame_data_earliest_timestamp};
 
             evt_lock_ul.unlock();
 
@@ -383,12 +339,6 @@ class EventData
             {
                 evt_lock_ul.unlock();
                 return -1; // Vector is empty, return -1
-            }
-
-            // Ensure sorted
-            if (evt_data_vector_need_update)
-            {
-                update_evt_data_vectors();
             }
 
             glm::vec4 timestampVec4(0.0f, 0.0f, timestamp, 0.0f);
@@ -422,12 +372,6 @@ class EventData
                 return -1; // Vector is empty, return -1
             }
 
-            // Ensure sorted
-            if (frame_data_vector_need_update)
-            {
-                update_frame_data_vectors();
-            }
-
             std::pair<cv::Mat, float> timestampPair{cv::Mat{}, timestamp};
 
             // frame_data_vector_relative should be sorted by the way EventData class is setup.
@@ -445,79 +389,27 @@ class EventData
 
         // Helper functions
     private:
-        // Hashmaps contains thread id mapped to boolean that indicates if new data was read
-        // since the thread called the get_*_vectors functions. This was added because
-        // calling these functions is expensive and should only be done
-        // if the data was updated.
-        /*std::unordered_map<std::thread::id, bool> changed_evt_thread_map;
-        std::mutex changed_evt_thread_map_lock;
-
-        std::unordered_map<std::thread::id, bool> changed_frame_thread_map;
-        std::mutex changed_frame_thread_map_lock;*/
-
-        /**
-         * @brief Updates event data internal vectors.
-         *
-         */
-        void update_evt_data_vectors()
-        {
-            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            evt_data_vector_relative.clear();
-            cull_elements(evt_data_vector_relative, evt_data, max_element_percentage, cull_element_percentage);
-            for (const EventDatum &evt_el : evt_data)
-            {
-                float x{static_cast<float>(evt_el.x)};
-                float y{static_cast<float>(evt_el.y)};
-                float timestamp_relative{static_cast<float>(evt_el.timestamp - get_earliest_evt_timestamp())};
-                float polarity{static_cast<float>(evt_el.polarity)};
-                evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
-            }
-
-            evt_data_vector_need_update = false;
-
-            evt_lock_ul.unlock();
-        }
-
-        /**
-         * @brief Updates frame internal vectors.
-         */
-        void update_frame_data_vectors()
-        {
-            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-            frame_data_vector_relative.clear();
-            cull_elements(frame_data_vector_relative, frame_data, 0.8f, 0.5f);
-            for (const FrameDatum &frame_el : frame_data)
-            {
-                float timestamp_relative{static_cast<float>(frame_el.timestamp - get_earliest_frame_timestamp())};
-                frame_data_vector_relative.push_back(std::make_pair(frame_el.frameData, timestamp_relative));
-            }
-
-            frame_data_vector_need_update = false;
-
-            evt_lock_ul.unlock();
-        }
-
         /**
          * @brief Memory management code. Must be called with appropriate locks.
          */
-        template <typename T, typename V>
-        bool cull_elements(std::vector<T> &vector_data, std::multiset<V> &data, float max_percentage,
-                           float cull_percentage)
+        template <typename T>
+        bool cull_elements(std::vector<T> &vector_data, float max_percentage, float cull_percentage)
         {
             bool culled = false;
-            size_t maxElements{std::min(vector_data.max_size(), data.max_size())};
-            if (data.size() >=
+            size_t maxElements{vector_data.max_size()};
+            if (vector_data.size() >=
                 static_cast<size_t>(max_percentage *
                                     maxElements)) // If there are more than max_percentage max number of events
             {
                 // Ensures upper bound is met no matter the condition
-                while (data.size() > static_cast<size_t>(cull_percentage * maxElements))
+                while (vector_data.size() > static_cast<size_t>(cull_percentage * maxElements))
                 {
-                    data.erase(data.begin(),
-                               std::next(data.begin(),
-                                         static_cast<size_t>((max_percentage - cull_percentage) *
-                                                             maxElements))); // Should bring number of elements down to
-                                                                             // cull_percentage of max elements
+                    vector_data.erase(
+                        vector_data.begin(),
+                        std::next(vector_data.begin(),
+                                  static_cast<size_t>((max_percentage - cull_percentage) *
+                                                      maxElements))); // Should bring number of elements down to
+                                                                      // cull_percentage of max elements
                     culled = true;
                 }
             }
