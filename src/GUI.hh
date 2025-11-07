@@ -159,13 +159,15 @@ class GUI
 
             if (!parameter_store->exists("unit_type"))
             {
-                parameter_store->add("unit_type", 1);
+                parameter_store->add("unit_type", static_cast<uint8_t>(TIME::UNIT_US));
             }
-            int32_t unit_type{parameter_store->get<int32_t>("unit_type")};
+            uint8_t unit_type{parameter_store->get<uint8_t>("unit_type")};
 
-            const int32_t units[] = {1000000000, 1000, 1};
-
-            ImGui::Combo("Time Unit", &unit_type, "s\0ms\0us\0");
+            const float units[] = {1000000.0f, 1000.0f, 1.0f};
+            
+            int32_t unit_type_copy{unit_type};
+            ImGui::Combo("Time Unit", &unit_type_copy, "s\0ms\0us\0");
+            unit_type = static_cast<uint8_t>(unit_type_copy);
             parameter_store->add("unit_time_conversion_factor", units[unit_type]);
             parameter_store->add("unit_type", unit_type);
 
@@ -325,13 +327,13 @@ class GUI
             ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
             parameter_store->add("shutter_is_morlet", shutter_is_morlet);
 
-            if (!parameter_store->exists("shutter_is_pca"))
-            {
-                parameter_store->add("shutter_is_pca", false);
-            }
-            bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            ImGui::Checkbox("PCA", &shutter_is_pca);
-            parameter_store->add("shutter_is_pca", shutter_is_pca);
+            // if (!parameter_store->exists("shutter_is_pca"))
+            // {
+            //     parameter_store->add("shutter_is_pca", false);
+            // }
+            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
+            // ImGui::Checkbox("PCA", &shutter_is_pca);
+            // parameter_store->add("shutter_is_pca", shutter_is_pca);
 
             if (!parameter_store->exists("shutter_is_positive_only"))
             {
@@ -349,29 +351,29 @@ class GUI
             }
             int32_t dce_color{parameter_store->get<int32_t>("dce_color")};
 
-            ImGui::Combo("Digital Exposure Color", &dce_color, "Use Visualizer Colors\0Tricolor\0High/Low\0");
+            ImGui::Combo("Digital Exposure Color", &dce_color, "High/Low\0Tricolor\0Use Visualizer Colors\0");
 
             parameter_store->add("dce_color", dce_color);
 
             if (!parameter_store->exists("polarity_neg_color_dce"))
             {
-                parameter_store->add("polarity_neg_color_dce", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
+                parameter_store->add("polarity_neg_color_dce", glm::vec3(0.0f, 0.0f, 0.0f)); // Default particle scale
             }
             glm::vec3 polarity_neg_color_dce{parameter_store->get<glm::vec3>("polarity_neg_color_dce")};
 
             if (!parameter_store->exists("polarity_pos_color_dce"))
             {
-                parameter_store->add("polarity_pos_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                parameter_store->add("polarity_pos_color_dce", glm::vec3(1.0f, 1.0f, 1.0f)); // Default particle scale
             }
             glm::vec3 polarity_pos_color_dce{parameter_store->get<glm::vec3>("polarity_pos_color_dce")};
 
             if (!parameter_store->exists("polarity_neut_color_dce"))
             {
-                parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 0.0f, 0.0f)); // Default particle scale
+                parameter_store->add("polarity_neut_color_dce", glm::vec3(0.5f, 0.5f, 0.5f)); // Default particle scale
             }
             glm::vec3 polarity_neut_color_dce{parameter_store->get<glm::vec3>("polarity_neut_color_dce")};
 
-            if (dce_color > 0) // Only allow editing colors if using visualizer colors
+            if (dce_color < 2) // Only allow editing colors if using visualizer colors
             {
                 ImGui::ColorEdit3("Negative Color", (float *)&polarity_neg_color_dce);
                 ImGui::ColorEdit3("Positive Color", (float *)&polarity_pos_color_dce);
@@ -394,6 +396,35 @@ class GUI
             //     ImGui::Checkbox("Combine Simultaneous Event Color", &combine_color);
             // }
             parameter_store->add("combine_color", combine_color);
+
+            if (!parameter_store->exists("activation_function"))
+            {
+                parameter_store->add("activation_function", 0);
+            }
+            int32_t activation_function{parameter_store->get<int32_t>("activation_function")};
+
+            ImGui::Combo("Activation Function", &activation_function, "Linear\0Sigmoid\0");
+
+            parameter_store->add("activation_function", activation_function);
+
+            ImGui::Separator();
+
+            if (!parameter_store->exists("morlet_frequency"))
+            {
+                parameter_store->add("morlet_frequency", 0.0f);
+            }
+            float morlet_frequency{parameter_store->get<float>("morlet_frequency")};
+            ImGui::SliderFloat("Morlet Frequency", &morlet_frequency, 0.0f, 10000.0f);
+            parameter_store->add("morlet_frequency", morlet_frequency);
+            
+            if (!parameter_store->exists("morlet_width"))
+            {
+                parameter_store->add("morlet_width", 0.01f);
+            }
+            float morlet_width{parameter_store->get<float>("morlet_width")};
+            ImGui::SliderFloat("Morlet Width", &morlet_width, 0.001f, 100000.0f);
+            parameter_store->add("morlet_width", morlet_width);
+
             // TODO implement video recording
             // Video (ffmpeg) controls
             // ImGui::Text("Video options"); // TODO add documentation
@@ -762,8 +793,23 @@ class GUI
             else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
             {
                 // Get time unit information
-                int32_t unit_type = parameter_store->get<int32_t>("unit_type");
+                uint8_t unit_type = parameter_store->get<uint8_t>("unit_type");
                 std::string time_unit_suffix = time_units[unit_type];
+
+                // Determine format string based on time unit
+                std::string time_format_str{};
+                switch(static_cast<TIME>(unit_type))
+                {
+                    case TIME::UNIT_US:
+                        time_format_str = std::string{"%.2f"};
+                        break;
+                    case TIME::UNIT_MS:
+                        time_format_str = std::string{"%.4f"};
+                        break;
+                    case TIME::UNIT_S:
+                        time_format_str = std::string{"%.8f"};
+                        break;
+                }   
 
                 // Current Time
                 if (!parameter_store->exists("scrubber.current_time"))
@@ -771,6 +817,14 @@ class GUI
                     parameter_store->add("scrubber.current_time", 0.0f);
                 }
                 float current_time = parameter_store->get<float>("scrubber.current_time");
+
+                if(!parameter_store->exists("unit_time_conversion_factor"))
+                {
+                    parameter_store->add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
+                }
+                float unit_time_conversion_factor{parameter_store->get<float>("unit_time_conversion_factor")};
+                float current_time_unit_adjusted = current_time / unit_time_conversion_factor;
+
 
                 // Get min/max time values from scrubber if available
                 float min_time = 0.0f;
@@ -781,11 +835,20 @@ class GUI
                     max_time = parameter_store->get<float>("scrubber.max_time");
                 }
 
+                float min_time_unit_adjusted = min_time / unit_time_conversion_factor;
+                float max_time_unit_adjusted = max_time / unit_time_conversion_factor;
+
                 std::string current_time_label = "Current Time " + time_unit_suffix;
-                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time, min_time, max_time, "%.4f"))
+                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted, time_format_str.c_str()))
                 {
-                    current_time = std::clamp(current_time, min_time, max_time);
-                    parameter_store->add("scrubber.current_time", current_time);
+                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
+                    if(max_time_unit_adjusted > min_time_unit_adjusted)
+                    {
+                        current_time_unit_adjusted = std::clamp(current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted);
+                        current_time = current_time_unit_adjusted * unit_time_conversion_factor; // Revert conversion to store back into scrubber
+                        // Scrubber deals in us time unit
+                        parameter_store->add("scrubber.current_time", current_time);
+                    }
                 }
 
                 // Time Window
@@ -794,15 +857,24 @@ class GUI
                     parameter_store->add("scrubber.time_window", 1.0f);
                 }
                 float time_window = parameter_store->get<float>("scrubber.time_window");
+                float time_window_unit_adjusted = time_window / unit_time_conversion_factor;
 
                 // Calculate maximum window size (half of total time range, minimum 0.001)
-                float max_window_time = std::max(0.001f, (max_time - min_time) * 0.5f);
+                float max_window_time = std::max(0.00001f, (max_time - min_time) * 0.5f);
+                float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
+
 
                 std::string time_window_label = "Time Window " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window, 0.001f, max_window_time, "%.4f"))
+                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted, time_format_str.c_str()))
                 {
-                    time_window = std::clamp(time_window, 0.001f, max_window_time);
-                    parameter_store->add("scrubber.time_window", time_window);
+                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
+                    if (max_window_time_unit_adjusted > 0.00001f)
+                    {
+                        time_window_unit_adjusted = std::clamp(time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted);
+                        // Adjust back to us to store into scrubber
+                        time_window = time_window_unit_adjusted * unit_time_conversion_factor;
+                        parameter_store->add("scrubber.time_window", time_window);
+                    }
                 }
 
                 // Time Step
@@ -811,16 +883,21 @@ class GUI
                     parameter_store->add("scrubber.time_step", 0.1f);
                 }
                 float time_step = parameter_store->get<float>("scrubber.time_step");
+                float time_step_unit_adjusted = time_step / unit_time_conversion_factor;
 
                 // Calculate maximum step size (total time range)
                 float max_step_time = max_time - min_time;
+                float max_step_time_unit_adjusted = max_step_time / unit_time_conversion_factor;
 
                 std::string time_step_label = "Time Step " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step, 0.001f, max_step_time, "%.4f"))
+                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted, time_format_str.c_str()))
                 {
-                    if (max_step_time > 0.001f)
+                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
+                    if (max_step_time_unit_adjusted > 0.00001f)
                     {
-                        time_step = std::clamp(time_step, 0.001f, max_step_time);
+                        time_step_unit_adjusted = std::clamp(time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted);
+                        // Adjust back to us to store into data scrubber
+                        time_step = time_step_unit_adjusted * unit_time_conversion_factor;
                         parameter_store->add("scrubber.time_step", time_step);
                     }
                 }
@@ -885,7 +962,7 @@ class GUI
                 }
                 else
                 {
-                    ImGui::Text("Texture for 'DigitalCodedExposure' is null.");
+                    ImGui::Text("No Event Data."); // Null texture should indicate no event data
                 }
             }
             else

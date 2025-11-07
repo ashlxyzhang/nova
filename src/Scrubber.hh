@@ -103,6 +103,33 @@ class Scrubber
             if (event_data->get_evt_vector_ref().empty())
             {
                 event_data->unlock_data_vectors();
+
+                // No event data? Scrubber has nothing to scrub.
+                parameter_store.add("scrubber.current_index", 0ULL);
+                parameter_store.add("scrubber.index_window", 0ULL);
+                parameter_store.add("scrubber.index_step", 0ULL);
+                parameter_store.add("scrubber.min_index", 0ULL);
+                parameter_store.add("scrubber.max_index", 0ULL);
+
+                parameter_store.add("scrubber.current_time", 0.0f);
+                parameter_store.add("scrubber.time_window", 0.0f);
+                parameter_store.add("scrubber.time_step", 0.0f);
+                parameter_store.add("scrubber.min_time", 0.0f);
+                parameter_store.add("scrubber.max_time", 0.0f);
+                parameter_store.add("scrubber.show_frame_data", false);
+
+                lower_index = 0;
+                current_index = 0;
+                index_step = 0;
+                index_window = 0;
+
+                lower_time = 0.0f;
+                current_time = 0.0f;
+                time_step = 0.0f;
+                time_window = 0.0f;
+
+
+
                 return;
             }
 
@@ -228,6 +255,20 @@ class Scrubber
             if (evt_vector.empty())
             {
                 event_data->unlock_data_vectors();
+
+                // Delete old buffer if it exists
+                if (points_buffer)
+                {
+                    SDL_ReleaseGPUBuffer(gpu_device, points_buffer);
+                    points_buffer = nullptr;
+                }
+
+                // Nothing to draw
+                points_buffer_size = 0;
+
+                // To prevent drawing of frames
+                frame_timestamps[0] = -1.0f;
+                frame_timestamps[1] = -1.0f;
                 return;
             }
 

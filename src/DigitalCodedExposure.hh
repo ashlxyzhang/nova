@@ -23,6 +23,7 @@ struct PassData{
     glm::vec4 negCol;
     glm::vec4 floatFlags;
     glm::vec4 flags;
+    glm::vec4 morletParams;
 };
 
 class DigitalCodedExposure
@@ -160,6 +161,13 @@ class DigitalCodedExposure
             if (event_data.get_evt_vector_ref().empty())
             {
                 event_data.unlock_data_vectors();
+                // Delete old texture
+                if(render_targets["DigitalCodedExposure"].texture)
+                {
+                    SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
+                    render_targets["DigitalCodedExposure"].texture = nullptr;
+                }
+                
                 return;
             }
             event_data.unlock_data_vectors();
@@ -256,6 +264,12 @@ class DigitalCodedExposure
             }
             int32_t dce_color{parameter_store->get<int32_t>("dce_color")};
 
+            if (!parameter_store->exists("activation_function"))
+            {
+                parameter_store->add("activation_function", 0);
+            }
+            int32_t activation_function{parameter_store->get<int32_t>("activation_function")};
+
             if (!parameter_store->exists("combine_color"))
             {
                 parameter_store->add("combine_color", false);
@@ -267,7 +281,7 @@ class DigitalCodedExposure
             glm::vec3 polarity_neut_color;
             glm::vec3 polarity_neg_color;
 
-            if (dce_color > 0){
+            if (dce_color < 2){
                 if (!parameter_store->exists("polarity_neg_color_dce"))
                 {
                     parameter_store->add("polarity_neg_color_dce", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
@@ -332,16 +346,48 @@ class DigitalCodedExposure
             //     parameter_store->add("shutter_is_pca", false);
             // }
             // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight, (combine_color ? 1.0f : 0.0f), 0.0f);
+
+            
+            if (!parameter_store->exists("scrubber.current_time"))
+            {
+                parameter_store->add("scrubber.current_time", 0.0f);
+            }
+            float current_time{parameter_store->get<float>("scrubber.current_time")};
+
+                        
+            if (!parameter_store->exists("scrubber.lower_time"))
+            {
+                parameter_store->add("scrubber.lower_time", 0.0f);
+            }
+            float lower_time{parameter_store->get<float>("scrubber.lower_time")};
+
+            float  time_center = (current_time + lower_time) / 2000.0f;
+
+            if (!parameter_store->exists("morlet_frequency"))
+            {
+                parameter_store->add("morlet_frequency", 0.0f);
+            }
+            float morlet_frequency{parameter_store->get<float>("morlet_frequency")};
+            
+            if (!parameter_store->exists("morlet_width"))
+            {
+                parameter_store->add("morlet_width", 0.01f);
+            }
+            float morlet_width{parameter_store->get<float>("morlet_width")};
+
+            glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight, static_cast<float>(activation_function), 0.0f);
             
             glm::vec4 flags = glm::vec4((shutter_is_positive_only ? 1.0f : 0.0f), (shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
             
+            glm::vec4 morletParams = glm::vec4(morlet_frequency, morlet_width, time_center, 0.0f); // frequency, width (h), time center
+
             PassData pass_data;
             pass_data.posCol = posCol;
             pass_data.neutCol = neutCol;
             pass_data.negCol = negCol;
             pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
+            pass_data.morletParams = morletParams;
             SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
             SDL_DispatchGPUCompute(compute_pass, point_count, 1, 1);
 

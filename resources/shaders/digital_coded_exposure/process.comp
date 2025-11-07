@@ -10,8 +10,10 @@ layout(set = 2, binding = 0) uniform Uniforms {
     vec4 posCol;
     vec4 neutCol;
     vec4 negCol;
-    vec4 floatFlags; // x: color option, y: scale
+    vec4 floatFlags; // x: color option, y: scale, z: activation function
     vec4 flags;      // x: posOnly?, y: morlet (unused)
+    vec4 morletParams; // x: frequency, y: width, z: amplitude
+
 } ubo;
 
 
@@ -23,21 +25,33 @@ void main() {
     
 
     float scale = ubo.floatFlags.y;
+    vec4 color;
+
     vec4 colorNeg = ubo.negCol;
     vec4 colorPos = ubo.posCol;
     vec4 colorNeut = ubo.neutCol;
     vec4 colorMix = mix(colorNeg, colorPos, 0.5);
+    float eventDiff = (float(positive_events) - float(negative_events))/100000.0;
+
     if(ubo.floatFlags.x < 0.9 || ubo.floatFlags.x > 1.1) {
         colorNeut = colorMix;
     }
-    float colorScale = 1/(1+exp(scale*(float(positive_events) - float(negative_events))));
-    float negScale = 1.0 - colorScale;
-    vec4 color;
-    if (colorScale > 0.5) {
-        color = mix(colorNeut, colorPos, (colorScale - 0.5) * 2.0);
+    if(ubo.floatFlags.z > 0.9) {
+        float colorScale = 1/(1+exp(-scale*(eventDiff)));
+        float negScale = 1.0 - colorScale;
+        if (colorScale > 0.5) {
+            color = mix(colorNeut, colorPos, (colorScale - 0.5) * 2.0);
+        } else {
+            color = mix(colorNeut, colorNeg, (negScale - 0.5) * 2.0);
+        }
     } else {
-        color = mix(colorNeut, colorNeg, (negScale - 0.5) * 2.0);
-
+        float colorScale = max(0.0, min(1.0, 0.5 + 0.25 * scale * eventDiff));
+        float negScale = 1.0 - colorScale;
+        if (colorScale > 0.5) {
+            color = mix(colorNeut, colorPos, (colorScale - 0.5) * 2.0);
+        } else {
+            color = mix(colorNeut, colorNeg, (negScale - 0.5) * 2.0);
+        }
     }
     vec4 newColor = color;
 

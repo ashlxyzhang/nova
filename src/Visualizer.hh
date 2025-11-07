@@ -851,6 +851,16 @@ class Visualizer
                 }
         };
 
+
+        // Enum for easily identifying time codes, duplicated in GUI.hh, TODO: figure out if we should move enums
+        // to program wide file
+        enum class TIME : uint8_t
+        {
+            UNIT_S = 0,
+            UNIT_MS = 1,
+            UNIT_US = 2
+        };
+
         Camera camera;
         glm::vec3 box_min;
         glm::vec3 box_max;
@@ -1038,9 +1048,32 @@ class Visualizer
 
                 // Convert normalized Z to actual depth value
                 float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
+                
+                if(!parameter_store.exists("unit_time_conversion_factor"))
+                {
+                    parameter_store.add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
+                }
+                float unit_time_conversion_factor{parameter_store.get<float>("unit_time_conversion_factor")};
 
                 // Format timestamp as string with reasonable precision
-                std::string timestamp_str = std::format("{:.2f}", timestamp);
+                if (!parameter_store.exists("unit_type"))
+                {
+                    parameter_store.add("unit_type", static_cast<uint8_t>(TIME::UNIT_US)); // Default to microsecond
+                }
+                uint8_t unit_type{parameter_store.get<uint8_t>("unit_type")};
+                std::string timestamp_str{};
+                switch(static_cast<TIME>(unit_type))
+                {
+                    case TIME::UNIT_US:
+                        timestamp_str = std::format("{:.2f}", timestamp / unit_time_conversion_factor);
+                        break;
+                    case TIME::UNIT_MS:
+                        timestamp_str = std::format("{:.4f}", timestamp / unit_time_conversion_factor);
+                        break;
+                    case TIME::UNIT_S:
+                        timestamp_str = std::format("{:.8f}", timestamp / unit_time_conversion_factor);
+                        break;
+                }   
 
                 // Position text at the corresponding Z subdivision
                 text_position.z = normalized_z;
