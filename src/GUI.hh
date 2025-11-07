@@ -327,13 +327,13 @@ class GUI
             ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
             parameter_store->add("shutter_is_morlet", shutter_is_morlet);
 
-            if (!parameter_store->exists("shutter_is_pca"))
-            {
-                parameter_store->add("shutter_is_pca", false);
-            }
-            bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            ImGui::Checkbox("PCA", &shutter_is_pca);
-            parameter_store->add("shutter_is_pca", shutter_is_pca);
+            // if (!parameter_store->exists("shutter_is_pca"))
+            // {
+            //     parameter_store->add("shutter_is_pca", false);
+            // }
+            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
+            // ImGui::Checkbox("PCA", &shutter_is_pca);
+            // parameter_store->add("shutter_is_pca", shutter_is_pca);
 
             if (!parameter_store->exists("shutter_is_positive_only"))
             {
