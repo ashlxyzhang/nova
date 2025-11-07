@@ -196,7 +196,7 @@ class Scrubber
                 parameter_store.add("scrubber.time_step", time_step);
                 parameter_store.add("scrubber.current_index", current_index);
                 parameter_store.add("scrubber.index_window", current_index - lower_index);
-                parameter_store.add("scrubber.index_step", static_cast<std::size_t>(time_step));
+                //parameter_store.add("scrubber.index_step", static_cast<std::size_t>(time_step));
             }
 
             if (parameter_store.get<ScrubberType>("scrubber.type") == ScrubberType::EVENT)

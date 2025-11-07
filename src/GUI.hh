@@ -788,6 +788,31 @@ class GUI
                         index_window_int = max_window_size;
                     parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
                 }
+
+                 // Time Step
+                if (!parameter_store->exists("scrubber.index_step"))
+                {
+                    size_t default_step{0};
+                    parameter_store->add("scrubber.index_step", default_step);
+                }
+                size_t event_step = parameter_store->get<std::size_t>("scrubber.index_step");
+
+                // Calculate maximum step size (total time range)
+                size_t max_step_int = max_index_int - min_index_int;
+
+                int32_t event_step_copy = static_cast<int32_t>(event_step);
+                std::string event_step_label{"Index Step"};
+                if (ImGui::SliderInt(event_step_label.c_str(), &event_step_copy, 0, max_step_int))
+                {
+                    if (max_step_int >= 0)
+                    {
+                        event_step = event_step_copy;
+                        size_t lowest_step{0};
+                        event_step = std::clamp(event_step, lowest_step, max_step_int);
+                        parameter_store->add("scrubber.index_step", event_step);
+                    }
+                }
+
             }
             // Time-based controls (for TIME type)
             else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
