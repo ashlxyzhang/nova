@@ -409,8 +409,10 @@ class Visualizer
                         glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
                     glm::mat4 z_switch =
                         glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                    glm::mat4 reflect_yz = glm::scale(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 1.0f));
 
-                    uniforms.mvp = vp * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
+                    uniforms.mvp =
+                        vp * reflect_yz * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
                     // Get camera dimensions for scaling
                     uniforms.negative_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_neg_color"), 1.0f);
@@ -792,8 +794,8 @@ class Visualizer
                     sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
                     sampler_info.mag_filter = SDL_GPU_FILTER_LINEAR;
                     sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
-                    sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-                    sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+                    sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
+                    sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
                     sampler_info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
                     sampler_info.mip_lod_bias = 0.0f;
                     sampler_info.min_lod = -1000.0f;
@@ -850,7 +852,6 @@ class Visualizer
                     SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
                 }
         };
-
 
         // Enum for easily identifying time codes, duplicated in GUI.hh, TODO: figure out if we should move enums
         // to program wide file
@@ -1050,8 +1051,8 @@ class Visualizer
 
                 // Convert normalized Z to actual depth value
                 float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
-                
-                if(!parameter_store.exists("unit_time_conversion_factor"))
+
+                if (!parameter_store.exists("unit_time_conversion_factor"))
                 {
                     parameter_store.add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
                 }
@@ -1064,18 +1065,18 @@ class Visualizer
                 }
                 uint8_t unit_type{parameter_store.get<uint8_t>("unit_type")};
                 std::string timestamp_str{};
-                switch(static_cast<TIME>(unit_type))
+                switch (static_cast<TIME>(unit_type))
                 {
-                    case TIME::UNIT_US:
-                        timestamp_str = std::format("{:.2f}", timestamp / unit_time_conversion_factor);
-                        break;
-                    case TIME::UNIT_MS:
-                        timestamp_str = std::format("{:.4f}", timestamp / unit_time_conversion_factor);
-                        break;
-                    case TIME::UNIT_S:
-                        timestamp_str = std::format("{:.8f}", timestamp / unit_time_conversion_factor);
-                        break;
-                }   
+                case TIME::UNIT_US:
+                    timestamp_str = std::format("{:.2f}", timestamp / unit_time_conversion_factor);
+                    break;
+                case TIME::UNIT_MS:
+                    timestamp_str = std::format("{:.4f}", timestamp / unit_time_conversion_factor);
+                    break;
+                case TIME::UNIT_S:
+                    timestamp_str = std::format("{:.8f}", timestamp / unit_time_conversion_factor);
+                    break;
+                }
 
                 // Position text at the corresponding Z subdivision
                 text_position.z = normalized_z;

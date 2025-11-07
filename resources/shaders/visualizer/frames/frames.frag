@@ -17,15 +17,21 @@ layout(set = 3, binding = 0) uniform FrameData
 
 void main()
 {
+    // Create a new UV coordinate mirrored on the vertical axis
+    // over and underflows will mirror repeat, based on sampler settings
+    vec2 mirroredUV = vec2(inUV.x + 1.0, inUV.y);
+
     if (frame_data.timestamps.x > 0.0 && frame_data.timestamps.y > 0.0)
     {
-        vec4 lower = texture(frame, vec3(inUV, 0));
-        vec4 upper = texture(frame, vec3(inUV, 1));
+        // Use the new mirroredUV for sampling
+        vec4 lower = texture(frame, vec3(mirroredUV, 0));
+        vec4 upper = texture(frame, vec3(mirroredUV, 1));
         float val = (frame_data.timestamps.z - frame_data.timestamps.x) / (frame_data.timestamps.y - frame_data.timestamps.x);
         FragColor = mix(lower, upper, val);
     }
     else
     {
-        FragColor = texture(frame, vec3(inUV, 0));
+        // Also use the new mirroredUV here
+        FragColor = texture(frame, vec3(mirroredUV, 0));
     }
 }
