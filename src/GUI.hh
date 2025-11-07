@@ -741,6 +741,20 @@ class GUI
 
             ImGui::Separator();
 
+            if (!parameter_store->exists("scrubber.cap_mode"))
+            {
+                parameter_store->add("scrubber.cap_mode", 0);
+            }
+            int cap_mode_int = parameter_store->get<int>("scrubber.cap_mode");
+            const char *cap_mode_names[] = {"Capped", "Uncapped"};
+            if (ImGui::Combo("Scrubber Cap", &cap_mode_int, cap_mode_names, 2))
+            {
+                parameter_store->add("scrubber.cap_mode", cap_mode_int);
+            }
+
+            bool capped = (cap_mode_int == 0);
+            ImGui::Separator();
+
             // Current Index (for EVENT type)
             if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::EVENT)
             {
@@ -771,13 +785,13 @@ class GUI
                 }
                 int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
 
-                // Calculate maximum window size (half of data size, minimum 1)
+                // Calculate maximum window size (1/2 or 1/100 of data size, minimum 1)
                 int max_window_size = 1;
                 if (scrubber)
                 {
                     int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") -
                                                      parameter_store->get<std::size_t>("scrubber.min_index") + 1);
-                    max_window_size = std::max(1, data_size / 2);
+                    max_window_size = std::max(1, data_size / (capped ? 100 : 2));
                 }
 
                 if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
@@ -863,6 +877,8 @@ class GUI
                 float max_window_time = std::max(0.00001f, (max_time - min_time) * 0.5f);
                 float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
 
+                // Calculate maximum window size (1/2 or 1/100 of total time range, minimum 0.001)
+                // float max_window_time = std::max(0.001f, (max_time - min_time) / (capped ? 100.0f : 2.0f));
 
                 std::string time_window_label = "Time Window " + time_unit_suffix;
                 if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted, time_format_str.c_str()))
@@ -888,6 +904,7 @@ class GUI
                 // Calculate maximum step size (total time range)
                 float max_step_time = max_time - min_time;
                 float max_step_time_unit_adjusted = max_step_time / unit_time_conversion_factor;
+                // float max_step_time = (max_time - min_time) / (capped ? 100.0f : 10.0f);
 
                 std::string time_step_label = "Time Step " + time_unit_suffix;
                 if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted, time_format_str.c_str()))
