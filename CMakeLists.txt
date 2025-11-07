@@ -4,55 +4,58 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include(FetchContent)
-
 project(NOVA LANGUAGES C CXX)
-
-if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-else()
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
-endif()
 
 file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.hh")
 
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build all dependencies as static libraries")
+# Use FetchContent on Linux, and find_package (vcpkg) on Windows/Other
+include(FetchContent)
 
-FetchContent_Declare(
-    SDL3
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG release-3.2.26
-)
-FetchContent_MakeAvailable(SDL3)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    FetchContent_Declare(
+        SDL3
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG release-3.2.26
+    )
+    FetchContent_MakeAvailable(SDL3)
 
-FetchContent_Declare(
-    SDL3_ttf
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
-    GIT_TAG release-3.2.2
-)
-FetchContent_MakeAvailable(SDL3_ttf)
+    FetchContent_Declare(
+        SDL3_ttf
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+        GIT_TAG release-3.2.2
+    )
+    FetchContent_MakeAvailable(SDL3_ttf)
 
-FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG 1.0.2
-)
-FetchContent_MakeAvailable(glm)
+    FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG 1.0.2
+    )
+    FetchContent_MakeAvailable(glm)
 
-FetchContent_Declare(
-    eigen
-    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-    GIT_TAG 3.4.0
-)
-FetchContent_MakeAvailable(eigen)
+    FetchContent_Declare(
+        eigen
+        GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+        GIT_TAG 3.4.0
+    )
+    FetchContent_MakeAvailable(eigen)
 
-FetchContent_Declare(
-    dv-processing
-    GIT_REPOSITORY https://gitlab.com/inivation/dv/dv-processing.git
-    GIT_TAG 2.0.2
-)
-FetchContent_MakeAvailable(dv-processing)
+    FetchContent_Declare(
+        dv-processing
+        GIT_REPOSITORY https://gitlab.com/inivation/dv/dv-processing.git
+        GIT_TAG 2.0.2
+    )
+    FetchContent_MakeAvailable(dv-processing)
+
+else()
+    find_package(SDL3 REQUIRED)
+    find_package(SDL3_ttf REQUIRED)
+    find_package(glm REQUIRED)
+    find_package(Eigen3 REQUIRED)
+    find_package(dv-processing REQUIRED)
+
+endif()
 
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 file(GLOB IMGUI_CORE_SOURCES
@@ -72,6 +75,7 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
