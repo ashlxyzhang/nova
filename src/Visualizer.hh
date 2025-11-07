@@ -1009,6 +1009,21 @@ class Visualizer
                     }
                     break;
 
+                case SDL_EVENT_MOUSE_WHEEL: {
+                    float scroll_delta = event->wheel.y;
+                    if (event->wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+                    {
+                        scroll_delta = -scroll_delta;
+                    }
+
+                    if (scroll_delta != 0.0f)
+                    {
+                        constexpr float vertical_pan_speed = 0.1f;
+                        camera.processMouseScroll(scroll_delta * vertical_pan_speed);
+                    }
+                    break;
+                }
+
                 default:
                     break;
                 }
