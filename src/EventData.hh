@@ -78,7 +78,7 @@ class EventData
             : evt_data_vector_relative{}, frame_data_vector_relative{}, evt_data_earliest_timestamp{-1},
               frame_data_earliest_timestamp{-1}, evt_data_latest_timestamp{-1}, frame_data_latest_timestamp{-1},
               camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{},
-              max_element_percentage{0.8f}, cull_element_percentage{0.5f}, evt_lock{}
+              max_element_percentage{0.8f}, cull_element_percentage{0.5f}, evt_lock{} //TODO: make percentages editable
         {
         }
 
