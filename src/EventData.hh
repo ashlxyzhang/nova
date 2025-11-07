@@ -193,6 +193,12 @@ class EventData
             // If this condition is met, then we only need to push back event data since it is ordered
             if (raw_evt_data.timestamp >= evt_data_latest_timestamp)
             {
+                // update earliest timestamp
+                if (evt_data_vector_relative.empty())
+                {
+                    evt_data_earliest_timestamp = raw_evt_data.timestamp;
+                }
+
                 // cull elements to avoid overflowing memory
                 cull_elements(evt_data_vector_relative, max_element_percentage, cull_element_percentage);
                 float x{static_cast<float>(raw_evt_data.x)};
@@ -201,18 +207,14 @@ class EventData
                 float polarity{static_cast<float>(raw_evt_data.polarity)};
                 evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
 
-                // update earliest and latest timestamps
-                if (evt_data_vector_relative.size() == 1)
-                {
-                    evt_data_earliest_timestamp = raw_evt_data.timestamp;
-                }
+                
                 evt_data_latest_timestamp = raw_evt_data.timestamp;
             }
             else
             {
                 // Reset assumed, timestamps are all back to zero, clear data
-                evt_data_earliest_timestamp = 0;
-                frame_data_earliest_timestamp = 0;
+                evt_data_earliest_timestamp = -1;
+                frame_data_earliest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
@@ -234,23 +236,25 @@ class EventData
             // If this condition is met, then we only need to push back event data since it is ordered
             if (raw_frame_data.timestamp >= frame_data_latest_timestamp)
             {
+                // update earliest timestamp
+                if (frame_data_vector_relative.empty())
+                {
+                    frame_data_earliest_timestamp = raw_frame_data.timestamp;
+                }
+
                 // cull elements to avoid overflowing memory
                 cull_elements(frame_data_vector_relative, max_element_percentage, cull_element_percentage);
                 float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - frame_data_earliest_timestamp)};
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
 
-                // update earliest and latest timestamps
-                if (frame_data_vector_relative.size() == 1)
-                {
-                    frame_data_earliest_timestamp = raw_frame_data.timestamp;
-                }
+                
                 frame_data_latest_timestamp = raw_frame_data.timestamp;
             }
             else
             {
                 // Reset assumed, timestamps are all back to zero, clear data
-                evt_data_earliest_timestamp = 0;
-                frame_data_earliest_timestamp = 0;
+                evt_data_earliest_timestamp = -1;
+                frame_data_earliest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
