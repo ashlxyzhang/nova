@@ -2,34 +2,22 @@
     "version": 2,
     "configurePresets": [
         {
-            "name": "clang-vcpkg",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build",
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "CMAKE_C_COMPILER": "clang.exe",
-                "CMAKE_CXX_COMPILER": "clang++.exe"
-            }
-        },
-        {
-            "name": "msvc-vcpkg",
+            "name": "msvc",
             "generator": "Visual Studio 17 2022",
-            "binaryDir": "${sourceDir}/build",
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-            }
+            "binaryDir": "${sourceDir}/build"
         },
         {
-            "name": "linux-clang",
+            "name": "clang",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "clang",
-                "CMAKE_CXX_COMPILER": "clang++"
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_BUILD_TYPE" : "Debug"
             }
         },
         {
-            "name": "linux-gcc",
+            "name": "gcc",
             "generator": "Make",
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {

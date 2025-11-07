@@ -56,7 +56,7 @@ class Scrubber
         glm::vec2 camera_resolution = glm::vec2(0.0f, 0.0f);
 
         SDL_GPUTexture *frames = nullptr;
-        std::array<float, 2> frame_timestamps;
+        std::array<float, 2> frame_timestamps = {-1.0, -1.0};
         std::size_t frame_width = 0, frame_height = 0;
 
     public:
@@ -69,8 +69,8 @@ class Scrubber
             parameter_store.add("scrubber.current_index", current_index);
             parameter_store.add("scrubber.index_window", index_window);
             parameter_store.add("scrubber.index_step", index_step);
-            parameter_store.add("scrubber.min_index", 0ULL);
-            parameter_store.add("scrubber.max_index", 0ULL);
+            parameter_store.add("scrubber.min_index", 0UL);
+            parameter_store.add("scrubber.max_index", 0UL);
 
             parameter_store.add("scrubber.current_time", current_time);
             parameter_store.add("scrubber.time_window", time_window);
@@ -106,7 +106,7 @@ class Scrubber
                 return;
             }
 
-            parameter_store.add("scrubber.min_index", 0ULL);
+            parameter_store.add("scrubber.min_index", 0UL);
             parameter_store.add("scrubber.max_index", event_data->get_evt_vector_ref().size() - 1);
 
             if (parameter_store.get<ScrubberType>("scrubber.type") == ScrubberType::TIME)
@@ -176,27 +176,27 @@ class Scrubber
             {
                 if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PAUSED)
                 {
-                    current_index = std::clamp(current_index, 0ULL, event_data->get_evt_vector_ref().size() - 1);
-                    index_window = std::clamp(index_window, 0ULL, event_data->get_evt_vector_ref().size() - 1);
-                    index_step = std::clamp(index_step, 0ULL, event_data->get_evt_vector_ref().size() - 1);
-                    lower_index = std::max(0ULL, current_index - index_window);
+                    current_index = std::clamp(current_index, 0UL, event_data->get_evt_vector_ref().size() - 1);
+                    index_window = std::clamp(index_window, 0UL, event_data->get_evt_vector_ref().size() - 1);
+                    index_step = std::clamp(index_step, 0UL, event_data->get_evt_vector_ref().size() - 1);
+                    lower_index = std::max(0UL, current_index - index_window);
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PLAYING)
                 {
-                    index_step = std::clamp(index_step, 0ULL, event_data->get_evt_vector_ref().size() - 1);
-                    index_window = std::clamp(index_window, 0ULL, event_data->get_evt_vector_ref().size() - 1);
+                    index_step = std::clamp(index_step, 0UL, event_data->get_evt_vector_ref().size() - 1);
+                    index_window = std::clamp(index_window, 0UL, event_data->get_evt_vector_ref().size() - 1);
                     current_index =
-                        std::clamp(current_index + index_step, 0ULL, event_data->get_evt_vector_ref().size() - 1);
-                    lower_index = std::max(0ULL, current_index - index_window);
+                        std::clamp(current_index + index_step, 0UL, event_data->get_evt_vector_ref().size() - 1);
+                    lower_index = std::max(0UL, current_index - index_window);
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::LATEST)
                 {
                     std::size_t event_data_size =
                         event_data->get_evt_vector_ref().empty() ? 0 : event_data->get_evt_vector_ref().size() - 1;
                     current_index = event_data_size;
-                    index_window = std::clamp(index_window, 0ULL, event_data_size);
-                    index_step = std::clamp(index_step, 0ULL, event_data_size);
-                    lower_index = std::max(0ULL, current_index - index_window);
+                    index_window = std::clamp(index_window, 0UL, event_data_size);
+                    index_step = std::clamp(index_step, 0UL, event_data_size);
+                    lower_index = std::max(0UL, current_index - index_window);
                 }
 
                 parameter_store.add("scrubber.current_index", current_index);

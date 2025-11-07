@@ -342,7 +342,7 @@ class DigitalCodedExposure
             pass_data.negCol = negCol;
             pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
-            SDL_PushGPUVertexUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
             SDL_DispatchGPUCompute(compute_pass, point_count, 1, 1);
 
             SDL_BindGPUComputePipeline(compute_pass, process_compute_pipeline);
