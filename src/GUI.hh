@@ -1139,8 +1139,6 @@ class GUI
             draw_digital_coded_exposure();
             draw_stream_window();
             draw_scrubber_window();
-            // Create a simple demo window
-            ImGui::ShowDemoWindow();
             draw_visualizer();
 
             // Rendering

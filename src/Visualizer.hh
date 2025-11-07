@@ -992,6 +992,8 @@ class Visualizer
 
                         // Update camera rotation based on mouse movement
                         camera.processMouseMovement(x_offset, y_offset);
+
+                        SDL_WarpMouseInWindow(window, last_mouse_x, last_mouse_y);
                     }
                     break;
 
