@@ -54,6 +54,7 @@ else()
     find_package(glm REQUIRED)
     find_package(Eigen3 REQUIRED)
     find_package(dv-processing REQUIRED)
+    find_package(Boost COMPONENTS iostreams REQUIRED)
 
 endif()
 
@@ -82,4 +83,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     Eigen3::Eigen
     dv::processing
+    Boost::iostreams
 )
