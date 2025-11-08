@@ -3,13 +3,25 @@
 #ifndef EVENTDATA_HH
 #define EVENTDATA_HH
 
-#include <deque>
+#include <algorithm>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <cstdint>
+#include <iomanip>
 #include <glm/glm.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <sstream>
+#include <thread>
+#include <functional>
+#include <system_error>
+#include <stdexcept>
+#include <iterator>
 #include <vector>
 
 #include <set>
+#include <boost/iostreams/device/mapped_file.hpp>
 
 // From previous NOVA source code
 // Used for timestamp comparisons of event data
@@ -27,8 +39,217 @@ inline bool frame_less_vec4_t(const std::pair<cv::Mat, float> &a, const std::pai
 
 class EventData
 {
-        // Internal structs
     public:
+        class MappedEventBuffer
+        {
+            public:
+                using value_type = glm::vec4;
+                using iterator = value_type *;
+                using const_iterator = const value_type *;
+
+                MappedEventBuffer()
+                {
+                    std::ostringstream oss;
+                    oss << "nova_evt_buffer_" << std::hex
+                        << std::hash<std::thread::id>{}(std::this_thread::get_id()) << "_"
+                        << reinterpret_cast<std::uintptr_t>(this) << ".bin";
+                    file_path_ = std::filesystem::current_path() / oss.str();
+                    remap(kInitialCapacity);
+                }
+
+                ~MappedEventBuffer()
+                {
+                    mapped_file_.close();
+                    if (!file_path_.empty())
+                    {
+                        std::error_code ec;
+                        std::filesystem::remove(file_path_, ec);
+                    }
+                }
+
+                MappedEventBuffer(const MappedEventBuffer &) = delete;
+                MappedEventBuffer &operator=(const MappedEventBuffer &) = delete;
+                MappedEventBuffer(MappedEventBuffer &&) noexcept = delete;
+                MappedEventBuffer &operator=(MappedEventBuffer &&) noexcept = delete;
+
+                void push_back(const value_type &value)
+                {
+                    ensure_capacity(size_ + 1);
+                    ptr()[size_] = value;
+                    ++size_;
+                }
+
+                [[nodiscard]] bool empty() const
+                {
+                    return size_ == 0;
+                }
+
+                [[nodiscard]] std::size_t size() const
+                {
+                    return size_;
+                }
+
+                [[nodiscard]] std::size_t capacity() const
+                {
+                    return capacity_;
+                }
+
+                [[nodiscard]] std::size_t max_size() const
+                {
+                    return capacity_;
+                }
+
+                void clear()
+                {
+                    size_ = 0;
+                }
+
+                value_type &operator[](std::size_t index)
+                {
+                    return ptr()[index];
+                }
+
+                const value_type &operator[](std::size_t index) const
+                {
+                    return ptr()[index];
+                }
+
+                value_type &back()
+                {
+                    return ptr()[size_ - 1];
+                }
+
+                const value_type &back() const
+                {
+                    return ptr()[size_ - 1];
+                }
+
+                iterator begin()
+                {
+                    return ptr();
+                }
+
+                iterator end()
+                {
+                    return ptr() + size_;
+                }
+
+                const_iterator begin() const
+                {
+                    return ptr();
+                }
+
+                const_iterator end() const
+                {
+                    return ptr() + size_;
+                }
+
+                const_iterator cbegin() const
+                {
+                    return ptr();
+                }
+
+                const_iterator cend() const
+                {
+                    return ptr() + size_;
+                }
+
+                value_type *data()
+                {
+                    return ptr();
+                }
+
+                const value_type *data() const
+                {
+                    return ptr();
+                }
+
+            private:
+                static constexpr std::size_t kInitialCapacity{4096};
+
+                boost::iostreams::mapped_file mapped_file_;
+                std::filesystem::path file_path_;
+                std::size_t size_{0};
+                std::size_t capacity_{0};
+
+                void ensure_capacity(std::size_t min_capacity)
+                {
+                    if (min_capacity <= capacity_)
+                    {
+                        return;
+                    }
+
+                    std::size_t new_capacity = capacity_ == 0 ? kInitialCapacity : capacity_;
+                    while (new_capacity < min_capacity)
+                    {
+                        new_capacity *= 2;
+                    }
+
+                    remap(new_capacity);
+                }
+
+                void remap(std::size_t new_capacity)
+                {
+                    const std::size_t bytes = new_capacity * sizeof(value_type);
+
+                    mapped_file_.close();
+
+                    if (bytes == 0)
+                    {
+                        capacity_ = 0;
+                        return;
+                    }
+
+                    {
+                        std::fstream file(file_path_, std::ios::binary | std::ios::in | std::ios::out);
+                        if (!file)
+                        {
+                            std::ofstream create(file_path_, std::ios::binary | std::ios::out | std::ios::trunc);
+                            create.close();
+                            file.open(file_path_, std::ios::binary | std::ios::in | std::ios::out);
+                        }
+
+                        file.seekp(static_cast<std::streamoff>(bytes) - 1, std::ios::beg);
+                        char zero = 0;
+                        file.write(&zero, 1);
+                    }
+
+                    boost::iostreams::mapped_file_params params;
+                    params.path = file_path_.string();
+                    params.mode = std::ios_base::in | std::ios_base::out;
+                    params.length = bytes;
+                    mapped_file_.open(params);
+                    if (!mapped_file_.is_open())
+                    {
+                        throw std::runtime_error("Failed to open mapped file for EventData buffer.");
+                    }
+                    capacity_ = new_capacity;
+                }
+
+                void erase_front(std::size_t count)
+                {
+                    if (count == 0 || count > size_)
+                    {
+                        return;
+                    }
+
+                    value_type *base_ptr = ptr();
+                    std::memmove(base_ptr, base_ptr + count, (size_ - count) * sizeof(value_type));
+                    size_ -= count;
+                }
+
+                value_type *ptr()
+                {
+                    return capacity_ == 0 ? nullptr : reinterpret_cast<value_type *>(mapped_file_.data());
+                }
+
+                const value_type *ptr() const
+                {
+                    return capacity_ == 0 ? nullptr : reinterpret_cast<const value_type *>(mapped_file_.data());
+                }
+        };
+
+        // Internal structs
         // Represents single event datum
         struct EventDatum
         {
@@ -47,7 +268,7 @@ class EventData
 
         // Member variables
     private:
-        std::vector<glm::vec4> evt_data_vector_relative;
+        MappedEventBuffer evt_data_vector_relative;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
 
         // Earliest event/frame timestamps
@@ -64,10 +285,6 @@ class EventData
         int32_t camera_frame_width{};
         int32_t camera_frame_height{};
 
-        float max_element_percentage;  // What percentage of max size of vector should number of elements populate
-        float cull_element_percentage; // What percentage of max size of vector should elements be culled to if they
-                                       // exceed max_element_percentage
-
         std::recursive_mutex evt_lock;
 
     public:
@@ -77,8 +294,7 @@ class EventData
         EventData()
             : evt_data_vector_relative{}, frame_data_vector_relative{}, evt_data_earliest_timestamp{-1},
               frame_data_earliest_timestamp{-1}, evt_data_latest_timestamp{-1}, frame_data_latest_timestamp{-1},
-              camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{},
-              max_element_percentage{0.8f}, cull_element_percentage{0.5f}, evt_lock{} //TODO: make percentages editable
+              camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{}, evt_lock{}
         {
         }
 
@@ -199,8 +415,6 @@ class EventData
                     evt_data_earliest_timestamp = raw_evt_data.timestamp;
                 }
 
-                // cull elements to avoid overflowing memory
-                cull_elements(evt_data_vector_relative, max_element_percentage, cull_element_percentage);
                 float x{static_cast<float>(raw_evt_data.x)};
                 float y{static_cast<float>(raw_evt_data.y)};
                 float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - evt_data_earliest_timestamp)};
@@ -242,8 +456,6 @@ class EventData
                     frame_data_earliest_timestamp = raw_frame_data.timestamp;
                 }
 
-                // cull elements to avoid overflowing memory
-                cull_elements(frame_data_vector_relative, max_element_percentage, cull_element_percentage);
                 float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - frame_data_earliest_timestamp)};
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
 
@@ -269,7 +481,7 @@ class EventData
          * timestamps). Otherwise regular timestamps.
          * @return const reference to internal event data vector.
          */
-        const std::vector<glm::vec4> &get_evt_vector_ref()
+        const MappedEventBuffer &get_evt_vector_ref() const
         {
             return evt_data_vector_relative;
         }
@@ -391,35 +603,6 @@ class EventData
             return ret_index;
         }
 
-        // Helper functions
-    private:
-        /**
-         * @brief Memory management code. Must be called with appropriate locks.
-         */
-        template <typename T>
-        bool cull_elements(std::vector<T> &vector_data, float max_percentage, float cull_percentage)
-        {
-            bool culled = false;
-            size_t maxElements{vector_data.max_size()};
-            if (vector_data.size() >=
-                static_cast<size_t>(max_percentage *
-                                    maxElements)) // If there are more than max_percentage max number of events
-            {
-                // Ensures upper bound is met no matter the condition
-                while (vector_data.size() > static_cast<size_t>(cull_percentage * maxElements))
-                {
-                    vector_data.erase(
-                        vector_data.begin(),
-                        std::next(vector_data.begin(),
-                                  static_cast<size_t>((max_percentage - cull_percentage) *
-                                                      maxElements))); // Should bring number of elements down to
-                                                                      // cull_percentage of max elements
-                    culled = true;
-                }
-            }
-
-            return culled;
-        }
 };
 
 // Operator overloads necessary to use Datum internal structs as keys to multiset

@@ -4,8 +4,11 @@
     "glm",
     {
       "name": "sdl3",
-      "features" : ["vulkan"]
+      "features": [
+        "vulkan"
+      ]
     },
-    "sdl3-ttf"
+    "sdl3-ttf",
+    "boost-iostreams"
   ]
 }

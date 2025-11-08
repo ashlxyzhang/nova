@@ -10,6 +10,9 @@
 #include "ParameterStore.hh"
 #include "UploadBuffer.hh"
 
+#include <algorithm>
+#include <array>
+
 class Scrubber
 {
     public:
@@ -143,7 +146,7 @@ class Scrubber
                 time_step = parameter_store.get<float>("scrubber.time_step");
 
                 // Get time bounds from event data
-                const std::vector<glm::vec4> &evt_vector_relative = event_data->get_evt_vector_ref();
+                const auto &evt_vector_relative = event_data->get_evt_vector_ref();
                 float min_time = 0.0f;
                 float max_time = 0.0f;
                 if (!evt_vector_relative.empty())
@@ -249,7 +252,7 @@ class Scrubber
             event_data->lock_data_vectors();
 
             // Get the data we need to copy
-            const std::vector<glm::vec4> &evt_vector = event_data->get_evt_vector_ref();
+            const auto &evt_vector = event_data->get_evt_vector_ref();
 
             // Return if event data is empty
             if (evt_vector.empty())
