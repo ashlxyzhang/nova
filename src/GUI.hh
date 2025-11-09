@@ -14,9 +14,6 @@
 #include "fonts/CascadiaCode.ttf.h"
 // Declared here to use with callback functions.
 
-// Callback used with SDL_ShowOpenFileDialog in draw_load_file_window
-inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused);
-
 // Callback used with SDL_ShowOpenFileDialog in draw_stream_window
 inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list,
                                                 int filter_unused);
@@ -673,20 +670,6 @@ class GUI
             ImGui::End();
         }
 
-        void draw_load_file_window()
-        {
-            ImGui::Begin("Load");
-            ImGui::Text("File:");
-
-            if (ImGui::Button("Open File"))
-            {
-                SDL_ShowOpenFileDialog(load_file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
-            }
-
-            
-            // TODO: Cache recent files and state?
-            ImGui::End();
-        }
 
         void draw_visualizer()
         {
@@ -1206,7 +1189,6 @@ class GUI
 
             // Draw debug block
             draw_debug_window(fps);
-            draw_load_file_window();
             draw_digital_coded_exposure();
             draw_stream_window();
             draw_scrubber_window();
@@ -1274,28 +1256,6 @@ class GUI
         }
 };
 
-// Callback used with SDL_ShowOpenFileDialog in draw_load_file_window
-inline void SDLCALL load_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
-{
-    ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
-    if (data_file_list)
-    {
-        if (*data_file_list)
-        {
-            std::string file_name{*data_file_list};
-            param_store_ptr->add("load_file_name", file_name);
-            param_store_ptr->add("load_file_changed", true);
-            param_store_ptr->add("program_state", GUI::PROGRAM_STATE::FILE_READ); // Determines if program is streaming
-
-            // reset camera streams
-            param_store_ptr->add("camera_changed", true);
-        }
-    }
-    else
-    {
-        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
-    }
-}
 
 // Callback used with SDL_ShowOpenFileDialog in draw_stream_window
 inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)

@@ -125,52 +125,6 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
             GUI::PROGRAM_STATE prog_state{param_store.get<GUI::PROGRAM_STATE>("program_state")};
             switch (prog_state)
             {
-            case GUI::PROGRAM_STATE::FILE_READ: // Case for reading from file
-                if (param_store.exists("load_file_name") && param_store.exists("load_file_changed"))
-                {
-                    if (param_store.get<bool>("load_file_changed"))
-                    {
-                        std::string load_file_name{param_store.get<std::string>("load_file_name")};
-
-                        evt_data.clear();
-                        data_writer.clear();
-                        bool init_success{data_acq.init_file_reader(load_file_name, param_store)};
-
-                        if (init_success)
-                        {
-                            data_acq.get_camera_event_resolution(evt_data);
-                            data_acq.get_camera_frame_resolution(evt_data);
-                            data_acq.get_all_evt_data(evt_data, param_store, data_writer);
-                            data_acq.get_all_frame_data(evt_data, param_store, data_writer);
-                            param_store.add("load_file_changed", false);
-                            param_store.add("resolution_initialized", true); // Need to communicate with DCE
-
-                            // Nothing should be saving from streamed data, indicate as such
-                            std::string saving_message{"Nothing Being Saved Currently"};
-                            param_store.add("saving_message", saving_message);
-                            // Test to ensure event/frame data was added and is ordered
-                            // evt_data.lock_data_vectors();
-
-                            // const auto &event_data{evt_data.get_evt_vector_ref()};
-
-                            // for (size_t i = 1; i < event_data.size(); ++i)
-                            // {
-                            //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                            // }
-
-                            // const auto &frame_data{evt_data.get_frame_vector_ref(true)};
-
-                            // for (size_t i = 1; i < frame_data.size(); ++i)
-                            // {
-                            //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-                            // }
-
-                            // evt_data.unlock_data_vectors();
-                        }
-                    }
-                }
-                break;
-
             case GUI::PROGRAM_STATE::FILE_STREAM: // Case for streaming from file
                 if (param_store.exists("stream_file_name") && param_store.exists("stream_file_changed") &&
                     param_store.exists("stream_paused") && param_store.exists("stream_save_file_name") &&
