@@ -456,6 +456,7 @@ class EventData
                     frame_data_earliest_timestamp = raw_frame_data.timestamp;
                 }
 
+                cull_elements(frame_data_vector_relative, 0.8, 0.5, 1 << 20); // Around 1 million frames is the limit
                 float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - frame_data_earliest_timestamp)};
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
 
@@ -601,6 +602,35 @@ class EventData
 
             evt_lock_ul.unlock();
             return ret_index;
+        }
+
+    private:
+        /**
+         * @brief Memory management code. Must be called with appropriate locks.
+         */
+        template <typename T>
+        bool cull_elements(std::vector<T> &vector_data, float max_percentage, float cull_percentage, size_t max_num_elements)
+        {
+            bool culled = false;
+            size_t maxElements{max_num_elements};
+            if (vector_data.size() >=
+                static_cast<size_t>(max_percentage *
+                                    maxElements)) // If there are more than max_percentage max number of events
+            {
+                // Ensures upper bound is met no matter the condition
+                while (vector_data.size() > static_cast<size_t>(cull_percentage * maxElements))
+                {
+                    vector_data.erase(
+                        vector_data.begin(),
+                        std::next(vector_data.begin(),
+                                  static_cast<size_t>((max_percentage - cull_percentage) *
+                                                      maxElements))); // Should bring number of elements down to
+                                                                      // cull_percentage of max elements
+                    culled = true;
+                }
+            }
+
+            return culled;
         }
 
 };
