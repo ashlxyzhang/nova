@@ -466,6 +466,29 @@ class GUI
         {
             ImGui::Begin("Streaming");
 
+            if (!parameter_store->exists("program_state"))
+            {
+                parameter_store->add("program_state", GUI::PROGRAM_STATE::IDLE);
+            }
+
+            GUI::PROGRAM_STATE program_state{parameter_store->get<GUI::PROGRAM_STATE>("program_state")};
+
+            // Display program state
+            ImGui::Text("Program State:");
+            switch(program_state)
+            {
+                case GUI::PROGRAM_STATE::IDLE:
+                    ImGui::Text("Program Is Currently Doing Nothing.");
+                    break;
+                case GUI::PROGRAM_STATE::FILE_STREAM:
+                    ImGui::Text("Program Is Currently Streaming From FILE.");
+                    break;
+                case GUI::PROGRAM_STATE::CAMERA_STREAM:
+                    ImGui::Text("Program Is Currently Streaming From CAMERA.");
+                    break;
+            }
+
+            ImGui::Separator();
             if (!parameter_store->exists("event_discard_odds"))
             {
                 parameter_store->add("event_discard_odds", 1.0f);
@@ -474,7 +497,7 @@ class GUI
             // The higher this value is, the higher chance events will be discarded
             float event_discard_odds{parameter_store->get<float>("event_discard_odds")};
             ImGui::Text("Event Discard Odds");
-            ImGui::SliderFloat("##Frequency Of Discarded Events", &event_discard_odds, 1.0f, 10000, "%f");
+            ImGui::SliderFloat("##Frequency Of Discarded Events", &event_discard_odds, 1.0f, 1500.0f, "%f");
             parameter_store->add("event_discard_odds", event_discard_odds);
 
             ImGui::Separator();
@@ -516,13 +539,6 @@ class GUI
 
             // std::cout << "CAMERA INDEX: " << camera_index << std::endl;
             parameter_store->add("camera_index", camera_index);
-
-            if (!parameter_store->exists("program_state"))
-            {
-                parameter_store->add("program_state", GUI::PROGRAM_STATE::IDLE);
-            }
-
-            GUI::PROGRAM_STATE program_state{parameter_store->get<GUI::PROGRAM_STATE>("program_state")};
 
             if (ImGui::Button(program_state == GUI::PROGRAM_STATE::CAMERA_STREAM ? "Stop Streaming"
                                                                                  : "Stream From Camera"))
@@ -590,7 +606,7 @@ class GUI
             bool stream_save_frames{parameter_store->get<bool>("stream_save_frames")};
             bool stream_save_frames_copy{stream_save_frames};
             // Save or stop saving stream frames
-            ImGui::Checkbox("Save Frames On Next Stream", &stream_save_frames);
+            ImGui::Checkbox("Save Frames On Next Stream (Will Stop Streaming)", &stream_save_frames);
             if(stream_save_frames != stream_save_frames_copy)
             {
                 parameter_store->add("program_state",
@@ -606,7 +622,7 @@ class GUI
             bool stream_save_events{parameter_store->get<bool>("stream_save_events")};
             bool stream_save_events_copy{stream_save_events};
             // Save or stop saving stream events
-            ImGui::Checkbox("Save Events On Next Stream", &stream_save_events);
+            ImGui::Checkbox("Save Events On Next Stream (Will Stop Streaming)", &stream_save_events);
             if(stream_save_events_copy != stream_save_events)
             {
                 parameter_store->add("program_state",
@@ -1099,7 +1115,6 @@ class GUI
         enum class PROGRAM_STATE : uint8_t
         {
             IDLE = 0,
-            FILE_READ = 1,    // Program is reading from a file
             FILE_STREAM = 2,  // Program is streaming from a file
             CAMERA_STREAM = 3 // Program is streaming from a camera
         };
