@@ -11,29 +11,33 @@
 // Anonymous helper functions
 namespace
 {
-inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store)
+inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store, GUI::PROGRAM_STATE prog_state)
 {
     data_writer.clear();
     std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
-    std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
 
-    if (!stream_save_file_name.ends_with(".aedat4"))
+    if(prog_state == GUI::PROGRAM_STATE::FILE_STREAM)
     {
-        stream_save_file_name.append(".aedat4");
-    }
+        std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
 
-    if (!stream_file_name.ends_with(".aedat4"))
-    {
-        stream_file_name.append(".aedat4");
-    }
+        if (!stream_save_file_name.ends_with(".aedat4"))
+        {
+            stream_save_file_name.append(".aedat4");
+        }
 
-    // Attempting to write to file while reading from it will lead to disaster
-    if (stream_save_file_name == stream_file_name)
-    {
-        size_t aedat_index{stream_save_file_name.find(".aedat4")};
-        stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
+        if (!stream_file_name.ends_with(".aedat4"))
+        {
+            stream_file_name.append(".aedat4");
+        }
+
+        // Attempting to write to file while reading from it will lead to disaster
+        if (stream_save_file_name == stream_file_name)
+        {
+            size_t aedat_index{stream_save_file_name.find(".aedat4")};
+            stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
+        }
+        param_store.add("stream_save_file_name", stream_save_file_name);
     }
-    param_store.add("stream_save_file_name", stream_save_file_name);
     if (param_store.get<bool>("stream_save_events") || param_store.get<bool>("stream_save_frames"))
     {
         bool init_data_writer_success{data_writer.init_data_writer(
@@ -58,6 +62,11 @@ inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, Par
             saving_message.append("To ");
             saving_message.append(stream_save_file_name);
             param_store.add("saving_message", saving_message);
+
+            // Reset saving controls
+            param_store.add("stream_save_file_name", std::string{""});
+            param_store.add("stream_save_events", false);
+            param_store.add("stream_save_frames", false);
         }
         else
         {
@@ -170,6 +179,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     // If stream file changed, reset reader to read from new file and clear previously read event data
                     if (param_store.get<bool>("stream_file_changed"))
                     {
+                        data_acq.clear_reader();
                         std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
                         evt_data.clear();
                         bool init_success{data_acq.init_file_reader(stream_file_name, param_store)};
@@ -180,11 +190,16 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("stream_file_changed", false);
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
                         }
+                        
+                        data_writer.clear();
+                        // Set for nothing saved for now, setup_writer will update it
+                        std::string saving_message{"Nothing Being Saved Currently"};
+                        param_store.add("saving_message", saving_message);
 
                         // If gui indicates writing needs to be done, then set up writer for writing
                         if (param_store.get<std::string>("stream_save_file_name") != "")
                         {
-                            setup_writer(data_acq, data_writer, param_store);
+                            setup_writer(data_acq, data_writer, param_store, prog_state);
                         }
                     }
 
@@ -232,11 +247,13 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                 {
 
                     if (param_store.get<bool>("camera_changed"))
-                    {
+                    {  
+                        data_acq.clear_reader();
                         evt_data.clear();
 
                         bool init_success{
                             data_acq.init_camera_reader(param_store.get<int32_t>("camera_index"), param_store)};
+                        
 
                         if (init_success)
                         {
@@ -245,12 +262,17 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("camera_changed", false);
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
                         }
-
+                        
+                        data_writer.clear();
+                        // Set for nothing saved for now
+                        std::string saving_message{"Nothing Being Saved Currently"};
+                        param_store.add("saving_message", saving_message);
                         // If gui indicates writing needs to be done, then set up writer for writing
                         if (param_store.get<std::string>("stream_save_file_name") != "")
                         {
-                            setup_writer(data_acq, data_writer, param_store);
+                            setup_writer(data_acq, data_writer, param_store, prog_state);
                         }
+
                     }
 
                     // Check if stream is paused
@@ -268,6 +290,9 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                 // Nothing being saved
                 std::string saving_message{"Nothing Being Saved Currently"};
                 param_store.add("saving_message", saving_message);
+
+                // Clear data acq
+                data_acq.clear_reader();
                 break;
             }
         }

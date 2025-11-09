@@ -468,6 +468,20 @@ class GUI
         void draw_stream_window()
         {
             ImGui::Begin("Streaming");
+
+            if (!parameter_store->exists("event_discard_odds"))
+            {
+                parameter_store->add("event_discard_odds", 1.0f);
+            }
+
+            // The higher this value is, the higher chance events will be discarded
+            float event_discard_odds{parameter_store->get<float>("event_discard_odds")};
+            ImGui::Text("Event Discard Odds");
+            ImGui::SliderFloat("##Frequency Of Discarded Events", &event_discard_odds, 1.0f, 10000, "%f");
+            parameter_store->add("event_discard_odds", event_discard_odds);
+
+            ImGui::Separator();
+            
             ImGui::Text("Stream From Camera:");
             if (ImGui::Button("Scan For Cameras"))
             {
@@ -484,11 +498,19 @@ class GUI
 
             if (!parameter_store->exists("discovered_cameras"))
             {
-                parameter_store->add("discovered_cameras", std::string{""});
+                parameter_store->add("discovered_cameras", std::vector<std::string>{});
             }
 
-            std::string discovered_cameras{parameter_store->get<std::string>("discovered_cameras")};
-            ImGui::Combo("Camera", &camera_index, discovered_cameras.c_str());
+            std::vector<std::string> discovered_cameras{parameter_store->get<std::vector<std::string>>("discovered_cameras")};
+
+            // This is stupid but it seems to work
+            // Dynamically populate IMGUI combo with camera options.
+            std::vector<const char*> discovered_cameras_char{};
+            for(std::string &element : discovered_cameras)
+            {
+                discovered_cameras_char.push_back(element.c_str());
+            }
+            ImGui::Combo("Camera", &camera_index, discovered_cameras_char.data(), discovered_cameras_char.size());
 
             if (camera_index_copy != camera_index) // Different camera chosen
             {
@@ -505,14 +527,19 @@ class GUI
 
             GUI::PROGRAM_STATE program_state{parameter_store->get<GUI::PROGRAM_STATE>("program_state")};
 
-            if (ImGui::Button(program_state == GUI::PROGRAM_STATE::CAMERA_STREAM ? "Streaming..."
+            if (ImGui::Button(program_state == GUI::PROGRAM_STATE::CAMERA_STREAM ? "Stop Streaming"
                                                                                  : "Stream From Camera"))
             {
                 if (program_state != GUI::PROGRAM_STATE::CAMERA_STREAM)
                 {
                     parameter_store->add("camera_changed", true); // Reset reader
+                    parameter_store->add("program_state", GUI::PROGRAM_STATE::CAMERA_STREAM);
                 }
-                parameter_store->add("program_state", GUI::PROGRAM_STATE::CAMERA_STREAM);
+                else
+                {
+                    parameter_store->add("program_state", GUI::PROGRAM_STATE::IDLE);
+                }
+                
             }
 
             if (!parameter_store->exists("camera_stream_paused"))
@@ -564,8 +591,14 @@ class GUI
             }
 
             bool stream_save_frames{parameter_store->get<bool>("stream_save_frames")};
+            bool stream_save_frames_copy{stream_save_frames};
             // Save or stop saving stream frames
             ImGui::Checkbox("Save Frames On Next Stream", &stream_save_frames);
+            if(stream_save_frames != stream_save_frames_copy)
+            {
+                parameter_store->add("program_state",
+                                 GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
+            }
             parameter_store->add("stream_save_frames", stream_save_frames);
 
             if (!parameter_store->exists("stream_save_events"))
@@ -574,10 +607,14 @@ class GUI
             }
 
             bool stream_save_events{parameter_store->get<bool>("stream_save_events")};
-
+            bool stream_save_events_copy{stream_save_events};
             // Save or stop saving stream events
             ImGui::Checkbox("Save Events On Next Stream", &stream_save_events);
-
+            if(stream_save_events_copy != stream_save_events)
+            {
+                parameter_store->add("program_state",
+                                 GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
+            }
             parameter_store->add("stream_save_events", stream_save_events);
 
             if (!parameter_store->exists("stream_save_file_name"))
@@ -646,17 +683,7 @@ class GUI
                 SDL_ShowOpenFileDialog(load_file_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr, 0);
             }
 
-            if (!parameter_store->exists("event_discard_odds"))
-            {
-                parameter_store->add("event_discard_odds", 1.0f);
-            }
-
-            // The higher this value is, the higher chance events will be discarded
-            float event_discard_odds{parameter_store->get<float>("event_discard_odds")};
-            ImGui::Text("Event Discard Odds");
-            ImGui::SliderFloat("##Frequency Of Discarded Events", &event_discard_odds, 1.0f, 10000, "%f");
-            parameter_store->add("event_discard_odds", event_discard_odds);
-
+            
             // TODO: Cache recent files and state?
             ImGui::End();
         }

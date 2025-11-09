@@ -35,6 +35,30 @@ class DataAcquisition
             : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
               camera_frame_height{}, acq_lock{}
         {
+        }  
+
+        /**
+         * Clears member variables pertaining to reader.
+         */
+        void clear_reader()
+        {
+            data_reader_ptr.reset();
+
+            camera_event_width = 0;
+            camera_event_height = 0;
+
+            camera_frame_width= 0;
+            camera_frame_height = 0;
+
+        }
+
+        /**
+         * Clears every member variable
+         */
+        void clear()
+        {
+            clear_reader();
+            scanned_cameras.clear();
         }
 
         /**
@@ -52,17 +76,21 @@ class DataAcquisition
 
             const auto discovered_cameras{dv::io::camera::discover()};
 
-            std::stringstream str_stream{};
+            std::vector<std::string> cameras_vec{};
 
             for (const auto &camera : discovered_cameras)
             {
+                std::stringstream str_stream{};
                 scanned_cameras.push_back(camera);
                 // To ensure string conversion works
                 str_stream << "Model: " << camera.cameraModel << " ";
                 str_stream << "Serial Number: " << camera.serialNumber << "\0";
+                cameras_vec.push_back(str_stream.str());
+                
             }
+            param_store.add("discovered_cameras", cameras_vec);
 
-            param_store.add("discovered_cameras", str_stream.str());
+            
 
             acq_lock_ul.unlock();
         }
