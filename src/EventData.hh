@@ -4,24 +4,24 @@
 #define EVENTDATA_HH
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <cstdint>
-#include <iomanip>
+#include <functional>
 #include <glm/glm.hpp>
+#include <iomanip>
+#include <iterator>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <sstream>
-#include <thread>
-#include <functional>
-#include <system_error>
 #include <stdexcept>
-#include <iterator>
+#include <system_error>
+#include <thread>
 #include <vector>
 
-#include <set>
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <set>
 
 // From previous NOVA source code
 // Used for timestamp comparisons of event data
@@ -50,9 +50,8 @@ class EventData
                 MappedEventBuffer()
                 {
                     std::ostringstream oss;
-                    oss << "nova_evt_buffer_" << std::hex
-                        << std::hash<std::thread::id>{}(std::this_thread::get_id()) << "_"
-                        << reinterpret_cast<std::uintptr_t>(this) << ".bin";
+                    oss << "nova_evt_buffer_" << std::hex << std::hash<std::thread::id>{}(std::this_thread::get_id())
+                        << "_" << reinterpret_cast<std::uintptr_t>(this) << ".bin";
                     file_path_ = std::filesystem::current_path() / oss.str();
                     remap(kInitialCapacity);
                 }
@@ -273,7 +272,6 @@ class EventData
 
         // Earliest event/frame timestamps
         int64_t evt_data_earliest_timestamp{-1};
-        int64_t frame_data_earliest_timestamp{-1};
 
         int64_t evt_data_latest_timestamp{-1};
         int64_t frame_data_latest_timestamp{-1};
@@ -293,8 +291,8 @@ class EventData
          */
         EventData()
             : evt_data_vector_relative{}, frame_data_vector_relative{}, evt_data_earliest_timestamp{-1},
-              frame_data_earliest_timestamp{-1}, evt_data_latest_timestamp{-1}, frame_data_latest_timestamp{-1},
-              camera_event_width{}, camera_event_height{}, camera_frame_width{}, camera_frame_height{}, evt_lock{}
+              evt_data_latest_timestamp{-1}, frame_data_latest_timestamp{-1}, camera_event_width{},
+              camera_event_height{}, camera_frame_width{}, camera_frame_height{}, evt_lock{}
         {
         }
 
@@ -310,7 +308,6 @@ class EventData
             frame_data_vector_relative.clear();
 
             evt_data_earliest_timestamp = -1;
-            frame_data_earliest_timestamp = -1;
 
             evt_data_latest_timestamp = -1;
             frame_data_latest_timestamp = -1;
@@ -415,20 +412,26 @@ class EventData
                     evt_data_earliest_timestamp = raw_evt_data.timestamp;
                 }
 
+                constexpr size_t MAX_EVENT_BACKING_SIZE{
+                    100 * ((static_cast<size_t>(1) << 30) / (1 << 4))}; // Set 100 GB approximately
+                if (evt_data_vector_relative.size() > MAX_EVENT_BACKING_SIZE)
+                {
+                    evt_data_vector_relative.clear(); // 100 GB is the limit
+                    frame_data_vector_relative.clear();
+                }
+
                 float x{static_cast<float>(raw_evt_data.x)};
                 float y{static_cast<float>(raw_evt_data.y)};
                 float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - evt_data_earliest_timestamp)};
                 float polarity{static_cast<float>(raw_evt_data.polarity)};
                 evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
 
-                
                 evt_data_latest_timestamp = raw_evt_data.timestamp;
             }
             else
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
-                frame_data_earliest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
@@ -451,23 +454,27 @@ class EventData
             if (raw_frame_data.timestamp >= frame_data_latest_timestamp)
             {
                 // update earliest timestamp
-                if (frame_data_vector_relative.empty())
+                if (evt_data_vector_relative.empty()) // Need to normalize timestamps relative to event data, ignore until event data is in
                 {
-                    frame_data_earliest_timestamp = raw_frame_data.timestamp;
+                    return;
                 }
 
-                cull_elements(frame_data_vector_relative, 0.8, 0.5, 1 << 20); // Around 1 million frames is the limit
-                float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - frame_data_earliest_timestamp)};
+                constexpr size_t MAX_FRAME_SIZE{static_cast<size_t>(1) << 20}; // Set max to 1 million elements
+                if (frame_data_vector_relative.size() > MAX_FRAME_SIZE)
+                {
+                    // Both need to be cleared to keep timestamps in sync
+                    frame_data_vector_relative.clear();
+                    evt_data_vector_relative.clear();
+                }
+                float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - evt_data_earliest_timestamp)};
                 frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
 
-                
                 frame_data_latest_timestamp = raw_frame_data.timestamp;
             }
             else
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
-                frame_data_earliest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
@@ -519,27 +526,6 @@ class EventData
             evt_lock_ul.unlock();
 
             return earliest_timestamp;
-        }
-
-        /**
-         * @brief Gets the earliest frame timestamp.
-         * @return earliest frame data timestamp.
-         */
-        int64_t get_earliest_frame_timestamp()
-        {
-            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-
-            if (frame_data_vector_relative.empty())
-            {
-                evt_lock_ul.unlock();
-                return -1; // No frame data
-            }
-
-            int64_t timestamp{frame_data_earliest_timestamp};
-
-            evt_lock_ul.unlock();
-
-            return timestamp;
         }
 
         /**
@@ -603,36 +589,6 @@ class EventData
             evt_lock_ul.unlock();
             return ret_index;
         }
-
-    private:
-        /**
-         * @brief Memory management code. Must be called with appropriate locks.
-         */
-        template <typename T>
-        bool cull_elements(std::vector<T> &vector_data, float max_percentage, float cull_percentage, size_t max_num_elements)
-        {
-            bool culled = false;
-            size_t maxElements{max_num_elements};
-            if (vector_data.size() >=
-                static_cast<size_t>(max_percentage *
-                                    maxElements)) // If there are more than max_percentage max number of events
-            {
-                // Ensures upper bound is met no matter the condition
-                while (vector_data.size() > static_cast<size_t>(cull_percentage * maxElements))
-                {
-                    vector_data.erase(
-                        vector_data.begin(),
-                        std::next(vector_data.begin(),
-                                  static_cast<size_t>((max_percentage - cull_percentage) *
-                                                      maxElements))); // Should bring number of elements down to
-                                                                      // cull_percentage of max elements
-                    culled = true;
-                }
-            }
-
-            return culled;
-        }
-
 };
 
 // Operator overloads necessary to use Datum internal structs as keys to multiset
