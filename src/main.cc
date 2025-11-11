@@ -204,6 +204,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     // Flush file write buffer?
     g_data_writer.clear();
 
+    // Ensure camera disconnect
+    g_data_acq.clear_reader();
+
     delete g_writer_thread_ptr;
     delete g_data_acquisition_thread_ptr;
 
