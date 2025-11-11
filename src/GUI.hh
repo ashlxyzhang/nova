@@ -790,24 +790,28 @@ class GUI
             // Current Index (for EVENT type)
             if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::EVENT)
             {
-                int current_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.current_index"));
+                size_t current_index_size_t = parameter_store->get<std::size_t>("scrubber.current_index");
 
                 // Get min/max values from scrubber if available
-                int min_index_int = 0;
-                int max_index_int = 0;
+                size_t min_index_size_t = 0;
+                size_t max_index_size_t = 0;
                 if (scrubber)
                 {
-                    min_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.min_index"));
-                    max_index_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index"));
+                    min_index_size_t = parameter_store->get<std::size_t>("scrubber.min_index");
+                    max_index_size_t = parameter_store->get<std::size_t>("scrubber.max_index");
                 }
 
-                if (ImGui::SliderInt("Current Index", &current_index_int, min_index_int, max_index_int))
+                float current_index_float{static_cast<float>(current_index_size_t)};
+                float min_index_float{static_cast<float>(min_index_size_t)};
+                float max_index_float{static_cast<float>(max_index_size_t)};
+
+                if (ImGui::SliderFloat("Current Index", &current_index_float, min_index_float, max_index_float))
                 {
-                    if (current_index_int < min_index_int)
-                        current_index_int = min_index_int;
-                    if (current_index_int > max_index_int)
-                        current_index_int = max_index_int;
-                    parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_int));
+                    if (current_index_float < min_index_float)
+                        current_index_float = min_index_float;
+                    if (current_index_float > max_index_float)
+                        current_index_float = max_index_float;
+                    parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_float));
                 }
 
                 // Index Window
@@ -815,24 +819,28 @@ class GUI
                 {
                     parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
                 }
-                int index_window_int = static_cast<int>(parameter_store->get<std::size_t>("scrubber.index_window"));
+                size_t index_window_size_t = parameter_store->get<std::size_t>("scrubber.index_window");
+
+                float index_window_float{static_cast<float>(index_window_size_t)};
 
                 // Calculate maximum window size (1/2 or 1/100 of data size, minimum 1)
-                int max_window_size = 1;
+                size_t max_window_size = 1;
                 if (scrubber)
                 {
-                    int data_size = static_cast<int>(parameter_store->get<std::size_t>("scrubber.max_index") -
-                                                     parameter_store->get<std::size_t>("scrubber.min_index") + 1);
-                    max_window_size = std::max(1, data_size / window_div_factor);
+                    size_t data_size = parameter_store->get<std::size_t>("scrubber.max_index") -
+                                                     parameter_store->get<std::size_t>("scrubber.min_index") + 1;
+                    max_window_size = std::max(static_cast<size_t>(1), data_size / window_div_factor);
                 }
 
-                if (ImGui::SliderInt("Index Window", &index_window_int, 1, max_window_size))
+                float max_window_size_float{static_cast<float>(max_window_size)};
+
+                if (ImGui::SliderFloat("Index Window", &index_window_float, 1.0f, max_window_size_float))
                 {
-                    if (index_window_int < 1)
-                        index_window_int = 1;
-                    if (index_window_int > max_window_size)
-                        index_window_int = max_window_size;
-                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_int));
+                    if (index_window_float < 1.0f)
+                        index_window_float = 1.0f;
+                    if (index_window_float > max_window_size_float)
+                        index_window_float = max_window_size_float;
+                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_float));
                 }
 
                  // Time Step
@@ -844,18 +852,19 @@ class GUI
                 size_t event_step = parameter_store->get<std::size_t>("scrubber.index_step");
 
                 // Calculate maximum step size (total time range)
-                size_t max_step_int = max_index_int - min_index_int;
+                size_t max_step_size_t = max_index_size_t - min_index_size_t;
+                float max_step_float{static_cast<float>(max_step_size_t)};
 
-                int32_t event_step_copy = static_cast<int32_t>(event_step);
+                float event_step_float = static_cast<float>(event_step);
                 std::string event_step_label{"Index Step"};
-                if (ImGui::SliderInt(event_step_label.c_str(), &event_step_copy, 0, max_step_int))
+                if (ImGui::SliderFloat(event_step_label.c_str(), &event_step_float, 0.0f, max_step_float))
                 {
-                    if (max_step_int >= 0)
+                    if (max_step_float >= 0.0f)
                     {
-                        event_step = event_step_copy;
-                        size_t lowest_step{0};
-                        event_step = std::clamp(event_step, lowest_step, max_step_int);
-                        parameter_store->add("scrubber.index_step", event_step);
+                        event_step_float = event_step_float;
+                        float lowest_step_float{0.0f};
+                        event_step_float = std::clamp(event_step_float, lowest_step_float, max_step_float);
+                        parameter_store->add("scrubber.index_step", static_cast<size_t>(event_step_float));
                     }
                 }
 
