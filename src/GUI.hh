@@ -852,7 +852,7 @@ class GUI
                 size_t event_step = parameter_store->get<std::size_t>("scrubber.index_step");
 
                 // Calculate maximum step size (total time range)
-                size_t max_step_size_t = max_index_size_t - min_index_size_t;
+                size_t max_step_size_t = (max_index_size_t - min_index_size_t) / step_div_factor;
                 float max_step_float{static_cast<float>(max_step_size_t)};
 
                 float event_step_float = static_cast<float>(event_step);
