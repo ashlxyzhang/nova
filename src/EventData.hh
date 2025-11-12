@@ -403,38 +403,33 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
-            // If this condition is met, then we only need to push back event data since it is ordered
-            if (raw_evt_data.timestamp >= evt_data_latest_timestamp)
-            {
-                // update earliest timestamp
-                if (evt_data_vector_relative.empty())
-                {
-                    evt_data_earliest_timestamp = raw_evt_data.timestamp;
-                }
+            constexpr size_t MAX_EVENT_BACKING_SIZE{
+                100 * ((static_cast<size_t>(1) << 30) / (1 << 4))}; // Set 100 GB approximately
 
-                constexpr size_t MAX_EVENT_BACKING_SIZE{
-                    100 * ((static_cast<size_t>(1) << 30) / (1 << 4))}; // Set 100 GB approximately
-                if (evt_data_vector_relative.size() > MAX_EVENT_BACKING_SIZE)
-                {
-                    evt_data_vector_relative.clear(); // 100 GB is the limit
-                    frame_data_vector_relative.clear();
-                }
-
-                float x{static_cast<float>(raw_evt_data.x)};
-                float y{static_cast<float>(raw_evt_data.y)};
-                float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - evt_data_earliest_timestamp)};
-                float polarity{static_cast<float>(raw_evt_data.polarity)};
-                evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
-
-                evt_data_latest_timestamp = raw_evt_data.timestamp;
-            }
-            else
+            // If this condition is met, then we have unordered data, assume camera reset, clear all previous data
+            // Or maximum number of event data has been reached
+            if ((raw_evt_data.timestamp < evt_data_latest_timestamp) || (evt_data_vector_relative.size() > MAX_EVENT_BACKING_SIZE))
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
+
+            // update earliest timestamp
+            if (evt_data_vector_relative.empty())
+            {
+                evt_data_earliest_timestamp = raw_evt_data.timestamp;
+            }
+
+            float x{static_cast<float>(raw_evt_data.x)};
+            float y{static_cast<float>(raw_evt_data.y)};
+            float timestamp_relative{static_cast<float>(raw_evt_data.timestamp - evt_data_earliest_timestamp)};
+            float polarity{static_cast<float>(raw_evt_data.polarity)};
+            evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
+
+            evt_data_latest_timestamp = raw_evt_data.timestamp;
+        
             evt_lock_ul.unlock();
         }
 
@@ -450,34 +445,29 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
-            // If this condition is met, then we only need to push back event data since it is ordered
-            if (raw_frame_data.timestamp >= frame_data_latest_timestamp)
-            {
-                // update earliest timestamp
-                if (evt_data_vector_relative.empty()) // Need to normalize timestamps relative to event data, ignore until event data is in
-                {
-                    return;
-                }
+            constexpr size_t MAX_FRAME_SIZE{static_cast<size_t>(1) << 20}; // Set max to 1 million frames
 
-                constexpr size_t MAX_FRAME_SIZE{static_cast<size_t>(1) << 20}; // Set max to 1 million elements
-                if (frame_data_vector_relative.size() > MAX_FRAME_SIZE)
-                {
-                    // Both need to be cleared to keep timestamps in sync
-                    frame_data_vector_relative.clear();
-                    evt_data_vector_relative.clear();
-                }
-                float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - evt_data_earliest_timestamp)};
-                frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
-
-                frame_data_latest_timestamp = raw_frame_data.timestamp;
-            }
-            else
+            // If this condition is met, unordered frame assumes camera reset, 
+            // or maximum number of frames met.
+            if ((raw_frame_data.timestamp < frame_data_latest_timestamp) || (frame_data_vector_relative.size() > MAX_FRAME_SIZE))
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
+
+            // update earliest timestamp
+            if (evt_data_vector_relative.empty()) // Need to normalize timestamps relative to event data, ignore until event data is in
+            {
+                return;
+            }
+
+            float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - evt_data_earliest_timestamp)};
+            frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
+
+            frame_data_latest_timestamp = raw_frame_data.timestamp;
+            
             evt_lock_ul.unlock();
         }
 
