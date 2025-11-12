@@ -253,6 +253,13 @@ class DigitalCodedExposure
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
             SDL_GPUBuffer *points_buffer = scrubber->get_points_buffer();
+            
+            if(!points_buffer) // Points buffer is null due to racing
+            {
+                SDL_EndGPUComputePass(compute_pass);
+                return;
+            }
+
             int point_count = scrubber->get_points_buffer_size();
 
             SDL_BindGPUComputeStorageBuffers(compute_pass, 0, &points_buffer, 1);
