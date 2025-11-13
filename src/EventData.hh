@@ -412,6 +412,8 @@ class EventData
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
+                evt_data_latest_timestamp = -1;
+                frame_data_latest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
@@ -453,6 +455,8 @@ class EventData
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
+                evt_data_latest_timestamp = -1;
+                frame_data_latest_timestamp = -1;
                 evt_data_vector_relative.clear();
                 frame_data_vector_relative.clear();
             }
@@ -464,6 +468,7 @@ class EventData
             }
 
             float timestamp_relative{static_cast<float>(raw_frame_data.timestamp - evt_data_earliest_timestamp)};
+
             frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
 
             frame_data_latest_timestamp = raw_frame_data.timestamp;
@@ -524,7 +529,7 @@ class EventData
          * @param timestamp Provided timestamp.
          * @return -1 if relative event data vector is empty, index otherwise.
          */
-        int64_t get_event_index_from_timestamp(float timestamp)
+        int64_t get_event_index_from_relative_timestamp(float timestamp)
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
@@ -541,7 +546,7 @@ class EventData
                                        event_less_vec4_t);
             if (lb == evt_data_vector_relative.end())
             {
-                return evt_data_vector_relative.size() - 1;
+                return -1; // Not found
             }
             int64_t ret_index{static_cast<int64_t>(std::distance(evt_data_vector_relative.begin(), lb))};
 
@@ -549,36 +554,6 @@ class EventData
             return ret_index;
         }
 
-        /**
-         * @brief Gets index of first frame data in relative event data vector with timestamp that is equal or greater
-         *        than provided timestamp.
-         * @param timestamp Provided timestamp.
-         * @return -1 if relative frame data vector is empty, index otherwise.
-         */
-        int64_t get_frame_index_from_timestamp(float timestamp)
-        {
-            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
-
-            if (frame_data_vector_relative.empty())
-            {
-                evt_lock_ul.unlock();
-                return -1; // Vector is empty, return -1
-            }
-
-            std::pair<cv::Mat, float> timestampPair{cv::Mat{}, timestamp};
-
-            // frame_data_vector_relative should be sorted by the way EventData class is setup.
-            auto lb = std::lower_bound(frame_data_vector_relative.begin(), frame_data_vector_relative.end(),
-                                       timestampPair, frame_less_vec4_t);
-            if (lb == frame_data_vector_relative.end())
-            {
-                return frame_data_vector_relative.size() - 1;
-            }
-            int64_t ret_index{static_cast<int64_t>(std::distance(frame_data_vector_relative.begin(), lb))};
-
-            evt_lock_ul.unlock();
-            return ret_index;
-        }
 };
 
 // Operator overloads necessary to use Datum internal structs as keys to multiset
