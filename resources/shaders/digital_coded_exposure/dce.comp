@@ -26,6 +26,8 @@ float get_weight(float time){
     float tDiff = time - ubo.morletParams.z;
     float sinusoid = cos(2 * 3.14159265 * ubo.morletParams.x * tDiff);
     float gauss = exp(- 4 * 0.693147 * (tDiff * tDiff) / (ubo.morletParams.y * ubo.morletParams.y));
+    //frequency domain bandwidth
+    // float gauss = exp(3.14159265 * 3.14159265 * ubo.morletParams.y * ubo.morletParams.y *tDiff * tDiff / (4 * 0.693147));
     return sinusoid * gauss;
 
 }
@@ -42,12 +44,12 @@ void write_to_intermediate_texture(int eventIndex) {
     float weight = get_weight(time);
 
     bool is_positive = (polarity == 1.00);
-    bool negativeWeight = (weight < 0.0);
+    bool posWeight = (weight > 0.0);
     weight = abs(weight);
     uint intWeight = uint(100000*weight);
     
 
-    if (is_positive != negativeWeight) {
+    if (is_positive == posWeight) {
         imageAtomicAdd(positive_texture, coord, intWeight);
     } else if(ubo.flags.x < 0.5) {
         imageAtomicAdd(negative_texture, coord, intWeight);

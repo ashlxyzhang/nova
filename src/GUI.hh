@@ -311,7 +311,7 @@ class GUI
                 parameter_store->add("event_contrib_weight", 0.5f);
             }
             float event_contrib_weight{parameter_store->get<float>("event_contrib_weight")};
-            ImGui::SliderFloat("Event Contribution Weight", &event_contrib_weight, 0.0f, 1.0f);
+            ImGui::SliderFloat("Event Contribution Weight", &event_contrib_weight, 0.0f, 10.0f);
             parameter_store->add("event_contrib_weight", event_contrib_weight);
 
             ImGui::Separator();
