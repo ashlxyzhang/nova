@@ -85,3 +85,26 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     dv::processing
     Boost::iostreams
 )
+
+# For CTEST functionality with GTEST
+set(GTEST_DIR "${CMAKE_SOURCE_DIR}/external/googletest")
+add_subdirectory(${GTEST_DIR}) 
+
+enable_testing()
+
+file(GLOB_RECURSE TEST_SOURCES "testing/*.cc")
+add_executable(tester ${TEST_SOURCES} ${HEADERS})
+target_include_directories(tester PRIVATE "resources/")
+target_link_libraries(tester PRIVATE
+    GTest::gtest_main
+    SDL3::SDL3
+    SDL3_ttf::SDL3_ttf
+    glm::glm
+    Eigen3::Eigen
+    dv::processing
+    Boost::iostreams 
+)
+
+include(GoogleTest)
+gtest_discover_tests(tester)  
+  
