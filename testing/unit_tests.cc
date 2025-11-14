@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../src/EventData.hh"
+#include "../src/ParameterStore.hh"
 #include <iostream>
 
 
@@ -268,5 +269,27 @@ TEST(EventData, get_event_index_from_timestamp)
         test_ed.unlock_data_vectors();
     }
 
+
+}
+
+TEST(ParameterStore, add_get_exists)
+{
+    ParameterStore test_param_store{};
+
+    // Test basic adding and getting
+    test_param_store.add("key1", 1);
+    test_param_store.add("key2", std::string("value"));
+    
+    EXPECT_EQ(test_param_store.get<int32_t>("key1"), 1) << "ParameterStore did not get correct int value.";
+    EXPECT_EQ(test_param_store.get<std::string>("key2"), std::string("value")) << "ParameterStore did not get correct string value.";
+
+    // Test modifying existing key
+    test_param_store.add("key1", 123);
+    EXPECT_EQ(test_param_store.get<int32_t>("key1"), 123) << "Parameter store did not correctly modify value.";
+
+
+    // Test exist function
+    EXPECT_EQ(test_param_store.exists("key1"), true) << "Parameter store did not detect existing key.";
+    EXPECT_EQ(test_param_store.exists("abc"), false) << "Parameter store detected non-existent key.";
 
 }
