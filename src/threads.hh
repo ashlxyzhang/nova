@@ -11,12 +11,13 @@
 // Anonymous helper functions
 namespace
 {
-inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store, GUI::PROGRAM_STATE prog_state)
+inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store,
+                         GUI::PROGRAM_STATE prog_state)
 {
     data_writer.clear();
     std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
 
-    if(prog_state == GUI::PROGRAM_STATE::FILE_STREAM)
+    if (prog_state == GUI::PROGRAM_STATE::FILE_STREAM)
     {
         std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
 
@@ -128,7 +129,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
             case GUI::PROGRAM_STATE::FILE_STREAM: // Case for streaming from file
                 if (param_store.exists("stream_file_name") && param_store.exists("stream_file_changed") &&
                     param_store.exists("stream_paused") && param_store.exists("stream_save_file_name") &&
-                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames"))
+                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames") &&
+                    param_store.exists("event_discard_odds"))
                 {
                     // If stream file changed, reset reader to read from new file and clear previously read event data
                     if (param_store.get<bool>("stream_file_changed"))
@@ -144,7 +146,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("stream_file_changed", false);
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
                         }
-                        
+
                         data_writer.clear();
                         // Set for nothing saved for now, setup_writer will update it
                         std::string saving_message{"Nothing Being Saved Currently"};
@@ -162,7 +164,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     if (!stream_paused)
                     {
                         // Get event/frame data in batches every frame
-                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer);
+                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer,
+                                                    param_store.get<float>("event_discard_odds"));
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
 
                         // Test to ensure event/frame data was added and is ordered
@@ -197,17 +200,17 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
             case GUI::PROGRAM_STATE::CAMERA_STREAM: // Case for streaming from camera
                 if (param_store.exists("camera_index") && param_store.exists("camera_changed") &&
                     param_store.exists("camera_stream_paused") && param_store.exists("stream_save_file_name") &&
-                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames"))
+                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames") &&
+                    param_store.exists("event_discard_odds"))
                 {
 
                     if (param_store.get<bool>("camera_changed"))
-                    {  
+                    {
                         data_acq.clear_reader();
                         evt_data.clear();
 
                         bool init_success{
                             data_acq.init_camera_reader(param_store.get<int32_t>("camera_index"), param_store)};
-                        
 
                         if (init_success)
                         {
@@ -216,7 +219,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                             param_store.add("camera_changed", false);
                             param_store.add("resolution_initialized", true); // Need to communicate with DCE
                         }
-                        
+
                         data_writer.clear();
                         // Set for nothing saved for now
                         std::string saving_message{"Nothing Being Saved Currently"};
@@ -226,7 +229,6 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         {
                             setup_writer(data_acq, data_writer, param_store, prog_state);
                         }
-
                     }
 
                     // Check if stream is paused
@@ -234,7 +236,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     if (!camera_stream_paused)
                     {
                         // Get event/frame data in batches every frame
-                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer);
+                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer,
+                                                    param_store.get<float>("event_discard_odds"));
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
                     }
                 }

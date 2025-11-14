@@ -35,7 +35,7 @@ class DataAcquisition
             : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
               camera_frame_height{}, acq_lock{}
         {
-        }  
+        }
 
         /**
          * Clears member variables pertaining to reader.
@@ -47,9 +47,8 @@ class DataAcquisition
             camera_event_width = 0;
             camera_event_height = 0;
 
-            camera_frame_width= 0;
+            camera_frame_width = 0;
             camera_frame_height = 0;
-
         }
 
         /**
@@ -86,11 +85,8 @@ class DataAcquisition
                 str_stream << "Model: " << camera.cameraModel << " ";
                 str_stream << "Serial Number: " << camera.serialNumber << "\0";
                 cameras_vec.push_back(str_stream.str());
-                
             }
             param_store.add("discovered_cameras", cameras_vec);
-
-            
 
             acq_lock_ul.unlock();
         }
@@ -219,36 +215,13 @@ class DataAcquisition
         }
 
         /**
-         * For static loading, gets all event data from a file and populates evt_data with them.
-         * @param evt_data EventData object to populate with event/frame data
-         * @param param_store ParameterStore object with data from GUI.
-         */
-        void get_all_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
-        {
-            while (get_batch_evt_data(evt_data, param_store, data_writer))
-            {
-            }
-        }
-
-        /**
-         * For static loading, gets all frame data from a file and populates evt_data with them.
-         * @param evt_data EventData object to populate with event/frame data
-         * @param param_store ParameterStore object with data from GUI.
-         */
-        void get_all_frame_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
-        {
-            while (get_batch_frame_data(evt_data, param_store, data_writer))
-            {
-            }
-        }
-
-        /**
          * For dynamic loading (streaming), gets a batch of event data.
          * @param evt_data EventData object to populate with event/frame data
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.
          */
-        bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
+        bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer,
+                                float event_discard_odds)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
             // If reader is not properly initialized, return immediately
@@ -259,8 +232,16 @@ class DataAcquisition
             }
             bool data_read = false;
 
+            if (event_discard_odds < 0.00001)
+            {
+                std::string pop_up_err_str{"Event Discard Odds are too low!"};
+                param_store.add("pop_up_err_str", pop_up_err_str);
+                acq_lock_ul.unlock();
+                return false;
+            }
+
             // Discard threshold
-            float threshold{1.0f / param_store.get<float>("event_discard_odds")};
+            float threshold{1.0f / event_discard_odds};
 
             // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-events-from-a-file
 

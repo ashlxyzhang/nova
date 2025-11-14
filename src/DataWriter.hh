@@ -27,8 +27,8 @@ class DataWriter
 
     public:
         DataWriter()
-            : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{},
-              writing_event_data{}
+            : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{false},
+              writing_event_data{false}
         {
         }
 
@@ -63,6 +63,11 @@ class DataWriter
         {
             std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
             data_writer_ptr.reset();
+
+            // Clear states
+            writing_frame_data = false;
+            writing_event_data = false;
+
             // Clear queues
             while (!writer_event_queue.empty())
             {
