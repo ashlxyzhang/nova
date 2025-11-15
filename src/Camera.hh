@@ -168,30 +168,64 @@ class Camera
         }
 
         // Essential getters
+        /**
+         * @brief Getter for position
+         * @return camera position
+         */
         glm::vec3 getPosition() const
         {
             return m_position;
         }
+
+        /**
+         * @brief Getter for orbit center
+         * @return camera orbit center
+         */
         glm::vec3 getOrbitCenter() const
         {
             return m_orbit_center;
         }
+
+        /**
+         * @brief Getter for orbit distance
+         * @return camera orbit distance
+         */
         float getOrbitDistance() const
         {
             return m_orbit_distance;
         }
+
+        /**
+         * @brief Getter for FOV
+         * @return camera FOV
+         */
         float getFOV() const
         {
             return m_fov;
         }
+
+        /**
+         * @brief Getter for aspect ratio
+         * @return aspect ratio
+         */
         float getAspectRatio() const
         {
             return m_aspect_ratio;
         }
+
+        /**
+         * @brief Getter for yaw
+         * @return camera yaw
+         */
         float getYaw() const
         {
             return m_yaw;
         }
+
+        /**
+         * @brief Getter for pitch
+         * @return camera pitch
+         */
         float getPitch() const
         {
             return m_pitch;

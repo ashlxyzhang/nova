@@ -22,6 +22,9 @@ inline void SDLCALL stream_file_handle_callback(void *param_store, const char *c
 inline void SDLCALL save_stream_handle_callback(void *param_store, const char *const *data_file_list,
                                                 int filter_unused);
 
+/**
+ * @brief This class provides functions to draw the GUI.
+ */
 class GUI
 {
     private:
@@ -34,21 +37,28 @@ class GUI
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
+        // Circular fps buffer
         std::vector<float> fps_history_buf;
         size_t fps_buf_index;
 
         bool check_for_layout_file;
 
-        // Update circular buffer of fps data
-        // From old NOVA source code
+        /**
+         * @brief Update circular buffer of fps data.
+         *        From old NOVA source code
+         * @param fps calculated fps to add to circular buffer.
+         */
         void update_fps_buffer(const float &fps)
         {
             fps_history_buf[fps_buf_index] = fps;
             fps_buf_index = (fps_buf_index + 1) % fps_history_buf.size();
         }
 
-        // Get average fps
-        // From old NOVA source code
+        /**
+         * @brief Get average fps from circular fps buffer.
+         *        From old NOVA source code
+         * @return average of circular fps buffer
+         */
         float get_avg_fps()
         {
             float sum = 0.0f;
@@ -59,8 +69,11 @@ class GUI
             return sum / fps_history_buf.size();
         }
 
-        // Get max fps
-        // From old NOVA source code
+        /**
+         * @brief Get max fps.
+         * From old NOVA source code
+         * @return maximum fps from circular fps buffer.
+         */
         float get_max_fps()
         {
             float max = fps_history_buf[0];
@@ -74,8 +87,11 @@ class GUI
             return max;
         }
 
-        // Get min fps
-        // From old NOVA source code
+        /**
+         * @brief Get min fps.
+         * From old NOVA source code
+         * @return minimum fps from circular buffer.
+         */
         float get_min_fps()
         {
             float min = fps_history_buf[0];
@@ -89,7 +105,13 @@ class GUI
             return min;
         }
 
-        // Draw error popup window()
+        /**
+         * @brief Draws error popup window. Will read
+         *        pop_up_err_str in parameter store for
+         *        a non-empty string. If a non-empty string
+         *        is detected, then the pop up will occur on the frame
+         *        with the string as message.
+         */
         void draw_error_popup_window()
         {
 
@@ -116,10 +138,13 @@ class GUI
             }
         }
 
-        // Recreate info window from old NOVA
-        // Also currently draws DCE controls for local variables' sake
+        /**
+         * @brief Recreate info window from old NOVA.
+         *        Draws the info window and DCE controls.
+         */
         void draw_info_window()
         {
+            // Info window
             ImGui::Begin("Info");
 
             if (!parameter_store->exists("particle_scale"))
@@ -161,148 +186,14 @@ class GUI
             uint8_t unit_type{parameter_store->get<uint8_t>("unit_type")};
 
             const float units[] = {1000000.0f, 1000.0f, 1.0f};
-            
+
             int32_t unit_type_copy{unit_type};
             ImGui::Combo("Time Unit", &unit_type_copy, "s\0ms\0us\0");
             unit_type = static_cast<uint8_t>(unit_type_copy);
             parameter_store->add("unit_time_conversion_factor", units[unit_type]);
             parameter_store->add("unit_type", unit_type);
 
-            // ImGui::Separator();
-
             ImGui::End();
-
-            // ImGui::Text("Processing options");
-
-            // if (!parameter_store->exists("shutter_type"))
-            // {
-            //     parameter_store->add("shutter_type", 0);
-            // }
-            // int32_t shutter_type{parameter_store->get<int32_t>("shutter_type")};
-            // ImGui::Combo("Shutter", &shutter_type, "Time Based\0Event Based\0");
-            // parameter_store->add("shutter_type", shutter_type);
-
-            // if (static_cast<GUI::SHUTTER>(parameter_store->get<int32_t>("shutter_type")) == GUI::SHUTTER::TIME_BASED)
-            // {
-
-            //     if (parameter_store->exists("time_window_begin") && parameter_store->exists("time_window_end"))
-            //     {
-            //         float time_window_end{parameter_store->get<float>("time_window_end")};
-            //         float time_window_begin{parameter_store->get<float>("time_window_begin")};
-            //         float frameLength_T = time_window_end - time_window_begin;
-
-            //         // Get user input for beginning of time shutter window
-            //         if (!parameter_store->exists("time_shutter_window_begin"))
-            //         {
-            //             parameter_store->add("time_shutter_window_begin", time_window_begin);
-            //         }
-            //         float time_shutter_window_begin{parameter_store->get<float>("time_shutter_window_begin")};
-            //         std::string shutter_initial{"Shutter Initial "};
-            //         shutter_initial.append(time_units[parameter_store->get<int32_t>("unit_type")]);
-            //         ImGui::SliderFloat(shutter_initial.c_str(), &time_shutter_window_begin, 0, frameLength_T,
-            //         "%.4f");
-
-            //         // Get user input for ending of time shutter window
-            //         if (!parameter_store->exists("time_shutter_window_end"))
-            //         {
-            //             parameter_store->add("time_shutter_window_end", time_window_end);
-            //         }
-            //         float time_shutter_window_end{parameter_store->get<float>("time_shutter_window_end")};
-            //         std::string shutter_final{"Shutter Final "};
-            //         shutter_final.append(time_units[parameter_store->get<int32_t>("unit_type")]);
-            //         ImGui::SliderFloat(shutter_final.c_str(), &time_shutter_window_end, 0, frameLength_T, "%.4f");
-
-            //         // Not sure if clamping is necessary
-            //         // evtData->getTimeShutterWindow_L() = std::clamp(evtData->getTimeShutterWindow_L(), 0.0f,
-            //         // frameLength_T); evtData->getTimeShutterWindow_R() =
-            //         std::clamp(evtData->getTimeShutterWindow_R(),
-            //         // evtData->getTimeShutterWindow_L(), frameLength_T);
-
-            //         // Add user time shutter window input to parameter store
-            //         parameter_store->add("time_shutter_window_begin", time_shutter_window_begin);
-            //         parameter_store->add("time_shutter_window_end", time_shutter_window_end);
-            //     }
-            // }
-            // else if (static_cast<GUI::SHUTTER>(parameter_store->get<int32_t>("shutter_type")) ==
-            //          GUI::SHUTTER::EVENT_BASED)
-            // {
-
-            //     if (parameter_store->exists("event_window_begin") && parameter_store->exists("event_window_end"))
-            //     {
-            //         uint32_t event_window_end{parameter_store->get<uint32_t>("event_window_end")};
-            //         uint32_t event_window_begin{parameter_store->get<uint32_t>("event_window_begin")};
-            //         uint32_t frameLength_E = event_window_end - event_window_begin;
-
-            //         if (!parameter_store->exists("event_shutter_window_begin"))
-            //         {
-            //             parameter_store->add("event_shutter_window_begin", event_window_begin);
-            //         }
-            //         uint32_t
-            //         event_shutter_window_begin{parameter_store->get<uint32_t>("event_shutter_window_begin")};
-            //         ImGui::SliderInt("Shutter Initial (events)", (int *)&event_shutter_window_begin, 0,
-            //         frameLength_E);
-
-            //         if (!parameter_store->exists("event_shutter_window_end"))
-            //         {
-            //             parameter_store->add("event_shutter_window_end", event_window_end);
-            //         }
-            //         uint32_t event_shutter_window_end{parameter_store->get<uint32_t>("event_shutter_window_end")};
-            //         ImGui::SliderInt("Shutter Final (events)", (int *)&event_shutter_window_end, 0, frameLength_E);
-
-            //         // Not sure if clamping is necessary
-            //         // evtData->getEventShutterWindow_L() = std::clamp(evtData->getEventShutterWindow_L(), (uint) 0,
-            //         // frameLength_E); evtData->getEventShutterWindow_R() =
-            //         // std::clamp(evtData->getEventShutterWindow_R(), evtData->getEventShutterWindow_L(),
-            //         // frameLength_E);
-
-            //         // Add user input back to parameter store
-            //         parameter_store->add("event_shutter_window_begin", event_shutter_window_begin);
-            //         parameter_store->add("event_shutter_window_end", event_shutter_window_end);
-            //     }
-            // }
-
-            // // Auto update controls
-            // if (!parameter_store->exists("shutter_fps"))
-            // {
-            //     parameter_store->add("shutter_fps", 0.0f);
-            // }
-            // float shutter_fps{parameter_store->get<float>("shutter_fps")};
-            // ImGui::SliderFloat("FPS", &shutter_fps, 0.0f, 100.0f);
-            // parameter_store->add("shutter_fps", shutter_fps);
-
-            // // TODO Implement buttons
-            // if (ImGui::Button("Play (Time period)"))
-            // {
-            // }
-            // if (ImGui::Button("Play (Events period)"))
-            // {
-            // }
-
-            // // "Post" processing
-            // if (!parameter_store->exists("shutter_frequency"))
-            // {
-            //     parameter_store->add("shutter_frequency", 100.0f);
-            // }
-            // float shutter_frequency{parameter_store->get<float>("shutter_frequency")};
-            // ImGui::SliderFloat("Frequency (Hz)", &shutter_frequency, 0.001f, 250.0f);
-            // parameter_store->add("shutter_frequency", shutter_frequency);
-
-            // if (parameter_store->exists("time_window_begin") && parameter_store->exists("time_window_end"))
-            // {
-            //     if (!parameter_store->exists("fwhm"))
-            //     {
-            //         parameter_store->add("fwhm", 0.0014f);
-            //     }
-            //     float fwhm{parameter_store->get<float>("fwhm")};
-            //     std::string fwhm_str{"Full Width at Half Measure "};
-            //     fwhm_str.append(time_units[parameter_store->get<int32_t>("unit_type")]);
-
-            //     ImGui::SliderFloat(fwhm_str.c_str(), &fwhm, 0.0001f,
-            //                        (parameter_store->get<float>("time_window_after") -
-            //                         parameter_store->get<float>("time_window_after")) *
-            //                            0.5,
-            //                        "%.4f");
-            // }
 
             ImGui::Begin("Digital Coded Exposure Controls");
 
@@ -323,14 +214,6 @@ class GUI
             bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
             ImGui::Checkbox("Morlet Shutter", &shutter_is_morlet);
             parameter_store->add("shutter_is_morlet", shutter_is_morlet);
-
-            // if (!parameter_store->exists("shutter_is_pca"))
-            // {
-            //     parameter_store->add("shutter_is_pca", false);
-            // }
-            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-            // ImGui::Checkbox("PCA", &shutter_is_pca);
-            // parameter_store->add("shutter_is_pca", shutter_is_pca);
 
             if (!parameter_store->exists("shutter_is_positive_only"))
             {
@@ -413,7 +296,7 @@ class GUI
             float morlet_frequency{parameter_store->get<float>("morlet_frequency")};
             ImGui::SliderFloat("Morlet Frequency", &morlet_frequency, 0.0f, 10000.0f);
             parameter_store->add("morlet_frequency", morlet_frequency);
-            
+
             if (!parameter_store->exists("morlet_width"))
             {
                 parameter_store->add("morlet_width", 0.01f);
@@ -422,21 +305,13 @@ class GUI
             ImGui::SliderFloat("Morlet Width", &morlet_width, 0.001f, 100000.0f);
             parameter_store->add("morlet_width", morlet_width);
 
-            // TODO implement video recording
-            // Video (ffmpeg) controls
-            // ImGui::Text("Video options"); // TODO add documentation
-            // inputTextWrapper(video_name); // TODO consider including library to allow inputting string as parameter
-            // if (ImGui::Button("Start Record")) {
-            //     recording = true;
-            // }
-            // if (ImGui::Button("Stop Record")) {
-            //     recording = false;
-            // }
-
             ImGui::End();
         }
 
-        // Draw debug window containing fps data
+        /**
+         * @brief Draw debug window containing fps data.
+         * @param fps Calculated fps in current frame.
+         */
         void draw_debug_window(float fps)
         {
             ImGui::Begin("Debug");
@@ -462,6 +337,9 @@ class GUI
             ImGui::End();
         }
 
+        /**
+         * @brief Draw Streaming window. Contains controls for streaming data in.
+         */
         void draw_stream_window()
         {
             ImGui::Begin("Streaming");
@@ -475,17 +353,17 @@ class GUI
 
             // Display program state
             ImGui::Text("Program State:");
-            switch(program_state)
+            switch (program_state)
             {
-                case GUI::PROGRAM_STATE::IDLE:
-                    ImGui::Text("Program Is Currently Doing Nothing.");
-                    break;
-                case GUI::PROGRAM_STATE::FILE_STREAM:
-                    ImGui::Text("Program Is Currently Streaming From FILE.");
-                    break;
-                case GUI::PROGRAM_STATE::CAMERA_STREAM:
-                    ImGui::Text("Program Is Currently Streaming From CAMERA.");
-                    break;
+            case GUI::PROGRAM_STATE::IDLE:
+                ImGui::Text("Program Is Currently Doing Nothing.");
+                break;
+            case GUI::PROGRAM_STATE::FILE_STREAM:
+                ImGui::Text("Program Is Currently Streaming From FILE.");
+                break;
+            case GUI::PROGRAM_STATE::CAMERA_STREAM:
+                ImGui::Text("Program Is Currently Streaming From CAMERA.");
+                break;
             }
 
             ImGui::Separator();
@@ -501,7 +379,8 @@ class GUI
             parameter_store->add("event_discard_odds", event_discard_odds);
 
             ImGui::Separator();
-            
+
+            // Stream from camera
             ImGui::Text("Stream From Camera:");
             if (ImGui::Button("Scan For Cameras"))
             {
@@ -521,12 +400,13 @@ class GUI
                 parameter_store->add("discovered_cameras", std::vector<std::string>{});
             }
 
-            std::vector<std::string> discovered_cameras{parameter_store->get<std::vector<std::string>>("discovered_cameras")};
+            std::vector<std::string> discovered_cameras{
+                parameter_store->get<std::vector<std::string>>("discovered_cameras")};
 
             // This is stupid but it seems to work
             // Dynamically populate IMGUI combo with camera options.
-            std::vector<const char*> discovered_cameras_char{};
-            for(std::string &element : discovered_cameras)
+            std::vector<const char *> discovered_cameras_char{};
+            for (std::string &element : discovered_cameras)
             {
                 discovered_cameras_char.push_back(element.c_str());
             }
@@ -537,7 +417,6 @@ class GUI
                 parameter_store->add("camera_changed", true);
             }
 
-            // std::cout << "CAMERA INDEX: " << camera_index << std::endl;
             parameter_store->add("camera_index", camera_index);
 
             if (ImGui::Button(program_state == GUI::PROGRAM_STATE::CAMERA_STREAM ? "Stop Streaming"
@@ -552,7 +431,6 @@ class GUI
                 {
                     parameter_store->add("program_state", GUI::PROGRAM_STATE::IDLE);
                 }
-                
             }
 
             if (!parameter_store->exists("camera_stream_paused"))
@@ -561,6 +439,7 @@ class GUI
             }
 
             bool camera_stream_paused{parameter_store->get<bool>("camera_stream_paused")};
+
             // Pause or resume stream
             if (ImGui::Button(camera_stream_paused ? "Camera Resume" : "Camera Pause"))
             {
@@ -568,6 +447,8 @@ class GUI
             }
 
             ImGui::Separator();
+
+            // Stream from file
             ImGui::Text("Stream From File:");
             if (ImGui::Button("Open File To Stream"))
             {
@@ -587,6 +468,8 @@ class GUI
             }
 
             ImGui::Separator();
+
+            // Stream save options
             ImGui::Text("Stream Save Options:");
 
             if (!parameter_store->exists("saving_message"))
@@ -607,10 +490,10 @@ class GUI
             bool stream_save_frames_copy{stream_save_frames};
             // Save or stop saving stream frames
             ImGui::Checkbox("Save Frames On Next Stream (Will Stop Streaming)", &stream_save_frames);
-            if(stream_save_frames != stream_save_frames_copy)
+            if (stream_save_frames != stream_save_frames_copy)
             {
                 parameter_store->add("program_state",
-                                 GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
+                                     GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
             }
             parameter_store->add("stream_save_frames", stream_save_frames);
 
@@ -623,10 +506,10 @@ class GUI
             bool stream_save_events_copy{stream_save_events};
             // Save or stop saving stream events
             ImGui::Checkbox("Save Events On Next Stream (Will Stop Streaming)", &stream_save_events);
-            if(stream_save_events_copy != stream_save_events)
+            if (stream_save_events_copy != stream_save_events)
             {
                 parameter_store->add("program_state",
-                                 GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
+                                     GUI::PROGRAM_STATE::IDLE); // Stop program to ensure correct initialization
             }
             parameter_store->add("stream_save_events", stream_save_events);
 
@@ -659,25 +542,6 @@ class GUI
                 ImGui::Text("Nothing Being Saved On Next Stream");
             }
 
-            // std::string stream_save_file_name{parameter_store->get<std::string>("stream_save_file_name")};
-            //  From old NOVA source code
-            //  const unsigned int max_length = 50;
-            //  char buf[max_length];
-            //  memset(buf, 0, max_length);
-            //  memcpy(buf, stream_save_file_name.c_str(), stream_save_file_name.size());
-            //  ImGui::InputText("Stream Output Name", buf, max_length);
-            //  stream_save_file_name = buf;
-
-            // if(stream_save_file_name.length() == 0)
-            // {
-            //     stream_save_file_name = "out";
-            // }
-
-            // if(!parameter_store->get<bool>("stream_save"))
-            // {
-            //     parameter_store->add("stream_save_file_name", stream_save_file_name);
-            // }
-
             if (ImGui::Button("Open File To Save Stream To (Will Stop Streaming)"))
             {
                 SDL_ShowSaveFileDialog(save_stream_handle_callback, parameter_store, nullptr, nullptr, 0, nullptr);
@@ -686,7 +550,9 @@ class GUI
             ImGui::End();
         }
 
-
+        /**
+         * @brief Draws 3D particle plot of event data.
+         */
         void draw_visualizer()
         {
             ImGui::Begin("3D Visualizer");
@@ -744,6 +610,9 @@ class GUI
             ImGui::End();
         }
 
+        /**
+         * @brief Draws scrubber window with controls for scrubbing through event data.
+         */
         void draw_scrubber_window()
         {
             ImGui::Begin("Scrubber");
@@ -778,13 +647,13 @@ class GUI
                 parameter_store->add("scrubber.cap_mode", cap_mode_int);
             }
             int window_div_factor = 100; // Default to 100 for capped mode
-            int step_div_factor = 100; // Default to 1 for step size
-            if(cap_mode_int != 0) // Uncapped mode
+            int step_div_factor = 100;   // Default to 1 for step size
+            if (cap_mode_int != 0)       // Uncapped mode
             {
                 window_div_factor = 2; // Use 2 for uncapped mode
-                step_div_factor = 10; // Use 10 for uncapped mode
+                step_div_factor = 10;  // Use 10 for uncapped mode
             }
-        
+
             ImGui::Separator();
 
             // Current Index (for EVENT type)
@@ -828,7 +697,7 @@ class GUI
                 if (scrubber)
                 {
                     size_t data_size = parameter_store->get<std::size_t>("scrubber.max_index") -
-                                                     parameter_store->get<std::size_t>("scrubber.min_index") + 1;
+                                       parameter_store->get<std::size_t>("scrubber.min_index") + 1;
                     max_window_size = std::max(static_cast<size_t>(1), data_size / window_div_factor);
                 }
 
@@ -843,7 +712,7 @@ class GUI
                     parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_float));
                 }
 
-                 // Time Step
+                // Time Step
                 if (!parameter_store->exists("scrubber.index_step"))
                 {
                     size_t default_step{0};
@@ -867,7 +736,6 @@ class GUI
                         parameter_store->add("scrubber.index_step", static_cast<size_t>(event_step_float));
                     }
                 }
-
             }
             // Time-based controls (for TIME type)
             else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
@@ -878,18 +746,18 @@ class GUI
 
                 // Determine format string based on time unit
                 std::string time_format_str{};
-                switch(static_cast<TIME>(unit_type))
+                switch (static_cast<TIME>(unit_type))
                 {
-                    case TIME::UNIT_US:
-                        time_format_str = std::string{"%.2f"};
-                        break;
-                    case TIME::UNIT_MS:
-                        time_format_str = std::string{"%.4f"};
-                        break;
-                    case TIME::UNIT_S:
-                        time_format_str = std::string{"%.8f"};
-                        break;
-                }   
+                case TIME::UNIT_US:
+                    time_format_str = std::string{"%.2f"};
+                    break;
+                case TIME::UNIT_MS:
+                    time_format_str = std::string{"%.4f"};
+                    break;
+                case TIME::UNIT_S:
+                    time_format_str = std::string{"%.8f"};
+                    break;
+                }
 
                 // Current Time
                 if (!parameter_store->exists("scrubber.current_time"))
@@ -898,13 +766,12 @@ class GUI
                 }
                 float current_time = parameter_store->get<float>("scrubber.current_time");
 
-                if(!parameter_store->exists("unit_time_conversion_factor"))
+                if (!parameter_store->exists("unit_time_conversion_factor"))
                 {
                     parameter_store->add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
                 }
                 float unit_time_conversion_factor{parameter_store->get<float>("unit_time_conversion_factor")};
                 float current_time_unit_adjusted = current_time / unit_time_conversion_factor;
-
 
                 // Get min/max time values from scrubber if available
                 float min_time = 0.0f;
@@ -919,13 +786,16 @@ class GUI
                 float max_time_unit_adjusted = max_time / unit_time_conversion_factor;
 
                 std::string current_time_label = "Current Time " + time_unit_suffix;
-                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted, time_format_str.c_str()))
+                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time_unit_adjusted, min_time_unit_adjusted,
+                                       max_time_unit_adjusted, time_format_str.c_str()))
                 {
                     // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
-                    if(max_time_unit_adjusted > min_time_unit_adjusted)
+                    if (max_time_unit_adjusted > min_time_unit_adjusted)
                     {
-                        current_time_unit_adjusted = std::clamp(current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted);
-                        current_time = current_time_unit_adjusted * unit_time_conversion_factor; // Revert conversion to store back into scrubber
+                        current_time_unit_adjusted =
+                            std::clamp(current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted);
+                        current_time = current_time_unit_adjusted *
+                                       unit_time_conversion_factor; // Revert conversion to store back into scrubber
                         // Scrubber deals in us time unit
                         parameter_store->add("scrubber.current_time", current_time);
                     }
@@ -944,12 +814,14 @@ class GUI
                 float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
 
                 std::string time_window_label = "Time Window " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted, time_format_str.c_str()))
+                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f,
+                                       max_window_time_unit_adjusted, time_format_str.c_str()))
                 {
                     // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
                     if (max_window_time_unit_adjusted > 0.00001f)
                     {
-                        time_window_unit_adjusted = std::clamp(time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted);
+                        time_window_unit_adjusted =
+                            std::clamp(time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted);
                         // Adjust back to us to store into scrubber
                         time_window = time_window_unit_adjusted * unit_time_conversion_factor;
                         parameter_store->add("scrubber.time_window", time_window);
@@ -969,12 +841,14 @@ class GUI
                 float max_step_time_unit_adjusted = max_step_time / unit_time_conversion_factor;
 
                 std::string time_step_label = "Time Step " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted, time_format_str.c_str()))
+                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f,
+                                       max_step_time_unit_adjusted, time_format_str.c_str()))
                 {
                     // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
                     if (max_step_time_unit_adjusted > 0.00001f)
                     {
-                        time_step_unit_adjusted = std::clamp(time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted);
+                        time_step_unit_adjusted =
+                            std::clamp(time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted);
                         // Adjust back to us to store into data scrubber
                         time_step = time_step_unit_adjusted * unit_time_conversion_factor;
                         parameter_store->add("scrubber.time_step", time_step);
@@ -994,6 +868,9 @@ class GUI
             ImGui::End();
         }
 
+        /**
+         * Draws Digital Coded Exposure window.
+         */
         void draw_digital_coded_exposure()
         {
             ImGui::Begin("Frame");
@@ -1050,6 +927,10 @@ class GUI
             }
             ImGui::End();
         }
+
+        /**
+         * @brief For testing, draws spinning cube.
+         */
         void draw_spinning_cube_viewport()
         {
             ImGui::Begin("Spinning Cube Viewport");
@@ -1108,26 +989,43 @@ class GUI
         }
 
     public:
+        /**
+         * @brief Represents time units used by NOVA.
+         */
         enum class TIME : uint8_t
         {
-            UNIT_S = 0,
-            UNIT_MS = 1,
-            UNIT_US = 2
+            UNIT_S = 0,  // seconds
+            UNIT_MS = 1, // milliseconds
+            UNIT_US = 2  // microseconds
         };
 
+        /**
+         * @brief Two types of shutter (time or event based)
+         */
         enum class SHUTTER
         {
             TIME_BASED = 0,
             EVENT_BASED = 1
         };
 
+        /**
+         * @brief State the program is in.
+         */
         enum class PROGRAM_STATE : uint8_t
         {
-            IDLE = 0,
+            IDLE = 0,         // Program is doing nothing
             FILE_STREAM = 2,  // Program is streaming from a file
             CAMERA_STREAM = 3 // Program is streaming from a camera
         };
 
+        /**
+         * @brief Constructor for GUI.
+         * @param render_targets Render targets of the program
+         * @param parameter_store ParameterStore object containing data from GUI
+         * @param window SDL_Window to draw on
+         * @param gpu_device SDL_GPUDevice to create texture on
+         * @param scrubber Scrubber object with data to compute DCE on
+         */
         GUI(std::unordered_map<std::string, RenderTarget> &render_targets, ParameterStore *parameter_store,
             SDL_Window *window, SDL_GPUDevice *gpu_device, Scrubber *scrubber)
             : render_targets(render_targets), parameter_store(parameter_store), window(window), gpu_device(gpu_device),
@@ -1148,9 +1046,6 @@ class GUI
 
             check_for_layout_file = true;
 
-            // Setup Dear ImGui style
-            // ImGui::StyleColorsDark();
-
             // Setup scaling
             float scaling_factor = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
             ImGuiStyle &style = ImGui::GetStyle();
@@ -1170,6 +1065,9 @@ class GUI
             ImGui_ImplSDLGPU3_Init(&init_info);
         }
 
+        /**
+         * @brief Destructor. Cleans up IMGUI.
+         */
         ~GUI()
         {
             // Cleanup ImGui
@@ -1178,12 +1076,21 @@ class GUI
             ImGui::DestroyContext();
         }
 
+        /**
+         * @brief IMGUI event handler.
+         * @param event SDL event to process.
+         */
         void event_handler(SDL_Event *event)
         {
             ImGui_ImplSDL3_ProcessEvent(event);
         }
 
-        // This is mandatory: call ImGui_ImplSDLGPU3_PrepareDrawData() to upload the vertex/index buffer!
+        /**
+         * @brief Prepares to renders the GUI in current frame.
+         *        This is mandatory: call ImGui_ImplSDLGPU3_PrepareDrawData() to upload the vertex/index buffer!
+         * @param command_buffer GPU command buffer.
+         * @param fps Calculated fps in current frame.
+         */
         void prepare_to_render(SDL_GPUCommandBuffer *command_buffer, float fps)
         {
 
@@ -1225,6 +1132,11 @@ class GUI
             ImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
         }
 
+        /**
+         * @brief Renders the current GUI frame.
+         * @param command_buffer GPU command buffer.
+         * @param render_pass Render pass.
+         */
         void render(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass)
         {
             ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
@@ -1242,6 +1154,9 @@ class GUI
             // }
         }
 
+        /**
+         * @brief Resets GUI layout back to default.
+         */
         void reset_layout_with_dockbuilder()
         {
             ImGuiID dockspace_id = ImGui::GetMainViewport()->ID;
@@ -1258,12 +1173,12 @@ class GUI
             ImGui::DockBuilderSplitNode(dock_id_main, ImGuiDir_Down, 0.25f, &dock_id_left_bottom, &dock_id_main);
 
             ImGuiID dock_id_right_top = dock_id_right; // top right for info/DCEcontrols, debug/load/stream windows
-            ImGuiID dock_id_right_bottom; // bottom right for 3d visualizer 
+            ImGuiID dock_id_right_bottom;              // bottom right for 3d visualizer
             ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.35f, &dock_id_right_bottom,
                                         &dock_id_right_top);
 
             ImGuiID dock_id_right_top_top = dock_id_right_top; // top for debug/load/stream windows
-            ImGuiID dock_id_right_top_bottom; // bottom  for info/DCEcontrols,
+            ImGuiID dock_id_right_top_bottom;                  // bottom  for info/DCEcontrols,
             ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom,
                                         &dock_id_right_top_top);
 
@@ -1280,8 +1195,13 @@ class GUI
         }
 };
 
-
 // Callback used with SDL_ShowOpenFileDialog in draw_stream_window
+/**
+ * @brief Callback function to open file dialog for streaming from file.
+ * @param param_store ParameterStore object containing data from GUI.
+ * @param data_file_list Chosen file by user.
+ * @param filter_unused unused filter.
+ */
 inline void SDLCALL stream_file_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
 {
     ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};
@@ -1305,6 +1225,12 @@ inline void SDLCALL stream_file_handle_callback(void *param_store, const char *c
 }
 
 // Callback used with SDL_ShowSaveFileDialog in draw_stream_window
+/**
+ * @brief Callback function to open file dialog for selecting file to save data into.
+ * @param param_store ParameterStore object containing data from GUI.
+ * @param data_file_list Chosen file by user.
+ * @param filter_unused unused filter.
+ */
 inline void SDLCALL save_stream_handle_callback(void *param_store, const char *const *data_file_list, int filter_unused)
 {
     ParameterStore *param_store_ptr{static_cast<ParameterStore *>(param_store)};

@@ -26,6 +26,10 @@ struct PassData{
     glm::vec4 morletParams;
 };
 
+/**
+ * @brief This class is responsible for creating the necessary compute pipelines to create the 
+ *        digital coded exposure.
+ */
 class DigitalCodedExposure
 {
     private:
@@ -48,6 +52,12 @@ class DigitalCodedExposure
         unsigned int width{};
         unsigned int height{};
 
+        /**
+         * @brief Creates intermediate texture to be used in pipeline.
+         * @param width width of texture.
+         * @param height height of texture.
+         * @return SDL_GPUTexture pointer to intermediate texture.
+         */
         SDL_GPUTexture* create_intermediate_texture(unsigned int width, unsigned int height) {
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
@@ -64,6 +74,18 @@ class DigitalCodedExposure
         }
 
     public:
+
+        /**
+         * @brief Constructor. Initializes compute pipelines.
+         * @param parameter_store ParameterStore object containing data from GUI
+         * @param render_targets Render targets of the program
+         * @param event_data EventData object containing event/frame data
+         * @param window SDL_Window to draw on
+         * @param gpu_device SDL_GPUDevice to create texture on
+         * @param upload_buffer UploadBuffer object for uploading to gpu
+         * @param scrubber Scrubber object with data to compute DCE on
+         * @param copy_pass SDL_GPUCopyPass unused
+         */
         DigitalCodedExposure(ParameterStore *parameter_store,
                              std::unordered_map<std::string, RenderTarget> &render_targets, EventData &event_data,
                              SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
@@ -140,6 +162,9 @@ class DigitalCodedExposure
             process_compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &process_compute_pipeline_info);
         }
 
+        /**
+         * @brief Destructor. Releases textures and pipelines related to Digital Coded Exposure.
+         */
         ~DigitalCodedExposure()
         {
             SDL_ReleaseGPUComputePipeline(gpu_device, compute_pipeline);
@@ -151,10 +176,18 @@ class DigitalCodedExposure
             SDL_ReleaseGPUTexture(gpu_device, negative_values_texture);
         }
 
+        /**
+         * @brief Unimplemented event handler function for digital coded exposure. For future functionality.
+         */
         bool event_handler(SDL_Event *event)
         {
             return false;
         }
+
+        /**
+         * @brief Called to update Digital Coded Exposure every frame.
+         *        Recreates texture should file change.
+         */
         void cpu_update()
         {
             event_data.lock_data_vectors();
@@ -209,9 +242,18 @@ class DigitalCodedExposure
                 parameter_store->add("resolution_initialized", false);
             }
         }
+        
+        /**
+         * @brief Unused copy pass.
+         */
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
+
+        /**
+         * @brief Compute pass. Dispatches compute shaders to calculate Digital Coded Exposure output.
+         * @param command_buffer GPU command buffer.
+         */
         void compute_pass(SDL_GPUCommandBuffer *command_buffer)
         {
             // Ensure there is data
@@ -347,13 +389,6 @@ class DigitalCodedExposure
                 parameter_store->add("shutter_is_morlet", false);
             }
             bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
-
-            // if (!parameter_store->exists("shutter_is_pca"))
-            // {
-            //     parameter_store->add("shutter_is_pca", false);
-            // }
-            // bool shutter_is_pca{parameter_store->get<bool>("shutter_is_pca")};
-
             
             if (!parameter_store->exists("scrubber.current_time"))
             {
@@ -403,6 +438,10 @@ class DigitalCodedExposure
 
             SDL_EndGPUComputePass(compute_pass);
         }
+
+        /**
+         * @brief Unused render pass
+         */
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
         }

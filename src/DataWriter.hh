@@ -7,10 +7,15 @@
 #include <dv-processing/io/mono_camera_writer.hpp>
 #include <queue>
 
+/**
+ * @brief This class provides functionality to write event and frame data
+ *        to an output aedat4 file. Works on a worker queue model.
+ */
 class DataWriter
 {
 
     private:
+        // data writer pointer
         std::unique_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
 
         std::mutex writer_lock; // For thread safety
@@ -26,6 +31,9 @@ class DataWriter
         bool writing_event_data;
 
     public:
+        /**
+         * @brief Constructor, zero initializes all values
+         */
         DataWriter()
             : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{false},
               writing_event_data{false}
@@ -33,8 +41,8 @@ class DataWriter
         }
 
         /**
-         * @brief Getter for writing_frame_data
-         * @return value of writing_frame_data
+         * @brief Getter for writing_frame_data. DataAcquisition should use to determine if writing frame data or not.
+         * @return value of writing_frame_data (is the object writing frame data or not)
          */
         bool get_writing_frame_data()
         {
@@ -45,8 +53,8 @@ class DataWriter
         }
 
         /**
-         * @brief Getter for writing_event_data
-         * @return value of writing_event_data
+         * @brief Getter for writing_event_data. DataAcquisition should use to determine if writing event data or not.
+         * @return value of writing_event_data (is the object writing event data or not)
          */
         bool get_writing_event_data()
         {

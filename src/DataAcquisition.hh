@@ -10,12 +10,22 @@
 #include <dv-processing/io/mono_camera_recording.hpp>
 #include <vector>
 
+/**
+ * @brief This class provides functions for getting event/frame data
+ *        from an aedat4 file or an event imager.
+ *
+ */
 class DataAcquisition
 {
 
     private:
+        // For storing currently detected cameras
         std::vector<dv::io::camera::USBDevice::DeviceDescriptor> scanned_cameras;
+
+        // Super class data reader object provided by DV-Processing library.
+        // Can get camera and file data.
         std::unique_ptr<dv::io::InputBase> data_reader_ptr;
+
         int32_t camera_event_width;
         int32_t camera_event_height;
 
@@ -23,14 +33,22 @@ class DataAcquisition
         int32_t camera_frame_height;
 
         std::mutex acq_lock; // For thread safety
-        // From old NOVA source code
-        // to get random float from 0.0 to 1.0
+
+        /**
+         * @brief From old NOVA source code
+         *        to get random float from 0.0 to 1.0
+         * @return random float from 0.0 to 1.0
+         */
+
         float randFloat()
         {
             return static_cast<float>(rand()) / RAND_MAX;
         };
 
     public:
+        /**
+         * @brief Constructor, zero initializes all variables
+         */
         DataAcquisition()
             : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
               camera_frame_height{}, acq_lock{}
@@ -38,7 +56,7 @@ class DataAcquisition
         }
 
         /**
-         * Clears member variables pertaining to reader.
+         * @brief Clears member variables pertaining to reader, including reseting the data reader.
          */
         void clear_reader()
         {

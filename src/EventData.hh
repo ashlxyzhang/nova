@@ -23,23 +23,42 @@
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <set>
 
-// From previous NOVA source code
-// Used for timestamp comparisons of event data
+/**
+ * @brief From previous NOVA source code
+ *        Used for timestamp comparisons of event data
+ * @param a Left event data vec4 vector operand
+ * @param b Right event data vec4 vector operand
+ * @return result of a.z < b.z (timestamp comparisons)
+ */
 inline bool event_less_vec4_t(const glm::vec4 &a, const glm::vec4 &b)
 {
     return a.z < b.z;
 }
 
-// From previous NOVA source code
-// Used for timestamp comparisons of frame data
+/**
+ * @brief From previous NOVA source code
+ *        Used for timestamp comparisons of frame data
+ * @param a Left frame data operand
+ * @param b Right frame data operand
+ * @return result of a.second < b.second (timestamp comparisons)
+ */
 inline bool frame_less_vec4_t(const std::pair<cv::Mat, float> &a, const std::pair<cv::Mat, float> &b)
 {
     return a.second < b.second;
 }
 
+/**
+ * @brief EventData is responsible for intaking event and frame data from DataAcquisition and
+ *        presenting it to the drawing code in a convenient format.
+ */
 class EventData
 {
     public:
+        /**
+         * @brief Secondary storage mapped event buffer.
+         *        Stores event data in second storage and provides
+         *        access to it like a standard random access std::vector object.
+         */
         class MappedEventBuffer
         {
             public:
@@ -47,6 +66,10 @@ class EventData
                 using iterator = value_type *;
                 using const_iterator = const value_type *;
 
+                /**
+                 * @brief Constructor. Generates file with name nova_evt_buffer_(some number) as backing store of event
+                 * data container.
+                 */
                 MappedEventBuffer()
                 {
                     std::ostringstream oss;
@@ -56,6 +79,9 @@ class EventData
                     remap(kInitialCapacity);
                 }
 
+                /**
+                 * @brief Destructor. Should delete backing file should it exist.
+                 */
                 ~MappedEventBuffer()
                 {
                     mapped_file_.close();
@@ -71,6 +97,10 @@ class EventData
                 MappedEventBuffer(MappedEventBuffer &&) noexcept = delete;
                 MappedEventBuffer &operator=(MappedEventBuffer &&) noexcept = delete;
 
+                /**
+                 * @brief Appends event data to container
+                 * @param value Event data represented as glm::vec4 (x, y, time, polarity)
+                 */
                 void push_back(const value_type &value)
                 {
                     ensure_capacity(size_ + 1);
@@ -78,86 +108,155 @@ class EventData
                     ++size_;
                 }
 
+                /**
+                 * @brief Returns if container is empty (size == 0)
+                 * @return true if container is empty, false otherwise
+                 */
                 [[nodiscard]] bool empty() const
                 {
                     return size_ == 0;
                 }
 
+                /**
+                 * @brief Returns number of event data elements in container.
+                 * @return number of event data elements in container.
+                 */
                 [[nodiscard]] std::size_t size() const
                 {
                     return size_;
                 }
 
+                /**
+                 * @brief Returns the total number of elements that can be added to the backing store.
+                 * @return total number of elements that can be added to the backing store.
+                 */
                 [[nodiscard]] std::size_t capacity() const
                 {
                     return capacity_;
                 }
 
+                /**
+                 * @brief Identical to capacity.
+                 * @return capacity.
+                 */
                 [[nodiscard]] std::size_t max_size() const
                 {
                     return capacity_;
                 }
 
+                /**
+                 * @brief Clears container.
+                 */
                 void clear()
                 {
                     size_ = 0;
                 }
 
+                /**
+                 * @brief Provides indexing access to container.
+                 * @param index index to get event data at.
+                 * @return event data at index.
+                 */
                 value_type &operator[](std::size_t index)
                 {
                     return ptr()[index];
                 }
 
+                /**
+                 * @brief Provides const indexing access to container.
+                 * @param index index to get event data at.
+                 * @return const event data at index.
+                 */
                 const value_type &operator[](std::size_t index) const
                 {
                     return ptr()[index];
                 }
 
+                /**
+                 * @brief Gets last event data in container.
+                 * @return last event data in container.
+                 */
                 value_type &back()
                 {
                     return ptr()[size_ - 1];
                 }
 
+                /**
+                 * @brief Gets last event data in container in const manner.
+                 * @return last const event data in container.
+                 */
                 const value_type &back() const
                 {
                     return ptr()[size_ - 1];
                 }
 
+                /**
+                 * @brief Returns iterator to beginning of container.
+                 * @return iterator to beginning of container.
+                 */
                 iterator begin()
                 {
                     return ptr();
                 }
 
+                /**
+                 * @brief Returns iterator to end of container.
+                 * @return iterator to end of container.
+                 */
                 iterator end()
                 {
                     return ptr() + size_;
                 }
 
+                /**
+                 * @brief Returns const iterator to beginning of container.
+                 * @return const iterator to beginning of container.
+                 */
                 const_iterator begin() const
                 {
                     return ptr();
                 }
 
+                /**
+                 * @brief Returns const iterator to end of container.
+                 * @return const iterator to end of container.
+                 */
                 const_iterator end() const
                 {
                     return ptr() + size_;
                 }
 
+                /**
+                 * @brief Returns const iterator to beginning of container.
+                 * @return const iterator to beginning of container.
+                 */
                 const_iterator cbegin() const
                 {
                     return ptr();
                 }
 
+                /**
+                 * @brief Returns const iterator to end of container.
+                 * @return const iterator to end of container.
+                 */
                 const_iterator cend() const
                 {
                     return ptr() + size_;
                 }
 
+                /**
+                 * Returns pointer to internal container.
+                 * @return pointer to internal container.
+                 */
                 value_type *data()
                 {
                     return ptr();
                 }
 
+                /**
+                 * @brief Returns pointer to const to internal container.
+                 * @return pointer to const to internal container.
+                 */
                 const value_type *data() const
                 {
                     return ptr();
@@ -171,6 +270,10 @@ class EventData
                 std::size_t size_{0};
                 std::size_t capacity_{0};
 
+                /**
+                 * @brief Like vector. Doubles backing store capacity.
+                 * @param min_capacity Minimum capacity of backing store needed.
+                 */
                 void ensure_capacity(std::size_t min_capacity)
                 {
                     if (min_capacity <= capacity_)
@@ -187,6 +290,11 @@ class EventData
                     remap(new_capacity);
                 }
 
+                /**
+                 * @brief Remaps internal backing store to a new capacity (changes file size to store capacity
+                 * elements).
+                 * @param new_capacity new capacity of internal backing store.
+                 */
                 void remap(std::size_t new_capacity)
                 {
                     const std::size_t bytes = new_capacity * sizeof(value_type);
@@ -225,6 +333,10 @@ class EventData
                     capacity_ = new_capacity;
                 }
 
+                /**
+                 * @brief Erases count elements from front.
+                 * @param count number of elements to erase from front of container.
+                 */
                 void erase_front(std::size_t count)
                 {
                     if (count == 0 || count > size_)
@@ -237,11 +349,19 @@ class EventData
                     size_ -= count;
                 }
 
+                /**
+                 * @brief Returns pointer to internal data.
+                 * @return pointer to internal data.
+                 */
                 value_type *ptr()
                 {
                     return capacity_ == 0 ? nullptr : reinterpret_cast<value_type *>(mapped_file_.data());
                 }
 
+                /**
+                 * @brief Returns pointer to const internal data.
+                 * @return pointer to const internal data.
+                 */
                 const value_type *ptr() const
                 {
                     return capacity_ == 0 ? nullptr : reinterpret_cast<const value_type *>(mapped_file_.data());
@@ -267,6 +387,7 @@ class EventData
 
         // Member variables
     private:
+        // Stores event and frame data with relative timestamps (timestamps - earliest event timestamp)
         MappedEventBuffer evt_data_vector_relative;
         std::vector<std::pair<cv::Mat, float>> frame_data_vector_relative;
 
@@ -393,7 +514,7 @@ class EventData
 
         /**
          * @brief Inserts event data into the event data vector with relative timestamps (absolute timestamp - absolute
-         * earliest timestamp). Following documentation of the AEDAT formats
+         * earliest event timestamp). Following documentation of the AEDAT formats
          * (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
          * monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
          * reset/syncronization is assumed where timestamps are reset to 0.
@@ -403,12 +524,15 @@ class EventData
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
 
+            // 100 GB / sizeof(glm::vec4) =  max number of elements to reach 100 GB
             constexpr size_t MAX_EVENT_BACKING_SIZE{
-                100 * ((static_cast<size_t>(1) << 30) / (1 << 4))}; // Set 100 GB approximately
+                (static_cast<size_t>(100) * (static_cast<size_t>(1) << 30)) /
+                sizeof(glm::vec4)}; // Set 100 GB approximately as maximum of backing store
 
             // If this condition is met, then we have unordered data, assume camera reset, clear all previous data
             // Or maximum number of event data has been reached
-            if ((raw_evt_data.timestamp < evt_data_latest_timestamp) || (evt_data_vector_relative.size() > MAX_EVENT_BACKING_SIZE))
+            if ((raw_evt_data.timestamp < evt_data_latest_timestamp) ||
+                (evt_data_vector_relative.size() > MAX_EVENT_BACKING_SIZE))
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
@@ -431,13 +555,13 @@ class EventData
             evt_data_vector_relative.push_back(glm::vec4{x, y, timestamp_relative, polarity});
 
             evt_data_latest_timestamp = raw_evt_data.timestamp;
-        
+
             evt_lock_ul.unlock();
         }
 
         /**
          * @brief Inserts frame data into the frame data vector with relative timestamps (absolute timestamp - absolute
-         * earliest timestamp). Following documentation of the AEDAT formats
+         * earliest event timestamp). Following documentation of the AEDAT formats
          * (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
          * monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
          * reset/syncronization is assumed where timestamps are reset to 0.
@@ -449,9 +573,10 @@ class EventData
 
             constexpr size_t MAX_FRAME_SIZE{static_cast<size_t>(1) << 20}; // Set max to 1 million frames
 
-            // If this condition is met, unordered frame assumes camera reset, 
+            // If this condition is met, unordered frame assumes camera reset,
             // or maximum number of frames met.
-            if ((raw_frame_data.timestamp < frame_data_latest_timestamp) || (frame_data_vector_relative.size() > MAX_FRAME_SIZE))
+            if ((raw_frame_data.timestamp < frame_data_latest_timestamp) ||
+                (frame_data_vector_relative.size() > MAX_FRAME_SIZE))
             {
                 // Reset assumed, timestamps are all back to zero, clear data
                 evt_data_earliest_timestamp = -1;
@@ -462,7 +587,8 @@ class EventData
             }
 
             // update earliest timestamp
-            if (evt_data_vector_relative.empty()) // Need to normalize timestamps relative to event data, ignore until event data is in
+            if (evt_data_vector_relative
+                    .empty()) // Need to normalize timestamps relative to event data, ignore until event data is in
             {
                 return;
             }
@@ -472,16 +598,14 @@ class EventData
             frame_data_vector_relative.push_back(std::make_pair(raw_frame_data.frameData, timestamp_relative));
 
             frame_data_latest_timestamp = raw_frame_data.timestamp;
-            
+
             evt_lock_ul.unlock();
         }
 
         /**
-         * @brief Exposes event data with relative timestamp as a vector of glm::vec4.
-         *        IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors()
-         *        when done working with the data vectors.
-         * @param relative If true, returns data with relative timestamps (earliest timestamp subtracted from all
-         * timestamps). Otherwise regular timestamps.
+         * @brief Exposes event data with relative timestamp (absolute timestamp - earliest event timestamp) as a vector
+         * of glm::vec4. IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors() when done
+         * working with the data vectors.
          * @return const reference to internal event data vector.
          */
         const MappedEventBuffer &get_evt_vector_ref() const
@@ -490,11 +614,9 @@ class EventData
         }
 
         /**
-         * @brief Exposes frame data with relative timestamp as a vector of pairs containing image data and
-         * timestamp. IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors() when done
-         * working with the data vectors.
-         * @param relative If true, returns data with relative timestamps (earliest timestamp subtracted from all
-         * timestamps). Otherwise regular timestamps.
+         * @brief Exposes frame data with relative timestamp (absolute timestamp - earliest event timestamp) as a vector
+         * of pairs containing image data and timestamp. IMPORTANT: Caller must have called lock_data_vectors(). Call
+         * unlock_data_vectors() when done working with the data vectors.
          * @return const reference to internal frame data vector.
          */
         const std::vector<std::pair<cv::Mat, float>> &get_frame_vector_ref()
@@ -527,7 +649,7 @@ class EventData
          * @brief Gets index of first event data in relative event data vector with timestamp that is equal or greater
          *        than provided timestamp.
          * @param timestamp Provided timestamp.
-         * @return -1 if relative event data vector is empty, index otherwise.
+         * @return -1 if relative event data vector is empty or index not found, index otherwise.
          */
         int64_t get_event_index_from_relative_timestamp(float timestamp)
         {
@@ -553,20 +675,6 @@ class EventData
             evt_lock_ul.unlock();
             return ret_index;
         }
-
 };
-
-// Operator overloads necessary to use Datum internal structs as keys to multiset
-// Define < operator for EventDatum
-inline bool operator<(const EventData::EventDatum &left, const EventData::EventDatum &right)
-{
-    return left.timestamp < right.timestamp;
-}
-
-// Define < operator for FrameDatum
-inline bool operator<(const EventData::FrameDatum &left, const EventData::FrameDatum &right)
-{
-    return left.timestamp < right.timestamp;
-}
 
 #endif // EVENTDATA_HH

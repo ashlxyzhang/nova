@@ -5,6 +5,9 @@
 
 #include "pch.hh"
 
+/**
+ * @brief Target to render on screen.
+ */
 struct RenderTarget
 {
         SDL_GPUTexture *texture = nullptr;
