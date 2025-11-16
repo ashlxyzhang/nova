@@ -12,3 +12,40 @@ To install NOVA for users, go to the latest release and download the zip file of
 
 # Installing For Developers
 
+## Windows
+### vcpkg
+NOVA on Windows requires the vcpkg package manager due to the dv-processing dependency. [vcpkg install instructions](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started?pivots=shell-powershell)
+### clang
+NOVA uses LLVM's Clang/Clang++ as the compiler. Please install it with the following.
+```
+winget install LLVM -i
+```
+Make sure to select the add to path option.
+
+## Linux
+### Package manager
+Most of the packages NOVA needs will be pulled automatically through CMake's FetchContent.
+However depending on the system, some internal libraries used by our dependencies may need
+to be manually installed. For example SDL3 will require some library to be able to create
+the native window, so wayland devel may be needed.
+### clang
+The clang compiler will need to be installed, the easiest way is to use the one provided
+with your distro's package manager.
+
+## CMake Commands
+
+### List all presets available for a system
+```
+cmake --list-presets
+```
+
+### Generate build files
+```
+cmake --preset preset-name
+```
+Where preset-name is one of the presets given in the previous step.
+
+### Invoke the build
+```
+cmake --build ./build --parallel
+```
