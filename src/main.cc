@@ -43,7 +43,9 @@ std::atomic<bool> g_data_acquisition_running{true};
 
 std::thread *g_data_acquisition_thread_ptr = nullptr;
 
-// This function runs once at startup.
+/**
+ * @brief This function runs once at startup.
+ */ 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     g_parameter_store = new ParameterStore();
@@ -105,7 +107,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     return SDL_APP_CONTINUE;
 }
 
-/* This function runs when a new event (mouse input, keypresses, etc) occurs. */
+/**
+ * @brief This function runs when a new event (mouse input, keypresses, etc) occurs. 
+ */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
     // handle the event for the gui
@@ -122,7 +126,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     return SDL_APP_CONTINUE;
 }
 
-/* This function runs once per frame, and is the heart of the program. */
+/**
+ * @brief This function runs once per frame, and is the heart of the program. 
+ */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
     // Skip rendering if window is minimized
@@ -190,6 +196,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     return SDL_APP_CONTINUE;
 }
 
+/**
+ * @brief On quit. Cleans up stuff.
+ */
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
 
