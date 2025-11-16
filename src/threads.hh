@@ -11,6 +11,14 @@
 // Anonymous helper functions
 namespace
 {
+
+/**
+ * @brief Sets up the DataWriter object for writing data to a file.
+ * @param data_acq DataAcquisition object that will write data to DataWriter.
+ * @param data_writer DataWriter object that will write data to file.
+ * @param param_store ParameterStore object that contains global data from GUI.
+ * @param prog_state State of the program.
+ */
 inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store,
                          GUI::PROGRAM_STATE prog_state)
 {
@@ -79,12 +87,17 @@ inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, Par
 } // namespace
 
 // Program threads
+/**
+ * @brief Namespace for functions that serve as entrypoints to threads in this program.
+ *        Consist of thread for data acquisition and thread for writing data.
+ */
 namespace program_thread
 {
 /**
  * @brief Thread for writing data back to persistent storage when streaming.
  * @param running Atomic boolean that determines if thread is running or not.
- * @param data_writer DataWriter object to write data with
+ * @param data_writer DataWriter object to write data with.
+ * @param param_store ParameterStore object containing global data.
  *
  */
 
@@ -168,31 +181,6 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                                                     param_store.get<float>("event_discard_odds"));
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
 
-                        // Test to ensure event/frame data was added and is ordered
-                        //  evt_data.lock_data_vectors();
-
-                        // const auto &event_data{evt_data.get_evt_vector_ref()};
-
-                        // for (size_t i = 1; i < event_data.size(); ++i)
-                        // {
-                        //     assert(event_data[i - 1][2] <= event_data[i][2]); // Ensure ascending timestamps
-                        //     std::cout << "AT i: " << i << " INDEX: " <<
-                        //     evt_data.get_event_index_from_timestamp(event_data[i][2]) << std::endl;
-                        // }
-
-                        // const auto &frame_data{evt_data.get_frame_vector_ref()};
-                        // std::cout << "FRAME DATA RECEIVED, SIZE: " << frame_data.size() << std::endl;
-
-                        // for (size_t i = 1; i < frame_data.size(); ++i)
-                        // {
-                        //     std::cout << "AT i: " << i << " TIMESTAMP: " << frame_data[i].second << std::endl;
-                        //     assert(frame_data[i].second <= frame_data[i].second); // Ensure ascending timestamps
-                        //     std::cout << "RETRIEVED: " <<
-                        //     evt_data.get_frame_index_from_timestamp(frame_data[i].second)
-                        //     << std::endl;
-                        // }
-
-                        // evt_data.unlock_data_vectors();
                     }
                 }
                 break;
