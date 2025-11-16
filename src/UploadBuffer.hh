@@ -5,6 +5,9 @@
 
 #include "pch.hh"
 
+/**
+ * @brief Class for uploading data to the GPU.
+ */
 class UploadBuffer
 {
     private:
@@ -14,6 +17,11 @@ class UploadBuffer
         constexpr static unsigned buffer_size = 1 << 20;
 
     public:
+
+        /**
+         * @brief Constructor. Initializes GPUTransferBuffer for transferring data to GPU.
+         * @param gpu_device SDL_GPUDevice to upload data to.
+         */
         UploadBuffer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device)
         {
             SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
@@ -21,11 +29,21 @@ class UploadBuffer
             transfer_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info);
         }
 
+        /**
+         * @brief Destructor. Releases data buffer on GPU.
+         */
         ~UploadBuffer()
         {
             SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
         }
 
+        /**
+         * @brief Uploads buffer data to GPU.
+         * @param pass SDL_GPUCopyPass for copying data to GPU.
+         * @param dst Destination of data to be copied to GPU.
+         * @param src Source data buffer to be copied.
+         * @param nbyte Number of bytes to copy from src to GPU.
+         */
         void upload_to_gpu(SDL_GPUCopyPass *pass, SDL_GPUBuffer *dst, const void *src, size_t nbyte)
         {
             size_t offset = 0;
@@ -50,10 +68,19 @@ class UploadBuffer
             }
         }
 
-        // This function will make a lot of assumptions
-        // first is that the SDL_GPUTexture is the same resolution as the cv::Mat
-        // second is that they have the same number of bits per channel
-        // third is that the texture was created with rgba8 unorm format
+        // 
+        /**
+         * @brief Uploads texture to GPU.
+         * 
+         * This function will make a lot of assumptions
+         * first is that the SDL_GPUTexture is the same resolution as the cv::Mat
+         * second is that they have the same number of bits per channel
+         * third is that the texture was created with rgba8 unorm format
+         * @param pass SDL_GPUCopyPass for copying data to GPU.
+         * @param texture SDL_GPUTexture texture destination to upload texture to.
+         * @param mat Texture information as cv::Mat to upload.
+         * @param layer Texture layers.
+         */
         void upload_cv_mat(SDL_GPUCopyPass *pass, SDL_GPUTexture *texture, const cv::Mat &mat, uint32_t layer = 0)
         {
             cv::Mat rgba;

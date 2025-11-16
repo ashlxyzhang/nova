@@ -70,7 +70,7 @@ class DataAcquisition
         }
 
         /**
-         * Clears every member variable
+         * @brief Clears every member variable
          */
         void clear()
         {
@@ -79,7 +79,7 @@ class DataAcquisition
         }
 
         /**
-         * Scan for cameras and populate parameter store with GUI values to choose from.
+         * @brief Scan for cameras and populate parameter store with GUI values to choose from.
          * @param param_store Parameter store to populate.
          */
         void discover_cameras(ParameterStore &param_store)
@@ -110,7 +110,7 @@ class DataAcquisition
         }
 
         /**
-         * Loads camera to read. Initializes internal reader with camera.
+         * @brief Loads camera to read. Initializes internal reader with camera.
          * @param camera_index Index of camera in scanned_cameras vector to stream from.
          * @param param_store param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
@@ -162,7 +162,7 @@ class DataAcquisition
         }
 
         /**
-         * Loads file to read. Initializes internal reader with filename.
+         * @brief Loads file to read. Initializes internal reader with filename.
          * @param file_name the name of the data file to read.
          * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
@@ -215,7 +215,7 @@ class DataAcquisition
         }
 
         /**
-         * Gives event camera resolution to event data.
+         * @brief Gives event camera resolution to event data.
          * @param evt_data EventData object to give camera resolution to.
          */
         void get_camera_event_resolution(EventData &evt_data)
@@ -224,7 +224,7 @@ class DataAcquisition
         }
 
         /**
-         * Gives frame camera resolution to event data.
+         * @brief Gives frame camera resolution to event data.
          * @param evt_data EventData object to give camera resolution to.
          */
         void get_camera_frame_resolution(EventData &evt_data)
@@ -233,7 +233,7 @@ class DataAcquisition
         }
 
         /**
-         * For dynamic loading (streaming), gets a batch of event data.
+         * @brief For dynamic loading (streaming), gets a batch of event data.
          * @param evt_data EventData object to populate with event/frame data
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.
@@ -307,7 +307,7 @@ class DataAcquisition
         }
 
         /**
-         * For dynamic loading (streaming), gets a batch of frame data.
+         * @brief For dynamic loading (streaming), gets a batch of frame data.
          * @param evt_data EventData object to populate with event/frame data
          * @param param_store ParameterStore object with data from GUI.
          * @return true if data was read, false otherwise.

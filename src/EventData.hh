@@ -68,7 +68,7 @@ class EventData
 
                 /**
                  * @brief Constructor. Generates file with name nova_evt_buffer_(some number) as backing store of event
-                 * data container.
+                 *        data container.
                  */
                 MappedEventBuffer()
                 {
@@ -245,7 +245,7 @@ class EventData
                 }
 
                 /**
-                 * Returns pointer to internal container.
+                 * @brief Returns pointer to internal container.
                  * @return pointer to internal container.
                  */
                 value_type *data()
@@ -463,7 +463,7 @@ class EventData
         }
 
         /**
-         * Sets camera resolution for event data.
+         * @brief Sets camera resolution for event data.
          * @param width Width of camera.
          * @param height Height of camera.
          */
@@ -476,7 +476,7 @@ class EventData
         }
 
         /**
-         * Sets camera resolution for frame data.
+         * @brief Sets camera resolution for frame data.
          * @param width Width of camera.
          * @param height Height of camera.
          */
@@ -489,7 +489,7 @@ class EventData
         }
 
         /**
-         * Gets event camera resolution.
+         * @brief Gets event camera resolution.
          * @return event camera resolution as glm::vec2 (width, height).
          */
         glm::vec2 get_camera_event_resolution()
@@ -501,7 +501,7 @@ class EventData
         }
 
         /**
-         * Gets frame camera resolution.
+         * @brief Gets frame camera resolution.
          * @return frame camera resolution as glm::vec2 (width, height).
          */
         glm::vec2 get_camera_frame_resolution()
@@ -514,10 +514,10 @@ class EventData
 
         /**
          * @brief Inserts event data into the event data vector with relative timestamps (absolute timestamp - absolute
-         * earliest event timestamp). Following documentation of the AEDAT formats
-         * (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
-         * monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
-         * reset/syncronization is assumed where timestamps are reset to 0.
+         *        earliest event timestamp). Following documentation of the AEDAT formats
+         *        (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
+         *        monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
+         *        reset/syncronization is assumed where timestamps are reset to 0.
          * @param raw_evt_data Raw event data to add.
          */
         void write_evt_data(EventDatum raw_evt_data)
@@ -561,10 +561,10 @@ class EventData
 
         /**
          * @brief Inserts frame data into the frame data vector with relative timestamps (absolute timestamp - absolute
-         * earliest event timestamp). Following documentation of the AEDAT formats
-         * (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
-         * monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
-         * reset/syncronization is assumed where timestamps are reset to 0.
+         *        earliest event timestamp). Following documentation of the AEDAT formats
+         *        (https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf page 163), data is assumed to be read in as
+         *        monotonically increasing timestamps. If a decreasing timestamp is detected, as per documentation, a camera
+         *        reset/syncronization is assumed where timestamps are reset to 0.
          * @param raw_frame_data Raw frame data to add.
          */
         void write_frame_data(FrameDatum raw_frame_data)
@@ -604,8 +604,8 @@ class EventData
 
         /**
          * @brief Exposes event data with relative timestamp (absolute timestamp - earliest event timestamp) as a vector
-         * of glm::vec4. IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors() when done
-         * working with the data vectors.
+         *        of glm::vec4. IMPORTANT: Caller must have called lock_data_vectors(). Call unlock_data_vectors() when done
+         *        working with the data vectors.
          * @return const reference to internal event data vector.
          */
         const MappedEventBuffer &get_evt_vector_ref() const
@@ -615,8 +615,8 @@ class EventData
 
         /**
          * @brief Exposes frame data with relative timestamp (absolute timestamp - earliest event timestamp) as a vector
-         * of pairs containing image data and timestamp. IMPORTANT: Caller must have called lock_data_vectors(). Call
-         * unlock_data_vectors() when done working with the data vectors.
+         *        of pairs containing image data and timestamp. IMPORTANT: Caller must have called lock_data_vectors(). Call
+         *        unlock_data_vectors() when done working with the data vectors.
          * @return const reference to internal frame data vector.
          */
         const std::vector<std::pair<cv::Mat, float>> &get_frame_vector_ref()

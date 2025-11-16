@@ -83,7 +83,7 @@ class ParameterStore
 
         /**
          * @brief Retrieves a parameter from the store.
-         * @tparam T The type of the value to retrieve.
+         * @param T The type of the value to retrieve.
          * @param key The key of the value to retrieve.
          * @return A copy of the stored value.
          * @throw std::out_of_range if the key does not exist.

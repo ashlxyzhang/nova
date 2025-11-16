@@ -23,9 +23,16 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
+/**
+ * @brief Provides functions for rendering the 3D event data particle plot visualization (3D Visualizer window).
+ */
 class Visualizer
 {
     private:
+        
+        /**
+         * @brief Provides functions for rendering the grid in the visualizer.
+         */
         class GridRenderer
         {
             private:
@@ -39,6 +46,9 @@ class Visualizer
                 SDL_GPUGraphicsPipeline *grid_pipeline = nullptr;
                 SDL_GPUBuffer *vertex_buffer = nullptr;
 
+                /**
+                 * @brief Generates grid lines in 3D Visualizer window.
+                 */
                 void generate_grid_lines()
                 {
                     lines.clear();
@@ -98,6 +108,14 @@ class Visualizer
                 }
 
             public:
+                
+                /**
+                 * @brief Constructor. Initializes necessary shaders for drawing grid.
+                 * @param parameter_store ParameterStore object containing global data
+                 * @param gpu_device SDL_GPUDevice to create shader
+                 * @param upload_buffer UploadBuffer object for uploading data to GPU
+                 * @param copy_pass SDL_GPUCopyPass unused
+                 */
                 GridRenderer(ParameterStore &parameter_store, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
                              SDL_GPUCopyPass *copy_pass)
                     : parameter_store(parameter_store), gpu_device(gpu_device)
@@ -194,6 +212,9 @@ class Visualizer
                     SDL_ReleaseGPUShader(gpu_device, fs);
                 }
 
+                /**
+                 * @brief Destructor, releases necessary buffers and pipelines from GPU device.
+                 */
                 ~GridRenderer()
                 {
                     if (vertex_buffer)
@@ -205,7 +226,10 @@ class Visualizer
                         SDL_ReleaseGPUGraphicsPipeline(gpu_device, grid_pipeline);
                     }
                 }
-
+                
+                /**
+                 * @brief Updates grid visualization on each frame.
+                 */
                 void cpu_update()
                 {
                     // Check if any subdivision parameters have changed
@@ -230,6 +254,11 @@ class Visualizer
                     }
                 }
 
+                /**
+                 * @brief Uploads updated grid lines to GPU.
+                 * @param upload_buffer UploadBuffer object for uploading data to GPU
+                 * @param copy_pass SDL_GPU_CopyPass for copying data to GPU
+                 */
                 void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     // Check if grid lines need to be updated
@@ -265,6 +294,12 @@ class Visualizer
                     }
                 }
 
+                /**
+                 * @brief Renders the grid visualization.
+                 * @param command_buffer GPU command buffer.
+                 * @param render_pass GPU render pass.
+                 * @param vp MVP matrix.
+                 */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp)
                 {
@@ -286,6 +321,9 @@ class Visualizer
                 }
         };
 
+        /**
+         * @brief Provides functions to render the event data individual points of the 3D Visualizer.
+         */
         class PointsRenderer
         {
             private:
@@ -296,6 +334,15 @@ class Visualizer
                 SDL_GPUGraphicsPipeline *points_pipeline = nullptr;
 
             public:
+
+                /**
+                 * @brief Constructor. Initializes necessary shaders for drawing points.
+                 * @param parameter_store ParameterStore object containing global data
+                 * @param scrubber Scrubber object containing points buffer to draw
+                 * @param gpu_device SDL_GPUDevice to create shader
+                 * @param upload_buffer UploadBuffer object for uploading data to GPU
+                 * @param copy_pass SDL_GPUCopyPass unused
+                 */
                 PointsRenderer(ParameterStore &parameter_store, EventData &event_data, Scrubber *scrubber,
                                SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
                     : parameter_store(parameter_store), event_data(event_data), scrubber(scrubber),
@@ -355,6 +402,9 @@ class Visualizer
                     SDL_ReleaseGPUShader(gpu_device, fs);
                 }
 
+                /**
+                 * @brief Destructor. Releases pipeline.
+                 */
                 ~PointsRenderer()
                 {
                     if (points_pipeline)
@@ -371,6 +421,12 @@ class Visualizer
                 {
                 }
 
+                /**
+                 * @brief Renders the event data points in the 3D Visualizer.
+                 * @param command_buffer GPU command buffer
+                 * @param render_pass GPU render pass
+                 * @param vp MVP matrix
+                 */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp)
                 {
@@ -428,6 +484,9 @@ class Visualizer
         };
 
         // very ai generated
+        /**
+         * @brief For rendering text.
+         */
         class TextRenderer
         {
             private:
@@ -469,6 +528,12 @@ class Visualizer
                 std::vector<TTF_Text *> managed_text_objects;
 
             public:
+
+                /**
+                 * @brief Constructor. Creates necessary shaders.
+                 * @param parameter_store ParameterStore object containing global data
+                 * @param gpu_device SDL_GPUDevice to create shader
+                 */
                 TextRenderer(ParameterStore &parameter_store, SDL_GPUDevice *gpu_device)
                     : parameter_store(parameter_store), gpu_device(gpu_device)
                 {
@@ -545,6 +610,9 @@ class Visualizer
                     sampler = SDL_CreateGPUSampler(gpu_device, &sampler_info);
                 }
 
+                /**
+                 * @brief Destructor. Releases GPU resources.
+                 */
                 ~TextRenderer()
                 {
                     // Clear any remaining text objects
@@ -655,7 +723,10 @@ class Visualizer
                     }
                 }
 
-                // Call this once per frame *before* queueing new text
+                /**
+                 * @brief Clears text in preparation for next frame.
+                 *        Call this once per frame *before* queueing new text
+                 */
                 void cpu_update()
                 {
                     // Clear data from previous frame
@@ -671,6 +742,11 @@ class Visualizer
                     managed_text_objects.clear();
                 }
 
+                /**
+                 * @brief Copies necessary data regarding text to GPU.
+                 * @param upload_buffer UploadBuffer object for uploading data to GPU
+                 * @param copy_pass GPU copy pass
+                 */
                 void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     if (vertices.empty() || indices.empty())
@@ -698,6 +774,12 @@ class Visualizer
                     upload_buffer->upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
                 }
 
+                /**
+                 * @brief Renders the text.
+                 * @param command_buffer GPU command buffer
+                 * @param render_pass GPU render pass
+                 * @param vp VP matrix
+                 */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp)
                 {
@@ -730,6 +812,9 @@ class Visualizer
                 }
         };
 
+        /**
+         * @brief Draw frame data.
+         */
         class FramesRenderer
         {
             private:
@@ -740,6 +825,13 @@ class Visualizer
                 SDL_GPUSampler *sampler = nullptr;
 
             public:
+
+                /**
+                 * @brief Constructor. Initializes necessary shaders.
+                 * @param parameter_store ParameterStore object containing program global data
+                 * @param gpu_device GPU device
+                 * @param scrubber Data scrubber containing frames to interpolate and draw.
+                 */
                 FramesRenderer(ParameterStore *parameter_store, SDL_GPUDevice *gpu_device, Scrubber *scrubber)
                     : parameter_store(parameter_store), gpu_device(gpu_device), scrubber(scrubber)
                 {
@@ -806,6 +898,9 @@ class Visualizer
                     sampler = SDL_CreateGPUSampler(gpu_device, &sampler_info);
                 }
 
+                /**
+                 * @brief Destructor. Releases necessary GPU resources.
+                 */
                 ~FramesRenderer()
                 {
                     if (sampler)
@@ -826,6 +921,12 @@ class Visualizer
                 {
                 }
 
+                /**
+                 * @brief Renders the frames.
+                 * @param command_buffer GPU command buffer
+                 * @param render_pass GPU render pass
+                 * @param vp MVP matrix
+                 */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp)
                 {
@@ -886,6 +987,19 @@ class Visualizer
         bool cursor_captured = false;
 
     public:
+        
+        /**
+         * @brief Constructor. Initializes render target of 3D Visualizer and GridRenderer, PointsRenderer, TextRenderer, and FramesRenderer
+         *        objects.
+         * @param parameter_store ParameterStore object containing data from GUI
+         * @param render_targets Render targets of the program
+         * @param event_data EventData object containing event/frame data 
+         * @param scrubber Scrubber object with data to compute DCE on
+         * @param window SDL_Window to draw on
+         * @param gpu_device SDL_GPUDevice to create texture on
+         * @param upload_buffer UploadBuffer object for uploading data to gpu
+         * @param copy_pass SDL_GPUCopyPass unused
+         */
         Visualizer(ParameterStore &parameter_store, std::unordered_map<std::string, RenderTarget> &render_targets,
                    EventData &event_data, Scrubber *scrubber, SDL_Window *window, SDL_GPUDevice *gpu_device,
                    UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
@@ -926,6 +1040,9 @@ class Visualizer
             frames_renderer = new FramesRenderer(&parameter_store, gpu_device, scrubber);
         }
 
+        /**
+         * @brief Destructor, release necessary resources.
+         */
         ~Visualizer()
         {
             if (frames_renderer)
@@ -948,6 +1065,11 @@ class Visualizer
             SDL_ReleaseGPUTexture(gpu_device, render_targets["VisualizerColor"].texture);
         }
 
+        /**
+         * @brief Event handler to allow mouse dragging rotation around 3D Visualizer window.
+         * @param event The recorded event to act on.
+         * @return true if event was handled. Otherwise false.
+         */
         bool event_handler(SDL_Event *event)
         {
             if (render_targets["VisualizerColor"].is_focused == true)
@@ -1033,6 +1155,9 @@ class Visualizer
             return false;
         }
 
+        /**
+         * @brief Updates information used to draw 3D Visualizer window on a frame including time axis units.
+         */
         void cpu_update()
         {
             grid_renderer->cpu_update();
@@ -1101,6 +1226,12 @@ class Visualizer
             }
         }
 
+        /**
+         * @brief Calls copy_pass of grid_renderer, points_renderer, text_renderer, and frames_renderer.
+         *        Basically uploading pertinent data to GPU.
+         * @param upload_buffer UploadBuffer object for uploading data to GPU.
+         * @param copy_pass GPU copy pass.
+         */
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
             grid_renderer->copy_pass(upload_buffer, copy_pass);
@@ -1113,6 +1244,10 @@ class Visualizer
         {
         }
 
+        /**
+         * @brief Renders the 3D Visualizer window (event data particle plot).
+         * @param command_buffer GPU command buffer
+         */
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
             // auto ts = scrubber->get_frames_timestamps();

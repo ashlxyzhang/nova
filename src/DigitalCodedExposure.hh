@@ -82,7 +82,7 @@ class DigitalCodedExposure
          * @param event_data EventData object containing event/frame data
          * @param window SDL_Window to draw on
          * @param gpu_device SDL_GPUDevice to create texture on
-         * @param upload_buffer UploadBuffer object for uploading to gpu
+         * @param upload_buffer UploadBuffer object for uploading data to GPU
          * @param scrubber Scrubber object with data to compute DCE on
          * @param copy_pass SDL_GPUCopyPass unused
          */
@@ -243,9 +243,6 @@ class DigitalCodedExposure
             }
         }
         
-        /**
-         * @brief Unused copy pass.
-         */
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
@@ -439,9 +436,6 @@ class DigitalCodedExposure
             SDL_EndGPUComputePass(compute_pass);
         }
 
-        /**
-         * @brief Unused render pass
-         */
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
         }

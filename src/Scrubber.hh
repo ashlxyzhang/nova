@@ -13,15 +13,27 @@
 #include <algorithm>
 #include <array>
 
+/**
+ * @brief Provides functionality for scrubbing through subsets of event data.
+ */
 class Scrubber
 {
     public:
+        /**
+         * @brief Two types of data scrubbing, event based or time based.
+         */
         enum class ScrubberType : std::uint8_t
         {
             EVENT,
             TIME,
         };
 
+        /**
+         * @brief Three modes of data scrubbing.
+         *        Paused is good for scrubbing through data.
+         *        Playing is good for recreating streaming from past data.
+         *        Latest is good for seeing data as it is streamed.
+         */
         enum class ScrubberMode : std::uint8_t
         {
             PAUSED,
@@ -63,6 +75,13 @@ class Scrubber
         std::size_t frame_width = 0, frame_height = 0;
 
     public:
+
+        /**
+         * @brief Constructor. Initializes ParameterStore with necessary variables.
+         * @param parameter_store ParameterStore object containing data from GUI
+         * @param event_data EventData object containing event/frame data
+         * @param gpu_device SDL_GPUDevice to upload event data points to
+         */
         Scrubber(ParameterStore &parameter_store, EventData *event_data, SDL_GPUDevice *gpu_device)
             : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
         {
@@ -83,6 +102,9 @@ class Scrubber
             parameter_store.add("scrubber.show_frame_data", false);
         }
 
+        /**
+         * @brief Destructor. Releases event points buffer.
+         */
         ~Scrubber()
         {
             if (points_buffer)
@@ -95,6 +117,9 @@ class Scrubber
             }
         }
 
+        /**
+         * @brief Updates what event data is being captured by scrubber every frame.
+         */
         void cpu_update()
         {
             current_index = parameter_store.get<std::size_t>("scrubber.current_index");
@@ -242,6 +267,12 @@ class Scrubber
             event_data->unlock_data_vectors();
         }
 
+        /**
+         * @brief Copies relevant event data and frame data into buffer on GPU
+         *        to be drawn and processed by DCE.
+         * @param upload_buffer UploadBuffer object for uploading data to gpu
+         * @param copy_pass SDL_GPUCopyPass for copying data to GPU
+         */
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
             if (!event_data || !upload_buffer || !copy_pass)
@@ -473,43 +504,75 @@ class Scrubber
             event_data->unlock_data_vectors();
         }
 
-        // return the points buffer
+        /**
+         * @brief Returns the points buffer, 
+         *        pointer to buffer in GPU memory containing event data points to be drawn.
+         * @return pointer to buffer in GPU memory containing event data points that are inside scrubber window.
+         */
         SDL_GPUBuffer *get_points_buffer()
         {
             return points_buffer;
         }
 
+        /**
+         * @brief Returns the frames texture.
+         * @return pointer to texture in GPU memory containing frames that are inside scrubber window.
+         */
         SDL_GPUTexture *get_frames_texture()
         {
             return frames;
         }
 
+        /**
+         * @brief Get timestamps of the two frames that are being interpolated in scrubber.
+         * @return std::array of timestamps of two frames being interpolated in scrubber.
+         */
         std::array<float, 2> get_frames_timestamps()
         {
             return frame_timestamps;
         }
 
+        /**
+         * @brief Get dimensions of frames being drawn by scrubber.
+         * @return std::array containing width and height of frames being drawn by scrubber.
+         */
         std::array<std::size_t, 2> get_frame_dimensions()
         {
             return {frame_width, frame_height};
         }
 
-        // return the size of the points buffer
+        /**
+         * @brief Returns the size of the points buffer,
+         *        size of buffer in GPU memory containing event data as points to be drawn.
+         * @return number of elements in the points buffer.
+         */ 
         std::size_t get_points_buffer_size()
         {
             return points_buffer_size / sizeof(glm::vec4);
         }
 
+        /**
+         * @brief Returns lower time bound of scrubber window.
+         * @return lower time bound of scrubber window.
+         */
         float get_lower_depth()
         {
             return lower_depth;
         }
 
+        /**
+         * @brief Returns upper time bound of scrubber window.
+         * @return upper time bound of scrubber window.
+         */
         float get_upper_depth()
         {
             return upper_depth;
         }
 
+        /**
+         * @brief Gets the event camera resolution.
+         * @return event camera resolution.
+         */
         glm::vec2 get_camera_resolution()
         {
             return camera_resolution;

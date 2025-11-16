@@ -71,7 +71,7 @@ class GUI
 
         /**
          * @brief Get max fps.
-         * From old NOVA source code
+         *        From old NOVA source code
          * @return maximum fps from circular fps buffer.
          */
         float get_max_fps()
@@ -89,7 +89,7 @@ class GUI
 
         /**
          * @brief Get min fps.
-         * From old NOVA source code
+         *        From old NOVA source code
          * @return minimum fps from circular buffer.
          */
         float get_min_fps()
@@ -551,7 +551,7 @@ class GUI
         }
 
         /**
-         * @brief Draws 3D particle plot of event data.
+         * @brief Draws 3D Visualizer window (event data particle plot) into IMGUI.
          */
         void draw_visualizer()
         {
@@ -869,7 +869,7 @@ class GUI
         }
 
         /**
-         * Draws Digital Coded Exposure window.
+         * @brief Draws Digital Coded Exposure window.
          */
         void draw_digital_coded_exposure()
         {
