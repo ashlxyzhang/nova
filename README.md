@@ -7,7 +7,7 @@ Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a
 - [Installing For Users](#installing-for-users)
 - [Installing For Developers](#installing-for-developers)
 - [Documentation](#documentation)
-- [User Quickstart](#quickstart)
+- [User Quickstart](#user-quickstart)
 - [Next Phase Features](#next-phase-features)
 - [References](#references)
 
