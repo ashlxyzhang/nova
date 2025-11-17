@@ -20,7 +20,7 @@ Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a
 To install NOVA for users, go to the latest release and download the zip file of the release. Unzip the downloaded zip file and launch NOVA.exe inside the unzipped file. Currently, only the Windows binary is available for download.
 
 # Installing For Developers
-
+Note, Windows is the preferred development environment. This application was developed primarily for Windows.
 ## Windows
 ### WSL
 Developers can use WSL to manage git cloning should they choose to do so.
