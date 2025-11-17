@@ -7,7 +7,7 @@ Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a
 - [Installing For Users](#installing-for-users)
 - [Installing For Developers](#installing-for-developers)
 - [Documentation](#documentation)
-- [Quickstart](#quickstart)
+- [User Quickstart](#quickstart)
 - [Next Phase Features](#next-phase-features)
 - [References](#references)
 
@@ -34,11 +34,13 @@ winget install Ninja-build.Ninja
 ### vcpkg
 NOVA on Windows requires the vcpkg package manager due to the dv-processing dependency. [vcpkg install instructions](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started?pivots=shell-powershell)
 ### Visual Studio
-vcpkg requires an instance of Visual Studio to run correctly (there are cumbersome ways to get it to use Clang that have not been tried). Download the [Visual Studio Installer](https://visualstudio.microsoft.com/downloads/). When installing from Visual Studio Installer, select the Desktop development with C++ Workload with the C++ Clang tools for Windows added. Note, majority of development was done using Visual Studio version 2022. Should the next team run into issues, try switching to Visual Studio version 2022.
+vcpkg requires an instance of Visual Studio to run correctly (there are cumbersome ways to get it to use Clang that have not been tried). Download the [Visual Studio Installer](https://visualstudio.microsoft.com/downloads/). When installing from Visual Studio Installer, select the "Desktop development with C++" Workload with the "C++ Clang tools for Windows" Individual Component added. Note, majority of development was done using Visual Studio version 2022. Should the next team run into issues, try switching to Visual Studio version 2022.
 ### Visual Studio Code
 Download Visual Studio Code. This was found to work the best as a development environment. Install the C/C++, C/C++ Extension Pack, C/C++ Themes, CMake Tools, and WSL extensions. From Visual Studio Code, open the folder containing the git repo for this project. Visual Studio Code should automatically start configuring the build. The preset (release or debug) can be selected from the CMake panel on the left side of the Visual Studio Code window. Building with the debug preset may produces issues with static asserts in DV-Processing, kindly comment out these two lines and build again. Building with the release preset seems to have no such issues. To build, click on the Build button on the bottom left corner of the Visual Studio Code window. To launch the application, the bottom left corner of the Visual Studio Code application offers the play button for regular launching and the debug symbol for launching in debug mode.
 ### Testing
 Ensure the tester.exe build target is built. In the Visual Studio Code terminal, cd into the build directory and type ctest. All tests should passes. Unit tests are conducted for EventData and ParameterStore. Integration tests are conducted for DataAcquisition, EventData, and DataWriter.
+### Releasing
+The release was created by deleting all build artifacts from the build directory and only keeping the NOVA.exe and necessary .dll files. The build directory was zipped and used as the release.
 
 ## Linux
 ### CMake
@@ -73,7 +75,7 @@ cmake --build ./build --parallel
 # Documentation
 The documentation is generated using Doxygen and is hosted at [Github Pages](https://utsawb.github.io/nova/).
 
-# Quickstart
+# User Quickstart
 ## Streaming Data
 <img width="639" height="739" alt="image" src="https://github.com/user-attachments/assets/422fdf89-b26e-42f9-b536-91d52dd8492b" />
 
