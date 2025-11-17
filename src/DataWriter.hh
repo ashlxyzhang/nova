@@ -150,6 +150,7 @@ class DataWriter
 
         /**
          * @brief Adds event data store to queue.
+         * @param evt_store dv::EventStore object containing event data to write.
          */
         void add_event_store(dv::EventStore evt_store)
         {
@@ -159,7 +160,8 @@ class DataWriter
         }
 
         /**
-         * @brief Adds frame data to queue
+         * @brief Adds frame data to queue.
+         * @param frame_data dv::Frame object containing frame data to write.
          */
         void add_frame_data(dv::Frame frame_data)
         {

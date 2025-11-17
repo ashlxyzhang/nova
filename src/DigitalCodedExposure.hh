@@ -10,24 +10,28 @@
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
-#include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/clear_comp.h"
+#include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/process_comp.h"
-
 
 #include <iostream>
 
-struct PassData{
-    glm::vec4 posCol;
-    glm::vec4 neutCol;
-    glm::vec4 negCol;
-    glm::vec4 floatFlags;
-    glm::vec4 flags;
-    glm::vec4 morletParams;
+/**
+ * @brief Flags passed to the compute shaders to determine how DCE is computed.
+ */
+struct PassData
+{
+        glm::vec4 posCol;     // Positive color
+        glm::vec4 neutCol;    // Neutral color
+        glm::vec4 negCol;     // Negative color
+        glm::vec4 floatFlags; // x: color option, y: scale, z: activation function (0 for linear 1 for sigmoid), w: time
+                              // center
+        glm::vec4 flags;      // x: posOnly, y: morlet
+        glm::vec4 morletParams; // x: frequency, y: width (h), z: time center
 };
 
 /**
- * @brief This class is responsible for creating the necessary compute pipelines to create the 
+ * @brief This class is responsible for creating the necessary compute pipelines to create the
  *        digital coded exposure.
  */
 class DigitalCodedExposure
@@ -48,7 +52,6 @@ class DigitalCodedExposure
         SDL_GPUTexture *positive_values_texture = nullptr;
         SDL_GPUTexture *negative_values_texture = nullptr;
 
-
         unsigned int width{};
         unsigned int height{};
 
@@ -58,11 +61,13 @@ class DigitalCodedExposure
          * @param height height of texture.
          * @return SDL_GPUTexture pointer to intermediate texture.
          */
-        SDL_GPUTexture* create_intermediate_texture(unsigned int width, unsigned int height) {
+        SDL_GPUTexture *create_intermediate_texture(unsigned int width, unsigned int height)
+        {
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
                 .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
-                .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE |
+                         SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
                 .width = width,
                 .height = height,
                 .layer_count_or_depth = 1,
@@ -74,7 +79,6 @@ class DigitalCodedExposure
         }
 
     public:
-
         /**
          * @brief Constructor. Initializes compute pipelines.
          * @param parameter_store ParameterStore object containing data from GUI
@@ -106,7 +110,7 @@ class DigitalCodedExposure
                 .sample_count = SDL_GPU_SAMPLECOUNT_1,
             };
             render_targets["DigitalCodedExposure"] = {SDL_CreateGPUTexture(gpu_device, &color_create_info), 1920, 1080};
-            
+
             positive_values_texture = create_intermediate_texture(1920, 1080);
             negative_values_texture = create_intermediate_texture(1920, 1080);
 
@@ -195,12 +199,12 @@ class DigitalCodedExposure
             {
                 event_data.unlock_data_vectors();
                 // Delete old texture
-                if(render_targets["DigitalCodedExposure"].texture)
+                if (render_targets["DigitalCodedExposure"].texture)
                 {
                     SDL_ReleaseGPUTexture(gpu_device, render_targets["DigitalCodedExposure"].texture);
                     render_targets["DigitalCodedExposure"].texture = nullptr;
                 }
-                
+
                 return;
             }
             event_data.unlock_data_vectors();
@@ -236,13 +240,13 @@ class DigitalCodedExposure
 
                 SDL_ReleaseGPUTexture(gpu_device, positive_values_texture);
                 SDL_ReleaseGPUTexture(gpu_device, negative_values_texture);
-    
+
                 positive_values_texture = create_intermediate_texture(width, height);
                 negative_values_texture = create_intermediate_texture(width, height);
                 parameter_store->add("resolution_initialized", false);
             }
         }
-        
+
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
@@ -270,20 +274,20 @@ class DigitalCodedExposure
             SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
 
             // First texture: DigitalCodedExposure
-            texture_buffer_bindings[0].texture   = render_targets["DigitalCodedExposure"].texture;
+            texture_buffer_bindings[0].texture = render_targets["DigitalCodedExposure"].texture;
             texture_buffer_bindings[0].mip_level = 0;
-            texture_buffer_bindings[0].layer     = 0;
-            texture_buffer_bindings[0].cycle     = false;
+            texture_buffer_bindings[0].layer = 0;
+            texture_buffer_bindings[0].cycle = false;
 
-            texture_buffer_bindings[1].texture   = positive_values_texture;
+            texture_buffer_bindings[1].texture = positive_values_texture;
             texture_buffer_bindings[1].mip_level = 0;
-            texture_buffer_bindings[1].layer     = 0;
-            texture_buffer_bindings[1].cycle     = false;
+            texture_buffer_bindings[1].layer = 0;
+            texture_buffer_bindings[1].cycle = false;
 
-            texture_buffer_bindings[2].texture   = negative_values_texture;
+            texture_buffer_bindings[2].texture = negative_values_texture;
             texture_buffer_bindings[2].mip_level = 0;
-            texture_buffer_bindings[2].layer     = 0;
-            texture_buffer_bindings[2].cycle     = false;
+            texture_buffer_bindings[2].layer = 0;
+            texture_buffer_bindings[2].cycle = false;
 
             SDL_GPUComputePass *compute_pass =
                 SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
@@ -292,8 +296,8 @@ class DigitalCodedExposure
             SDL_DispatchGPUCompute(compute_pass, width, height, 1);
 
             SDL_GPUBuffer *points_buffer = scrubber->get_points_buffer();
-            
-            if(!points_buffer) // Points buffer is null due to racing
+
+            if (!points_buffer) // Points buffer is null due to racing
             {
                 SDL_EndGPUComputePass(compute_pass);
                 return;
@@ -322,31 +326,36 @@ class DigitalCodedExposure
             }
             bool combine_color{parameter_store->get<bool>("combine_color")};
 
-            //This is awful, sorry
+            // This is awful, sorry
             glm::vec3 polarity_pos_color;
             glm::vec3 polarity_neut_color;
             glm::vec3 polarity_neg_color;
 
-            if (dce_color < 2){
+            if (dce_color < 2)
+            {
                 if (!parameter_store->exists("polarity_neg_color_dce"))
                 {
-                    parameter_store->add("polarity_neg_color_dce", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
+                    parameter_store->add("polarity_neg_color_dce",
+                                         glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
                 }
                 polarity_neg_color = parameter_store->get<glm::vec3>("polarity_neg_color_dce");
 
                 if (!parameter_store->exists("polarity_pos_color_dce"))
                 {
-                    parameter_store->add("polarity_pos_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                    parameter_store->add("polarity_pos_color_dce",
+                                         glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
                 }
                 polarity_pos_color = parameter_store->get<glm::vec3>("polarity_pos_color_dce");
 
                 if (!parameter_store->exists("polarity_neut_color_dce"))
                 {
-                    parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
+                    parameter_store->add("polarity_neut_color_dce",
+                                         glm::vec3(0.0f, 1.0f, 0.0f)); // Default particle scale
                 }
                 polarity_neut_color = parameter_store->get<glm::vec3>("polarity_neut_color_dce");
             }
-            else{
+            else
+            {
                 if (!parameter_store->exists("polarity_neg_color"))
                 {
                     parameter_store->add("polarity_neg_color", glm::vec3(1.0f, 0.0f, 0.0f)); // Default particle scale
@@ -372,8 +381,8 @@ class DigitalCodedExposure
             }
             float event_contrib_weight{parameter_store->get<float>("event_contrib_weight")};
 
-            //flag building
-            //TODO: use other flags, unSNAFU parameter store
+            // flag building
+            // TODO: use other flags, unSNAFU parameter store
 
             if (!parameter_store->exists("shutter_is_positive_only"))
             {
@@ -386,39 +395,41 @@ class DigitalCodedExposure
                 parameter_store->add("shutter_is_morlet", false);
             }
             bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
-            
+
             if (!parameter_store->exists("scrubber.current_time"))
             {
                 parameter_store->add("scrubber.current_time", 0.0f);
             }
             float current_time{parameter_store->get<float>("scrubber.current_time")};
 
-                        
             if (!parameter_store->exists("scrubber.lower_time"))
             {
                 parameter_store->add("scrubber.lower_time", 0.0f);
             }
             float lower_time{parameter_store->get<float>("scrubber.lower_time")};
 
-            float  time_center = (current_time + lower_time) / 2000.0f;
+            float time_center = (current_time + lower_time) / 2000.0f;
 
             if (!parameter_store->exists("morlet_frequency"))
             {
                 parameter_store->add("morlet_frequency", 0.0f);
             }
             float morlet_frequency{parameter_store->get<float>("morlet_frequency")};
-            
+
             if (!parameter_store->exists("morlet_width"))
             {
                 parameter_store->add("morlet_width", 0.01f);
             }
             float morlet_width{parameter_store->get<float>("morlet_width")};
 
-            glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight, static_cast<float>(activation_function), 0.0f);
-            
-            glm::vec4 flags = glm::vec4((shutter_is_positive_only ? 1.0f : 0.0f), (shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
-            
-            glm::vec4 morletParams = glm::vec4(morlet_frequency, morlet_width, time_center, 0.0f); // frequency, width (h), time center
+            glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight,
+                                             static_cast<float>(activation_function), 0.0f);
+
+            glm::vec4 flags =
+                glm::vec4((shutter_is_positive_only ? 1.0f : 0.0f), (shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
+
+            glm::vec4 morletParams =
+                glm::vec4(morlet_frequency, morlet_width, time_center, 0.0f); // frequency, width (h), time center
 
             PassData pass_data;
             pass_data.posCol = posCol;
