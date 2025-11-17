@@ -6,6 +6,7 @@ Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a
 - [Images](#images)
 - [Installing For Users](#installing-for-users)
 - [Installing For Developers](#installing-for-developers)
+- [Documentation](#documentation)
 - [Quickstart](#quickstart)
 
 # Images
@@ -60,6 +61,8 @@ Where preset-name is one of the presets given in the previous step.
 cmake --build ./build --parallel
 ```
 
+# Documentation
+The documentation is generated using Doxygen and is hosted at [Github Pages](https://github.com/Utsawb/nova/deployments/github-pages).
 
 # Quickstart
 ## Streaming Data
