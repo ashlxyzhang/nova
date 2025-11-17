@@ -62,7 +62,7 @@ cmake --build ./build --parallel
 ```
 
 # Documentation
-The documentation is generated using Doxygen and is hosted at [Github Pages](https://github.com/Utsawb/nova/deployments/github-pages).
+The documentation is generated using Doxygen and is hosted at [Github Pages](https://utsawb.github.io/nova/).
 
 # Quickstart
 ## Streaming Data
