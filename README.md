@@ -53,3 +53,36 @@ Where preset-name is one of the presets given in the previous step.
 ```
 cmake --build ./build --parallel
 ```
+
+
+# Quickstart
+## Streaming Data
+<img width="639" height="739" alt="image" src="https://github.com/user-attachments/assets/422fdf89-b26e-42f9-b536-91d52dd8492b" />
+
+Users can stream data from the Streaming window shown above.
+To stream from the camera, users can click the Scan For Cameras button to populate the Camera dropdown. From the Camera dropdown, users can select the desired, detected camera to stream from. Once the camera is selected, users click the Stream From Camera button to start the streaming.
+
+To stream from a file, users can click the Open File To Stream button to select an aedat4 file to stream from. Streaming from the file will begin as soon as a file is selected.
+
+The Event Discard Odds determines the odds that event data is randomly discarded. This setting is useful when streaming from a camera.
+
+Users can click the Open File To Save Stream To to select/create an aedat4 file to stream data to. Users can select the Save Frames on Next Stream and/or Save Events On Next Stream checkboxes to save frame and/or event data to the save file. Selecting any of the these options will stop streaming. To start saving, start streaming from a file or camera with these save options set.
+
+## 3D Visualizer
+<img width="1061" height="883" alt="image" src="https://github.com/user-attachments/assets/f97fc2b7-9809-4565-b278-95687ee10e35" />
+
+The 3D Visualizer is given above. It is a point particle plot. Each point in the plot represents event data. The colors used to represent event polarity for each particle as well as particle scales can be changed in the Info window. The axis with text is the time axis. The other bottom axis is the x-pixel dimension of the event data. The vertical axis is the y-pixel dimension of the event data. Frame data will be shown should the Show Frame Data checkbox be selected in the Scrubber window and should there be frame data received.
+
+## Digital Coded Exposure
+<img width="1466" height="1083" alt="image" src="https://github.com/user-attachments/assets/9c6c6bf9-ad60-4788-8aae-0482584ffe0d" />
+
+The Digital Coded Exposure attempts to reconstruct frame data out of event data. The controls are given in the Digital Coded Exposure Controls window. There, the user can select the color scheme, enable Morlet shutter contribution calculations, choose the activation function (how each pixel's color is determined from event contributions), etc. It should be noted that due to limitations in Vulkan shaders (specifically, the inability to atomically add floating point numbers), the Morlet shutter will not work for high Current Index (Time) slider values in the Scrubber window. To see Morlet Shutter output, a smaller data file with with high Morlet Frequency and Morlet Width values is recommended.
+
+
+## Scrubbing Data
+<img width="1548" height="355" alt="image" src="https://github.com/user-attachments/assets/b7fbbfec-ec80-4d9d-8525-a56567d2d9a6" />
+
+Users can determine what data is shown in the Digital Coded Exposure and 3D Visualizer windows by using the Scrubber window. The Scrubber Type determines what the controls are based off of (event based or time based). The Mode provides three ways to view data: Paused allows the user to scrub through past data, Playing allows the user to play through data (controlled by the Index (Time) Step) slider, and Latest fixes the Current Index (Time) to the latest received data (very useful when streaming from a camera). The Scrubber Cap puts a cap on the sliders to handle situations where huge amounts of data reduce the precision of the slider controls. The Current Index (Time) determines the last event point being shown in the visualizations. The Index (Time) Window determines the number of events before the Current Index (Time) that are shown in the visualizations. For the Digital Coded Exposure, the Index (Time) Window is basically the shutter length. The Index (Time) Step determines the increment to the Current Index (Time) for each frame should the Playing Mode be selected.
+
+
+
