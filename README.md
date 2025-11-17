@@ -8,6 +8,8 @@ Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a
 - [Installing For Developers](#installing-for-developers)
 - [Documentation](#documentation)
 - [Quickstart](#quickstart)
+- [Next Phase Features](#next-phase-features)
+- [References](#references)
 
 # Images
 ![Image of NOVA with test file](images/NOVAbasic.PNG)
@@ -93,5 +95,16 @@ The Digital Coded Exposure attempts to reconstruct frame data out of event data.
 
 Users can determine what data is shown in the Digital Coded Exposure and 3D Visualizer windows by using the Scrubber window. The Scrubber Type determines what the controls are based off of (event based or time based). The Mode provides three ways to view data: Paused allows the user to scrub through past data, Playing allows the user to play through data (controlled by the Index (Time) Step) slider, and Latest fixes the Current Index (Time) to the latest received data (very useful when streaming from a camera). The Scrubber Cap puts a cap on the sliders to handle situations where huge amounts of data reduce the precision of the slider controls. The Current Index (Time) determines the last event point being shown in the visualizations. The Index (Time) Window determines the number of events before the Current Index (Time) that are shown in the visualizations. For the Digital Coded Exposure, the Index (Time) Window is basically the shutter length. The Index (Time) Step determines the increment to the Current Index (Time) for each frame should the Playing Mode be selected.
 
+# Next Phase Features
+Here are some suggestions for next phase features:
+- PCA support
+- Fixes to Morlet Shutter (either by finding better workarounds for atomic add floating point operations or rearchitecting the whole digital coded exposure functionality)
+- Multi-camera support (multi-stereo)
 
+# References
+- [NOVA Phase 1 team](https://github.com/andrewleachtx/nova) which NOVA Phase 2 is based heavily off of (in terms of project requirements).
+- [SDL3 wiki](https://wiki.libsdl.org/SDL3/FrontPage)
+- [Dear ImGui](https://github.com/ocornut/imgui)
+- [DV-Processing](https://dv-processing.inivation.com/master/index.html)
+- [iniVation docs](https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf)
 
