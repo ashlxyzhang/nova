@@ -75,7 +75,6 @@ class Scrubber
         std::size_t frame_width = 0, frame_height = 0;
 
     public:
-
         /**
          * @brief Constructor. Initializes ParameterStore with necessary variables.
          * @param parameter_store ParameterStore object containing data from GUI
@@ -156,8 +155,6 @@ class Scrubber
                 time_step = 0.0f;
                 time_window = 0.0f;
 
-
-
                 return;
             }
 
@@ -224,7 +221,7 @@ class Scrubber
                 parameter_store.add("scrubber.time_step", time_step);
                 parameter_store.add("scrubber.current_index", current_index);
                 parameter_store.add("scrubber.index_window", current_index - lower_index);
-                //parameter_store.add("scrubber.index_step", static_cast<std::size_t>(time_step));
+                // parameter_store.add("scrubber.index_step", static_cast<std::size_t>(time_step));
             }
 
             if (parameter_store.get<ScrubberType>("scrubber.type") == ScrubberType::EVENT)
@@ -505,7 +502,7 @@ class Scrubber
         }
 
         /**
-         * @brief Returns the points buffer, 
+         * @brief Returns the points buffer,
          *        pointer to buffer in GPU memory containing event data points to be drawn.
          * @return pointer to buffer in GPU memory containing event data points that are inside scrubber window.
          */
@@ -545,7 +542,7 @@ class Scrubber
          * @brief Returns the size of the points buffer,
          *        size of buffer in GPU memory containing event data as points to be drawn.
          * @return number of elements in the points buffer.
-         */ 
+         */
         std::size_t get_points_buffer_size()
         {
             return points_buffer_size / sizeof(glm::vec4);

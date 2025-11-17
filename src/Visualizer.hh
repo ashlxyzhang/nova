@@ -29,7 +29,6 @@
 class Visualizer
 {
     private:
-        
         /**
          * @brief Provides functions for rendering the grid in the visualizer.
          */
@@ -108,7 +107,6 @@ class Visualizer
                 }
 
             public:
-                
                 /**
                  * @brief Constructor. Initializes necessary shaders for drawing grid.
                  * @param parameter_store ParameterStore object containing global data
@@ -226,7 +224,7 @@ class Visualizer
                         SDL_ReleaseGPUGraphicsPipeline(gpu_device, grid_pipeline);
                     }
                 }
-                
+
                 /**
                  * @brief Updates grid visualization on each frame.
                  */
@@ -334,7 +332,6 @@ class Visualizer
                 SDL_GPUGraphicsPipeline *points_pipeline = nullptr;
 
             public:
-
                 /**
                  * @brief Constructor. Initializes necessary shaders for drawing points.
                  * @param parameter_store ParameterStore object containing global data
@@ -528,7 +525,6 @@ class Visualizer
                 std::vector<TTF_Text *> managed_text_objects;
 
             public:
-
                 /**
                  * @brief Constructor. Creates necessary shaders.
                  * @param parameter_store ParameterStore object containing global data
@@ -825,7 +821,6 @@ class Visualizer
                 SDL_GPUSampler *sampler = nullptr;
 
             public:
-
                 /**
                  * @brief Constructor. Initializes necessary shaders.
                  * @param parameter_store ParameterStore object containing program global data
@@ -987,13 +982,12 @@ class Visualizer
         bool cursor_captured = false;
 
     public:
-        
         /**
-         * @brief Constructor. Initializes render target of 3D Visualizer and GridRenderer, PointsRenderer, TextRenderer, and FramesRenderer
-         *        objects.
+         * @brief Constructor. Initializes render target of 3D Visualizer and GridRenderer, PointsRenderer,
+         * TextRenderer, and FramesRenderer objects.
          * @param parameter_store ParameterStore object containing data from GUI
          * @param render_targets Render targets of the program
-         * @param event_data EventData object containing event/frame data 
+         * @param event_data EventData object containing event/frame data
          * @param scrubber Scrubber object with data to compute DCE on
          * @param window SDL_Window to draw on
          * @param gpu_device SDL_GPUDevice to create texture on

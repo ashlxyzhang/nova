@@ -180,7 +180,6 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                         data_acq.get_batch_evt_data(evt_data, param_store, data_writer,
                                                     param_store.get<float>("event_discard_odds"));
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
-
                     }
                 }
                 break;

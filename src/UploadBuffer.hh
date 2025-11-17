@@ -17,7 +17,6 @@ class UploadBuffer
         constexpr static unsigned buffer_size = 1 << 20;
 
     public:
-
         /**
          * @brief Constructor. Initializes GPUTransferBuffer for transferring data to GPU.
          * @param gpu_device SDL_GPUDevice to upload data to.
@@ -68,10 +67,10 @@ class UploadBuffer
             }
         }
 
-        // 
+        //
         /**
          * @brief Uploads texture to GPU.
-         * 
+         *
          * This function will make a lot of assumptions
          * first is that the SDL_GPUTexture is the same resolution as the cv::Mat
          * second is that they have the same number of bits per channel

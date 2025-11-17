@@ -45,7 +45,7 @@ std::thread *g_data_acquisition_thread_ptr = nullptr;
 
 /**
  * @brief This function runs once at startup.
- */ 
+ */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     g_parameter_store = new ParameterStore();
@@ -108,7 +108,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 }
 
 /**
- * @brief This function runs when a new event (mouse input, keypresses, etc) occurs. 
+ * @brief This function runs when a new event (mouse input, keypresses, etc) occurs.
  */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
@@ -127,7 +127,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 }
 
 /**
- * @brief This function runs once per frame, and is the heart of the program. 
+ * @brief This function runs once per frame, and is the heart of the program.
  */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
