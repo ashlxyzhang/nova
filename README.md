@@ -2,6 +2,12 @@
 Neuromorphic Optics and Visualization Application.
 Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a more modular architectural paradigm with streaming support.
 
+# Table of Contents
+- [Images](#images)
+- [Installing For Users](#installing-for-users)
+- [Installing For Developers](#installing-for-developers)
+- [Quickstart](#quickstart)
+
 # Images
 ![Image of NOVA with test file](images/NOVAbasic.PNG)
 ![Image of NOVA with frame data](images/NOVAframes.PNG)
