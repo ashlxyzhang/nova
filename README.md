@@ -1,6 +1,6 @@
 # NOVA PHASE 2
 Neuromorphic Optics and Visualization Application.
-Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a more modular architectural paradigm with streaming support.
+Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a more modular architectural paradigm with streaming support from a file or iniVation Neuromorphic camera.
 
 # Table of Contents
 - [Images](#images)
@@ -22,16 +22,23 @@ To install NOVA for users, go to the latest release and download the zip file of
 # Installing For Developers
 
 ## Windows
+### WSL
+Developers can use WSL to manage git cloning should they choose to do so.
 ### CMake
 NOVA uses CMake as the build system. [CMake install instructions](https://cmake.org/download/)
+### Ninja
+Since vcpkg and NOVA rely on Ninja for the low level build system, install Ninja by typing the following in PowerShell:
+```
+winget install Ninja-build.Ninja
+```
 ### vcpkg
 NOVA on Windows requires the vcpkg package manager due to the dv-processing dependency. [vcpkg install instructions](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started?pivots=shell-powershell)
-### clang
-NOVA uses LLVM's Clang/Clang++ as the compiler. Please install it with the following.
-```
-winget install LLVM -i
-```
-Make sure to select the add to path option.
+### Visual Studio
+vcpkg requires an instance of Visual Studio to run correctly (there are cumbersome ways to get it to use Clang that have not been tried). Download the [Visual Studio Installer](https://visualstudio.microsoft.com/downloads/). When installing from Visual Studio Installer, select the Desk development with C++ Workload with the C++ Clang tools for Windows added. Note, majority of development was done using Visual Studio version 2022. Should the next team run into issues, try switching to Visual Studio version 2022.
+### Visual Studio Code
+Download Visual Studio Code. This was found to work the best as a development environment. Install the C/C++, C/C++ Extension Pack, C/C++ Themes, CMake Tools, and WSL extensions. From Visual Studio Code, open the folder containing the git repo for this project. Visual Studio Code should automatically start configuring the build. The preset (release or debug) can be selected from the CMake panel on the left side of the Visual Studio Code window. Building with the debug preset may produces issues with static asserts in DV-Processing, kindly comment out these two lines and build again. Building with the release preset seems to have no such issues. To build, click on the Build button on the bottom left corner of the Visual Studio Code window. To launch the application, the bottom left corner of the Visual Studio Code application offers the play button for regular launching and the debug symbol for launching in debug mode.
+### Testing
+Ensure the tester.exe build target is built. In the Visual Studio Code terminal, cd into the build directory and type ctest. All tests should passes. Unit tests are conducted for EventData and ParameterStore. Integration tests are conducted for DataAcquisition, EventData, and DataWriter.
 
 ## Linux
 ### CMake
@@ -46,7 +53,7 @@ The clang compiler will need to be installed, the easiest way is to use the one 
 with your distro's package manager.
 
 ## CMake Commands
-
+Note, running these commands in powershell does not seem to work on Windows. Use the Visual Studio Code method mentioned above.
 ### List all presets available for a system
 ```
 cmake --list-presets
