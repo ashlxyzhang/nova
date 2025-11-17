@@ -13,6 +13,8 @@ To install NOVA for users, go to the latest release and download the zip file of
 # Installing For Developers
 
 ## Windows
+### CMake
+NOVA uses CMake as the build system. [CMake install instructions](https://cmake.org/download/)
 ### vcpkg
 NOVA on Windows requires the vcpkg package manager due to the dv-processing dependency. [vcpkg install instructions](https://learn.microsoft.com/en-us/vcpkg/get_started/get-started?pivots=shell-powershell)
 ### clang
@@ -23,6 +25,8 @@ winget install LLVM -i
 Make sure to select the add to path option.
 
 ## Linux
+### CMake
+NOVA uses CMake as the build system. You can probably install it using your distro's package manager. Otherwise: [CMake install instructions](https://cmake.org/download/)
 ### Package manager
 Most of the packages NOVA needs will be pulled automatically through CMake's FetchContent.
 However depending on the system, some internal libraries used by our dependencies may need
