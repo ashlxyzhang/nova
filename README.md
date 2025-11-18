@@ -114,6 +114,8 @@ Here are some suggestions for next phase features:
 - PCA support
 - Fixes to Morlet Shutter (either by finding better workarounds for atomic add floating point operations or rearchitecting the whole digital coded exposure functionality)
 - Multi-camera support (multi-stereo)
+- Per-pixel statistics in 3D Visualizer
+- Handling of IMU data
 
 # References
 - [NOVA Phase 1 team](https://github.com/andrewleachtx/nova) which NOVA Phase 2 is based heavily off of (in terms of project requirements).
