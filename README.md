@@ -126,6 +126,8 @@ Here are some suggestions for next phase features:
   - One interesting application of Neromorphic cameras requires many cameras to be used at once.
   - Although NOVA in its current state does not support multiple cameras, due to its modular nature it should be possible to introduce multi camera support with exsiting subsystems.
   - However one problem we forsee is running out of compute resources due to the sheer amount of data being ingested.
+- Per-pixel statistics in 3D Visualizer
+- Handling of IMU data
 
 # References
 - [NOVA Phase 1 team](https://github.com/andrewleachtx/nova) which NOVA Phase 2 is based heavily off of (in terms of project requirements).
