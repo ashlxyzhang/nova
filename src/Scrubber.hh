@@ -313,16 +313,16 @@ class Scrubber
             // Clamp to the actual size of the vector
             num_points = std::min(num_points, evt_vector.size() - lower_index);
 
-            event_data->unlock_data_vectors();
-
             // If we have no points to upload, skip
             if (num_points == 0)
             {
+                event_data->unlock_data_vectors();
                 return;
             }
 
             if (lower_index >= evt_vector.size() || current_index >= evt_vector.size())
             {
+                event_data->unlock_data_vectors();
                 return;
             }
 
@@ -347,12 +347,17 @@ class Scrubber
             points_buffer = SDL_CreateGPUBuffer(gpu_device, &buffer_create_info);
 
             // Upload data to the new buffer
-            event_data->lock_data_vectors();
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
             upload_buffer->upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
 
+            const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data->get_frame_vector_ref();
+
             // Below is frame texture generation code, skip if user does not want frames
-            if (!parameter_store.get<bool>("scrubber.show_frame_data"))
+            glm::vec2 current_frame_dimensions = event_data->get_camera_frame_resolution();
+
+            // Also sanity check the dimensions of the frame
+            if (!parameter_store.get<bool>("scrubber.show_frame_data") || frame_vector.empty() ||
+                (current_frame_dimensions.x < 1.0f || current_frame_dimensions.y < 1.0f))
             {
                 event_data->unlock_data_vectors();
 
@@ -363,7 +368,6 @@ class Scrubber
             }
 
             // recreate frame if necessary
-            glm::vec2 current_frame_dimensions = event_data->get_camera_frame_resolution();
             if (frame_width != current_frame_dimensions.x || frame_height != current_frame_dimensions.y)
             {
                 if (frames != nullptr)
@@ -389,17 +393,10 @@ class Scrubber
             // and determine which 2 frames should be used for interpolation
             // If there's only one in the window, use that but set the second timestamp to -1
             // If there are no frames in the window, make both -1
-            const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data->get_frame_vector_ref();
-
             // Initialize both timestamps to -1 (invalid)
+
             frame_timestamps[0] = -1.0f;
             frame_timestamps[1] = -1.0f;
-
-            if (frame_vector.empty())
-            {
-                event_data->unlock_data_vectors();
-                return;
-            }
 
             // Since frame_vector is sorted by timestamp, use binary search to find frames
             // that bracket upper_depth (the current time we're interpolating at)
