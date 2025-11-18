@@ -42,6 +42,7 @@ class GUI
         size_t fps_buf_index;
 
         bool check_for_layout_file;
+        bool show_quickstart;
 
         /**
          * @brief Update circular buffer of fps data.
@@ -334,6 +335,11 @@ class GUI
             {
                 reset_layout_with_dockbuilder();
             }
+            if (ImGui::Button("Quickstart Guide"))
+            {
+                show_quickstart = true;
+            }
+            
             ImGui::End();
         }
 
@@ -988,6 +994,110 @@ class GUI
             ImGui::End();
         }
 
+        /**
+         * @brief Markdown render of quickstart guide for users to reference.
+         */
+        void draw_quickstart_window()
+        {
+            if (show_quickstart)
+                ImGui::OpenPopup("Quickstart Guide");
+
+            const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+            ImGui::SetNextWindowPos(
+                viewport->GetCenter(),
+                ImGuiCond_Appearing,
+                ImVec2(0.5f, 0.5f)
+            );
+
+            ImVec2 windowSize = ImVec2(viewport->Size.x * 0.75f, viewport->Size.y * 0.75f);
+            ImGui::SetNextWindowSize(windowSize, ImGuiCond_Appearing);
+
+            if (ImGui::BeginPopupModal(
+                    "Quickstart Guide",
+                    &show_quickstart))
+            {
+                ImGui::BeginChild("QSContent", ImVec2(0, -50), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "You can view this popup again by clicking the 'Quickstart Guide' button in the debug window.");
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Windows can be moved and resized, you can reset the layout to the default by clicking the 'Reset Layout' button in the debug window.");
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "Sliders can be ctrl+clicked to enter a value directly.");
+                ImGui::Separator();
+
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Streaming Data");
+                ImGui::Separator();
+                ImGui::TextWrapped(
+                    "Users can stream data from the Streaming window (located in the top right by default). "
+                    "To stream from the camera, users can click the 'Scan For Cameras' button to populate the Camera dropdown. " 
+                    "From the Camera dropdown, users can select the desired, detected camera to stream from. "
+                    "Once the camera is selected, users click the 'Stream From Camera' button to start the streaming. "
+                    "To stream from a file, users can click the 'Open File To Stream' button to select an aedat4 file to stream from. "
+                    "Streaming from the file will begin as soon as a file is selected. "
+                    "The Event Discard Odds determines the odds that event data is randomly discarded, this setting is useful when streaming from a camera. "
+                    "Users can click the 'Open File To Save Stream To' to select/create an aedat4 file to stream data to. "
+                    "Users can select the 'Save Frames on Next Stream' and/or 'Save Events On Next Stream' checkboxes to save frame and/or event data to the save file. "
+                    "Selecting any of the these options will stop streaming. "
+                    "To start saving, start streaming from a file or camera with these save options set. "
+                );
+                ImGui::Spacing();
+
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "3D Visualizer");
+                ImGui::Separator();
+                ImGui::TextWrapped(
+                    "The 3D Visualizer is a point particle plot. "
+                    "Each point in the plot represents event data. "
+                    "The colors used to represent event polarity for each particle as well as particle scales can be changed in the Info window. "
+                    "The axis with text is the time axis. "
+                    "The other bottom axis is the x-pixel dimension of the event data. "
+                    "The vertical axis is the y-pixel dimension of the event data. "
+                    "Frame data will be shown should the 'Show Frame Data' checkbox be selected in the Scrubber window and should there be frame data received. "
+                );
+                ImGui::Spacing();
+
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Digital Coded Exposure");
+                ImGui::Separator();
+                ImGui::TextWrapped(
+                    "The Digital Coded Exposure attempts to reconstruct frame data out of event data. "
+                    "The controls are given in the Digital Coded Exposure Controls window. "
+                    "There, the user can select the color scheme, "
+                    "enable Morlet shutter contribution calculations, "
+                    "choose the activation function (how each pixel's color is determined from event contributions), etc. "
+                    "It should be noted that due to limitations in Vulkan shaders (specifically, the inability to atomically add floating point numbers), "
+                    "the Morlet shutter will not work for high Current Index (Time) slider values in the Scrubber window. "
+                    "To see Morlet Shutter output, a smaller data file with with high Morlet Frequency and Morlet Width values is recommended. "
+                );
+                ImGui::Spacing();
+
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Scrubbing Data");
+                ImGui::Separator();
+                ImGui::TextWrapped(
+                    "Users can determine what data is shown in the Digital Coded Exposure and 3D Visualizer windows by using the Scrubber window. "
+                    "The 'Scrubber Type' dropdown determines what the controls are based off of (event based or time based). "
+                    "The 'Mode' dropdown provides three ways to view data: "
+                    "'Paused' allows the user to scrub through past data, "
+                    "'Playing' allows the user to play through data (controlled by the Index (Time) Step) slider, "
+                    "Latest' fixes the Current Index (Time) to the latest received data (very useful when streaming from a camera). "
+                    "The 'Scrubber Cap' dropdown puts a cap on the sliders by default to increase the precision of the slider controls."
+                    "The Current Index (Time) determines the last event point being shown in the visualizations. "
+                    "The Index (Time) Window determines the number of events before the Current Index (Time) that are shown in the visualizations. "
+                    "For the Digital Coded Exposure, the Index (Time) Window is basically the shutter length. "
+                    "The Index (Time) Step determines the increment to the Current Index (Time) for each frame should the Playing Mode be selected. "
+                );
+
+                ImGui::EndChild();
+
+                ImGui::Separator();
+
+                if (ImGui::Button("Got it!"))
+                {
+                    ImGui::CloseCurrentPopup();
+                    show_quickstart = false;
+                }
+
+                ImGui::EndPopup();
+            }
+        }
+
     public:
         /**
          * @brief Represents time units used by NOVA.
@@ -1045,6 +1155,7 @@ class GUI
             io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
 
             check_for_layout_file = true;
+            show_quickstart = false;
 
             // Setup scaling
             float scaling_factor = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -1106,8 +1217,8 @@ class GUI
             {
                 if (!std::filesystem::exists("imgui.ini"))
                 {
-                    // std::cout << "No imgui.ini found, setting default layout." << std::endl;
                     reset_layout_with_dockbuilder();
+                    show_quickstart = true;
                 }
                 check_for_layout_file = false;
             }
@@ -1124,6 +1235,9 @@ class GUI
             draw_stream_window();
             draw_scrubber_window();
             draw_visualizer();
+
+            // Show quickstart popup (if enabled)
+            draw_quickstart_window();
 
             // Rendering
             ImGui::Render();
