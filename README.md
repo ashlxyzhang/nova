@@ -21,6 +21,11 @@ To install NOVA for users, go to the latest release and download the zip file of
 
 # Installing For Developers
 Note, Windows is the preferred development environment. This application was developed primarily for Windows.
+
+## Vulkan
+NOVA uses the Vulkan backend for SDL3 for our Visualizer and GPGPU tasks. Please install the [VulkanSDK](https://vulkan.lunarg.com/sdk/home) to ensure you have
+all the tools needed to effectivly develop for NOVA.
+
 ## Windows
 ### WSL
 Developers can use WSL to manage git cloning should they choose to do so.
