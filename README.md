@@ -8,7 +8,7 @@ Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a
 - [Installing For Developers](#installing-for-developers)
 - [Documentation](#documentation)
 - [User Quickstart](#user-quickstart)
-- [Next Phase Features](#next-phase-features)
+- [Roadmap (Possible Future Work)](#roadmap-possible-future-work)
 - [References](#references)
 
 # Images
@@ -96,7 +96,7 @@ Users can click the Open File To Save Stream To to select/create an aedat4 file 
 ## 3D Visualizer
 <img width="1061" height="883" alt="image" src="https://github.com/user-attachments/assets/f97fc2b7-9809-4565-b278-95687ee10e35" />
 
-The 3D Visualizer is given above. It is a point particle plot. Each point in the plot represents event data. The colors used to represent event polarity for each particle as well as particle scales can be changed in the Info window. The axis with text is the time axis. The other bottom axis is the x-pixel dimension of the event data. The vertical axis is the y-pixel dimension of the event data. Frame data will be shown should the Show Frame Data checkbox be selected in the Scrubber window and should there be frame data received.
+The 3D Visualizer is given above. It is a point particle plot. Each point in the plot represents event data. The colors used to represent event polarity for each particle as well as particle scales can be changed in the Info window. The axis with text is the time axis. The other bottom axis is the x-pixel dimension of the event data. The vertical axis is the y-pixel dimension of the event data. Frame data will be shown should the Show Frame Data checkbox be selected in the Scrubber window and should there be frame data received. Should the user's mouse get stuck in the 3D Visualizer, double-click to get the mouse unstuck.
 
 ## Digital Coded Exposure
 <img width="1466" height="1083" alt="image" src="https://github.com/user-attachments/assets/9c6c6bf9-ad60-4788-8aae-0482584ffe0d" />
