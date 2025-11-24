@@ -117,6 +117,27 @@ TEST(DataAcquisition, reading)
 
     param_store.add("pop_up_err_str", "");
 
+    // Ensure non-existent file case is handled
+    ASSERT_EQ(data_acq.init_file_reader("non-existent-file.aedat4", param_store), false)
+        << "Non-existent file successfully initialized";
+    ASSERT_EQ(param_store.get<std::string>("pop_up_err_str"),
+              "Something went wrong while initializing file for reading!")
+        << "Wrong error message for non-existent file";
+    ASSERT_EQ(data_acq.get_batch_evt_data(evt_data, param_store, data_writer, 1.0f) ||
+                  data_acq.get_batch_frame_data(evt_data, param_store, data_writer),
+              false)
+        << "Somehow read data from non-existent file";
+
+    // Ensure non-aedat file case is handled
+    ASSERT_EQ(data_acq.init_file_reader("../testing/unit_tests.cc", param_store), false)
+        << "Non-aedat4 file successfully initialized";
+    ASSERT_EQ(param_store.get<std::string>("pop_up_err_str"), "File extension is not .aedat4!")
+        << "Wrong error message for non-aedat4 file";
+    ASSERT_EQ(data_acq.get_batch_evt_data(evt_data, param_store, data_writer, 1.0f) ||
+                  data_acq.get_batch_frame_data(evt_data, param_store, data_writer),
+              false)
+        << "Somehow read data from non-aedat4 file";
+
     ASSERT_EQ(data_acq.init_file_reader("../testing/test_data.aedat4", param_store), true)
         << "Failed to initialize file for reading: " << param_store.get<std::string>("pop_up_err_str");
 

@@ -224,12 +224,15 @@ TEST(EventData, get_earliest_evt_timestamp)
 TEST(EventData, get_event_index_from_timestamp)
 {
     EventData test_ed{};
+
+    // test on empty data
+    int64_t empty_index = test_ed.get_event_index_from_relative_timestamp(0);
+    EXPECT_EQ(empty_index, -1) << "Expected -1 for no existing event data.";
+
     EventData::EventDatum evt_datum1{.x = 0, .y = 0, .timestamp = 0, .polarity = 0};
     test_ed.write_evt_data(evt_datum1);
 
     {
-        test_ed.lock_data_vectors();
-
         int64_t bad_index1 = test_ed.get_event_index_from_relative_timestamp(2);
         EXPECT_EQ(bad_index1, -1) << "Expected -1 for non-existent timestamp.";
 
@@ -238,8 +241,6 @@ TEST(EventData, get_event_index_from_timestamp)
 
         int64_t good_index1 = test_ed.get_event_index_from_relative_timestamp(0);
         EXPECT_EQ(good_index1, 0) << "Expected 0 for existing timestamp.";
-
-        test_ed.unlock_data_vectors();
     }
 
     EventData::EventDatum evt_datum2{.x = 0, .y = 0, .timestamp = 123, .polarity = 0};
@@ -249,8 +250,6 @@ TEST(EventData, get_event_index_from_timestamp)
     test_ed.write_evt_data(evt_datum3);
 
     {
-        test_ed.lock_data_vectors();
-
         int64_t good_index1 = test_ed.get_event_index_from_relative_timestamp(0);
         EXPECT_EQ(good_index1, 0) << "Expected 0 for existing timestamp.";
 
@@ -266,8 +265,6 @@ TEST(EventData, get_event_index_from_timestamp)
         int64_t bad_index1 = test_ed.get_event_index_from_relative_timestamp(10000);
         EXPECT_EQ(bad_index1, -1)
             << "Expected -1 for non-existent timestamp (no timestamp greater than or equal to provided exist).";
-
-        test_ed.unlock_data_vectors();
     }
 }
 
