@@ -1,4 +1,4 @@
-# Nova PHASE 3
+# NOVA PHASE 3
 Team Members: Jack Lewicki, Ryan O’Mullan, Ashley Zhang, Cole Greinke, and Neil Kodali
 
 NOVA is a visualization platform with support for 2D and 3D visualization of data from neuromorphic cameras.
