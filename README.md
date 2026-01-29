@@ -1,3 +1,11 @@
+# Nova PHASE 3
+Team Members: Jack Lewicki, Ryan O’Mullan, Ashley Zhang, Cole Greinke, and Neil Kodali
+
+NOVA is a visualization platform with support for 2D and 3D visualization of data from neuromorphic cameras.
+
+The main goals for our project as aligned with our Los Alamos stakeholders are to extend the existing NOVA software to support both Prophesee and Inivation neuromorphic cameras, stereo imaging from multiple cameras, and develop a NOVA API. Our work is constrained by a time limit of 12 weeks, a five person team, access to materials such as cameras, and platform limits as we must build on top of existing infrastructure.
+
+<!--
 # NOVA PHASE 2
 Neuromorphic Optics and Visualization Application.
 Welcome to phase 2 of NOVA. This phase includes a rewrite of NOVA that follows a more modular architectural paradigm with streaming support from a file or iniVation Neuromorphic camera.
@@ -140,4 +148,4 @@ Here are some suggestions for next phase features:
 - [DV-Processing](https://dv-processing.inivation.com/master/index.html)
 - [iniVation docs](https://docs.inivation.com/_static/inivation-docs_2025-08-05.pdf)
 - [Test data used for development and testing](https://nusneuromorphic.github.io/dataset/)
-
+-->
