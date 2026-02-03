@@ -9,6 +9,8 @@ project(NOVA LANGUAGES C CXX)
 file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.hh")
 
+find_package(Vulkan REQUIRED)
+
 # Use FetchContent on Linux, and find_package (vcpkg) on Windows/Other
 include(FetchContent)
 
@@ -88,6 +90,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Eigen3::Eigen
     dv::processing
     Boost::iostreams
+    Vulkan::Vulkan
 )
 
 # For CTEST functionality with GTEST
