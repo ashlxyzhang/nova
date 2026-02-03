@@ -77,6 +77,10 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
 
+if(APPLE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
@@ -95,6 +99,9 @@ enable_testing()
 file(GLOB_RECURSE TEST_SOURCES "testing/*.cc")
 add_executable(tester ${TEST_SOURCES} ${HEADERS})
 target_include_directories(tester PRIVATE "resources/")
+if(APPLE)
+    target_compile_definitions(tester PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+endif()
 target_link_libraries(tester PRIVATE
     GTest::gtest_main
     SDL3::SDL3
