@@ -1,9 +1,46 @@
-# NOVA PHASE 3
-Team Members: Jack Lewicki, Ryan O’Mullan, Ashley Zhang, Cole Greinke, and Neil Kodali
+# NOVA - Neuromorphic Optics and Visualization Application
+
+![C++23](https://img.shields.io/badge/C%2B%2B-23-blue?style=flat&logo=cplusplus)
+![Windows](https://img.shields.io/badge/Windows-supported-brightgreen?style=flat&logo=windows)
+![Linux](https://img.shields.io/badge/Linux-supported-brightgreen?style=flat&logo=linux)
+![macOS](https://img.shields.io/badge/macOS-supported-brightgreen?style=flat&logo=apple)
 
 NOVA is a visualization platform with support for 2D and 3D visualization of data from neuromorphic cameras.
 
-The main goals for our project as aligned with our Los Alamos stakeholders are to extend the existing NOVA software to support both Prophesee and Inivation neuromorphic cameras, stereo imaging from multiple cameras, and develop a NOVA API. Our work is constrained by a time limit of 12 weeks, a five person team, access to materials such as cameras, and platform limits as we must build on top of existing infrastructure.
+## Phase 3 Team
+
+Jack Lewicki, Ryan O'Mullan, Ashley Zhang, Cole Greinke, and Neil Kodali
+
+## Building from Source
+
+### Prerequisites
+
+- **CMake** 3.24 or higher
+- **Ninja** build system
+- **Clang** compiler with C++23 support
+- **Vulkan SDK** - [Download here](https://vulkan.lunarg.com/sdk/home)
+
+### Build Steps
+
+1. Clone the repository with submodules:
+   ```
+   git clone --recursive https://github.com/ashlxyzhang/nova.git
+   cd nova
+   ```
+
+2. Bootstrap vcpkg:
+   ```
+   ./vcpkg/bootstrap-vcpkg.sh   # Linux/macOS
+   ./vcpkg/bootstrap-vcpkg.bat  # Windows
+   ```
+
+3. Configure and build:
+   ```
+   cmake --preset release
+   cmake --build ./build --parallel
+   ```
+
+   Available presets: `debug`, `release`
 
 <!--
 # NOVA PHASE 2
