@@ -132,11 +132,11 @@ class Scrubber
                 event_data->unlock_data_vectors();
 
                 // No event data? Scrubber has nothing to scrub.
-                parameter_store.add("scrubber.current_index", 0ULL);
-                parameter_store.add("scrubber.index_window", 0ULL);
-                parameter_store.add("scrubber.index_step", 0ULL);
-                parameter_store.add("scrubber.min_index", 0ULL);
-                parameter_store.add("scrubber.max_index", 0ULL);
+                parameter_store.add("scrubber.current_index", static_cast<std::size_t>(0));
+                parameter_store.add("scrubber.index_window", static_cast<std::size_t>(0));
+                parameter_store.add("scrubber.index_step", static_cast<std::size_t>(0));
+                parameter_store.add("scrubber.min_index", static_cast<std::size_t>(0));
+                parameter_store.add("scrubber.max_index", static_cast<std::size_t>(0));
 
                 parameter_store.add("scrubber.current_time", 0.0f);
                 parameter_store.add("scrubber.time_window", 0.0f);
