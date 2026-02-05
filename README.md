@@ -20,12 +20,24 @@ Jack Lewicki, Ryan O'Mullan, Ashley Zhang, Cole Greinke, and Neil Kodali
 - **Clang** compiler with C++23 support
 - **Vulkan SDK** - [Download here](https://vulkan.lunarg.com/sdk/home)
 
+### macOS
+
+Install pkg-config (required by dv-processing):
+```
+brew install pkg-config
+```
+
 ### Build Steps
 
 1. Clone the repository with submodules:
    ```
    git clone --recursive https://github.com/ashlxyzhang/nova.git
    cd nova
+   ```
+
+   If you already cloned without `--recursive`, initialize submodules with:
+   ```
+   git submodule update --init --recursive
    ```
 
 2. Bootstrap vcpkg:
