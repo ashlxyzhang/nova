@@ -57,6 +57,8 @@ else()
     find_package(Eigen3 REQUIRED)
     find_package(dv-processing REQUIRED)
     find_package(Boost COMPONENTS iostreams REQUIRED)
+    find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
+    find_package(MetavisionHAL REQUIRED)
 
 endif()
 
@@ -91,6 +93,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     dv::processing
     Boost::iostreams
     Vulkan::Vulkan
+    MetavisionSDK::core
+    MetavisionSDK::stream
+    Metavision::HAL
 )
 
 # For CTEST functionality with GTEST
@@ -116,5 +121,5 @@ target_link_libraries(tester PRIVATE
 )
 
 include(GoogleTest)
-gtest_discover_tests(tester)  
+gtest_discover_tests(tester)
   

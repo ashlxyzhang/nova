@@ -1,0 +1,16 @@
+diff --git a/cmake/Modules/FindLibUSB.cmake b/cmake/Modules/FindLibUSB.cmake
+index 0cc3fb3..0bd42ff 100644
+--- a/cmake/Modules/FindLibUSB.cmake
++++ b/cmake/Modules/FindLibUSB.cmake
+@@ -63,6 +63,11 @@ if (LIBUSB_FOUND AND NOT TARGET libusb-1.0)
+     set_target_properties(libusb-1.0 PROPERTIES 
+                             IMPORTED_LOCATION ${LIBUSB_LIBRARY}
+                             INTERFACE_INCLUDE_DIRECTORIES ${LIBUSB_INCLUDE_DIR})
++    if(APPLE)
++        set_target_properties(libusb-1.0 PROPERTIES
++            INTERFACE_LINK_LIBRARIES "-framework CoreFoundation;-framework IOKit;-framework Security"
++        )
++    endif()
+ endif (LIBUSB_FOUND AND NOT TARGET libusb-1.0)
+ 
+ mark_as_advanced(

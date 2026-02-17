@@ -1,0 +1,46 @@
+{
+  "name": "openeb",
+  "version": "5.2.0",
+  "description": "Open source event-based vision library by Prophesee (Metavision SDK/HAL).",
+  "homepage": "https://github.com/prophesee-ai/openeb",
+  "license": "Apache-2.0",
+  "dependencies": [
+    "boost-program-options",
+    "boost-timer",
+    "boost-chrono",
+    "boost-thread",
+    "boost-any",
+    "boost-spirit",
+    "boost-filesystem",
+    "libusb",
+    "glew",
+    "glfw3",
+    {
+      "name": "opencv4",
+      "features": [
+        "calib3d"
+      ]
+    },
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ],
+  "features": {
+    "hdf5": {
+      "description": "Enable HDF5 support for event file I/O",
+      "dependencies": [
+        {
+          "name": "hdf5",
+          "features": [
+            "cpp"
+          ]
+        }
+      ]
+    }
+  }
+}
