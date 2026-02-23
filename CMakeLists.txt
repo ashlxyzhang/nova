@@ -6,6 +6,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(NOVA LANGUAGES C CXX)
 
+option(NOVA_USE_OPENEB "Enable Prophesee OpenEB/Metavision camera support" OFF)
+
 file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.hh")
 
@@ -57,8 +59,11 @@ else()
     find_package(Eigen3 REQUIRED)
     find_package(dv-processing REQUIRED)
     find_package(Boost COMPONENTS iostreams REQUIRED)
-    find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
-    find_package(MetavisionHAL REQUIRED)
+
+    if(NOVA_USE_OPENEB)
+        find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
+        find_package(MetavisionHAL REQUIRED)
+    endif()
 
 endif()
 
@@ -122,6 +127,10 @@ if(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
 endif()
 
+if(NOVA_USE_OPENEB)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NOVA_HAS_OPENEB)
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
@@ -130,10 +139,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     dv::processing
     Boost::iostreams
     Vulkan::Vulkan
-    MetavisionSDK::core
-    MetavisionSDK::stream
-    Metavision::HAL
 )
+
+if(NOVA_USE_OPENEB)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        MetavisionSDK::core
+        MetavisionSDK::stream
+        Metavision::HAL
+    )
+endif()
 
 # For CTEST functionality with GTEST
 set(GTEST_DIR "${CMAKE_SOURCE_DIR}/external/googletest")
