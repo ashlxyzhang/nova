@@ -62,6 +62,42 @@ else()
 
 endif()
 
+# --- Shader compilation ---
+find_program(GLSLANG glslang REQUIRED)
+
+set(SHADER_DIR "${CMAKE_SOURCE_DIR}/resources/shaders")
+set(COMPILED_SHADER_HEADERS "")
+
+function(compile_shader SRC VAR)
+    get_filename_component(DIR "${SRC}" DIRECTORY)
+    set(HDR "${DIR}/${VAR}.h")
+    add_custom_command(
+        OUTPUT  "${HDR}"
+        COMMAND "${GLSLANG}" --target-env vulkan1.0 --vn "${VAR}" -o "${HDR}" "${SRC}"
+        DEPENDS "${SRC}"
+        COMMENT "Compiling ${SRC}"
+        VERBATIM
+    )
+    set(COMPILED_SHADER_HEADERS "${COMPILED_SHADER_HEADERS};${HDR}" PARENT_SCOPE)
+endfunction()
+
+compile_shader("${SHADER_DIR}/digital_coded_exposure/clear.comp"   clear_comp)
+compile_shader("${SHADER_DIR}/digital_coded_exposure/dce.comp"     dce_comp)
+compile_shader("${SHADER_DIR}/digital_coded_exposure/process.comp" process_comp)
+compile_shader("${SHADER_DIR}/spinning_cube/spinning_cube.frag"    spinning_cube_frag)
+compile_shader("${SHADER_DIR}/spinning_cube/spinning_cube.vert"    spinning_cube_vert)
+compile_shader("${SHADER_DIR}/visualizer/frames/frames.frag"       frames_frag)
+compile_shader("${SHADER_DIR}/visualizer/frames/frames.vert"       frames_vert)
+compile_shader("${SHADER_DIR}/visualizer/grid/grid.frag"           grid_frag)
+compile_shader("${SHADER_DIR}/visualizer/grid/grid.vert"           grid_vert)
+compile_shader("${SHADER_DIR}/visualizer/points/points.frag"       points_frag)
+compile_shader("${SHADER_DIR}/visualizer/points/points.vert"       points_vert)
+compile_shader("${SHADER_DIR}/visualizer/text/text.frag"           text_frag)
+compile_shader("${SHADER_DIR}/visualizer/text/text.vert"           text_vert)
+
+add_custom_target(shaders DEPENDS ${COMPILED_SHADER_HEADERS})
+# ---
+
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 file(GLOB IMGUI_CORE_SOURCES
     "${IMGUI_DIR}/imgui.cpp"
@@ -76,7 +112,8 @@ file(GLOB IMGUI_BACKENDS
 )
 list(APPEND SOURCES ${IMGUI_CORE_SOURCES} ${IMGUI_BACKENDS})
 
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${COMPILED_SHADER_HEADERS})
+add_dependencies(${CMAKE_PROJECT_NAME} shaders)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
