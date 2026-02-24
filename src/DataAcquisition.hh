@@ -122,9 +122,10 @@ class DataAcquisition
                 data_reader_ptr = std::make_unique<DVEventReader>(
                     dv::io::camera::open(scanned_cameras[camera_index]));
             }
-            catch (...)
+            catch (const std::exception &e)
             {
-                std::string pop_up_err_str{"Something went wrong with the camera for reading!"};
+                std::string pop_up_err_str{"Camera reader error: "};
+                pop_up_err_str += e.what();
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
@@ -182,9 +183,10 @@ class DataAcquisition
                     data_reader_ptr = std::make_unique<DVEventReader>(
                         std::make_unique<dv::io::MonoCameraRecording>(file_name));
                 }
-                catch (...)
+                catch (const std::exception &e)
                 {
-                    std::string pop_up_err_str{"Something went wrong while initializing file for reading!"};
+                    std::string pop_up_err_str{"aedat4 reader error: "};
+                    pop_up_err_str += e.what();
                     param_store.add("pop_up_err_str", pop_up_err_str);
                     acq_lock_ul.unlock();
                     return false;
@@ -196,10 +198,10 @@ class DataAcquisition
                 {
                     data_reader_ptr = std::make_unique<MetavisionEventReader>(file_name);
                 }
-                catch (...)
+                catch (const std::exception &e)
                 {
-                    std::string pop_up_err_str{
-                        "Something went wrong while initializing Metavision file for reading!"};
+                    std::string pop_up_err_str{"Metavision reader error: "};
+                    pop_up_err_str += e.what();
                     param_store.add("pop_up_err_str", pop_up_err_str);
                     acq_lock_ul.unlock();
                     return false;
@@ -307,9 +309,10 @@ class DataAcquisition
                     }
                 }
             }
-            catch (...)
+            catch (const std::exception &e)
             {
-                std::string pop_up_err_str{"Something went wrong with reading event data!"};
+                std::string pop_up_err_str{"Event read error: "};
+                pop_up_err_str += e.what();
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
@@ -358,9 +361,10 @@ class DataAcquisition
                     }
                 }
             }
-            catch (...)
+            catch (const std::exception &e)
             {
-                std::string pop_up_err_str{"Something went wrong with reading frame data!"};
+                std::string pop_up_err_str{"Frame read error: "};
+                pop_up_err_str += e.what();
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
