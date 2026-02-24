@@ -29,21 +29,17 @@ brew install pkg-config
 
 ### Build Steps
 
-1. Clone the repository with submodules:
+1. Clone the repository:
    ```
-   git clone --recursive https://github.com/ashlxyzhang/nova.git
+   git clone https://github.com/ashlxyzhang/nova.git
    cd nova
    ```
 
-   If you already cloned without `--recursive`, initialize submodules with:
+2. Clone and bootstrap vcpkg into the `vcpkg/` directory:
    ```
-   git submodule update --init --recursive
-   ```
-
-2. Bootstrap vcpkg:
-   ```
-   ./vcpkg/bootstrap-vcpkg.sh   # Linux/macOS
-   ./vcpkg/bootstrap-vcpkg.bat  # Windows
+   git clone https://github.com/microsoft/vcpkg.git vcpkg
+   ./vcpkg/bootstrap-vcpkg.sh    # Linux/macOS
+   .\vcpkg\bootstrap-vcpkg.bat   # Windows
    ```
 
 3. Configure and build:
