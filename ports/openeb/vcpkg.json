@@ -15,6 +15,11 @@
     "libusb",
     "glew",
     "glfw3",
+    "protobuf",
+    {
+      "name": "dirent",
+      "platform": "windows"
+    },
     {
       "name": "opencv4",
       "features": [
