@@ -2,18 +2,25 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
+#include "DVEventReader.hh"
 #include "DataWriter.hh"
 #include "EventData.hh"
+#include "IEventReader.hh"
 #include "ParameterStore.hh"
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
-#include <dv-processing/io/mono_camera_recording.hpp>
+#include <opencv2/imgproc.hpp>
 #include <vector>
+
+#include "MetavisionEventReader.hh"
 
 /**
  * @brief This class provides functions for getting event/frame data
- *        from an aedat4 file or an event imager.
+ *        from an event camera file or a live event imager.
  *
+ * File format routing:
+ *   .aedat4          -> DVEventReader  (dv-processing)
+ *   .raw / .dat      -> MetavisionEventReader  (OpenEB)
  */
 class DataAcquisition
 {
@@ -22,9 +29,8 @@ class DataAcquisition
         // For storing currently detected cameras
         std::vector<dv::io::camera::USBDevice::DeviceDescriptor> scanned_cameras;
 
-        // Super class data reader object provided by DV-Processing library.
-        // Can get camera and file data.
-        std::unique_ptr<dv::io::InputBase> data_reader_ptr;
+        // Backend-agnostic event reader; created by init_file_reader / init_camera_reader
+        std::unique_ptr<IEventReader> data_reader_ptr;
 
         int32_t camera_event_width;
         int32_t camera_event_height;
@@ -34,21 +40,12 @@ class DataAcquisition
 
         std::mutex acq_lock; // For thread safety
 
-        /**
-         * @brief From old NOVA source code
-         *        to get random float from 0.0 to 1.0
-         * @return random float from 0.0 to 1.0
-         */
-
         float randFloat()
         {
             return static_cast<float>(rand()) / RAND_MAX;
         };
 
     public:
-        /**
-         * @brief Constructor, zero initializes all variables
-         */
         DataAcquisition()
             : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
               camera_frame_height{}, acq_lock{}
@@ -85,11 +82,7 @@ class DataAcquisition
         void discover_cameras(ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            // Remove previously scanned cameras
             scanned_cameras.clear();
-
-            // Discover available cameras
-            // https://dv-processing.inivation.com/master/reading_data.html
 
             const auto discovered_cameras{dv::io::camera::discover()};
 
@@ -99,7 +92,6 @@ class DataAcquisition
             {
                 std::stringstream str_stream{};
                 scanned_cameras.push_back(camera);
-                // To ensure string conversion works
                 str_stream << "Model: " << camera.cameraModel << " ";
                 str_stream << "Serial Number: " << camera.serialNumber << "\0";
                 cameras_vec.push_back(str_stream.str());
@@ -112,14 +104,13 @@ class DataAcquisition
         /**
          * @brief Loads camera to read. Initializes internal reader with camera.
          * @param camera_index Index of camera in scanned_cameras vector to stream from.
-         * @param param_store param_store ParameterStore necessary for storing error messages in cases of failure.
+         * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
          */
         bool init_camera_reader(int32_t camera_index, ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
 
-            // Sanity check
             if (scanned_cameras.empty() || camera_index < 0 || camera_index >= scanned_cameras.size())
             {
                 acq_lock_ul.unlock();
@@ -128,8 +119,8 @@ class DataAcquisition
 
             try
             {
-                data_reader_ptr = std::move(
-                    dv::io::camera::open(scanned_cameras[camera_index])); // Specify move semantics for unique pointer
+                data_reader_ptr = std::make_unique<DVEventReader>(
+                    dv::io::camera::open(scanned_cameras[camera_index]));
             }
             catch (...)
             {
@@ -144,8 +135,8 @@ class DataAcquisition
                 auto evt_resolution = data_reader_ptr->getEventResolution();
                 if (evt_resolution.has_value())
                 {
-                    camera_event_width = evt_resolution.value().width;
-                    camera_event_height = evt_resolution.value().height;
+                    camera_event_width  = evt_resolution->width;
+                    camera_event_height = evt_resolution->height;
                 }
             }
             if (data_reader_ptr->isFrameStreamAvailable())
@@ -153,8 +144,8 @@ class DataAcquisition
                 auto frame_resolution = data_reader_ptr->getFrameResolution();
                 if (frame_resolution.has_value())
                 {
-                    camera_frame_width = frame_resolution.value().width;
-                    camera_frame_height = frame_resolution.value().height;
+                    camera_frame_width  = frame_resolution->width;
+                    camera_frame_height = frame_resolution->height;
                 }
             }
             acq_lock_ul.unlock();
@@ -162,7 +153,9 @@ class DataAcquisition
         }
 
         /**
-         * @brief Loads file to read. Initializes internal reader with filename.
+         * @brief Loads file to read. Initializes internal reader based on file extension:
+         *          .aedat4        -> dv-processing backend
+         *          .raw / .dat    -> OpenEB/Metavision backend
          * @param file_name the name of the data file to read.
          * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
@@ -170,35 +163,63 @@ class DataAcquisition
         bool init_file_reader(std::string file_name, ParameterStore &param_store)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            // FROM OLD NOVA source code
-            // Verify provided file is aedat4
+
             size_t extension_pos = file_name.find_last_of('.');
-            if (extension_pos == std::string::npos || file_name.substr(extension_pos) != ".aedat4")
+            if (extension_pos == std::string::npos)
             {
-                std::string pop_up_err_str{"File extension is not .aedat4!"};
+                std::string pop_up_err_str{"File has no extension!"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
             }
 
-            try
+            std::string ext = file_name.substr(extension_pos);
+
+            if (ext == ".aedat4")
             {
-                data_reader_ptr = std::make_unique<dv::io::MonoCameraRecording>(file_name);
+                try
+                {
+                    data_reader_ptr = std::make_unique<DVEventReader>(
+                        std::make_unique<dv::io::MonoCameraRecording>(file_name));
+                }
+                catch (...)
+                {
+                    std::string pop_up_err_str{"Something went wrong while initializing file for reading!"};
+                    param_store.add("pop_up_err_str", pop_up_err_str);
+                    acq_lock_ul.unlock();
+                    return false;
+                }
             }
-            catch (...)
+            else if (ext == ".raw" || ext == ".dat")
             {
-                std::string pop_up_err_str{"Something went wrong while initializing file for reading!"};
+                try
+                {
+                    data_reader_ptr = std::make_unique<MetavisionEventReader>(file_name);
+                }
+                catch (...)
+                {
+                    std::string pop_up_err_str{
+                        "Something went wrong while initializing Metavision file for reading!"};
+                    param_store.add("pop_up_err_str", pop_up_err_str);
+                    acq_lock_ul.unlock();
+                    return false;
+                }
+            }
+            else
+            {
+                std::string pop_up_err_str{"Unsupported file extension. Supported formats: .aedat4, .raw, .dat"};
                 param_store.add("pop_up_err_str", pop_up_err_str);
                 acq_lock_ul.unlock();
                 return false;
             }
+
             if (data_reader_ptr->isEventStreamAvailable())
             {
                 auto evt_resolution = data_reader_ptr->getEventResolution();
                 if (evt_resolution.has_value())
                 {
-                    camera_event_width = evt_resolution.value().width;
-                    camera_event_height = evt_resolution.value().height;
+                    camera_event_width  = evt_resolution->width;
+                    camera_event_height = evt_resolution->height;
                 }
             }
             if (data_reader_ptr->isFrameStreamAvailable())
@@ -206,8 +227,8 @@ class DataAcquisition
                 auto frame_resolution = data_reader_ptr->getFrameResolution();
                 if (frame_resolution.has_value())
                 {
-                    camera_frame_width = frame_resolution.value().width;
-                    camera_frame_height = frame_resolution.value().height;
+                    camera_frame_width  = frame_resolution->width;
+                    camera_frame_height = frame_resolution->height;
                 }
             }
             acq_lock_ul.unlock();
@@ -234,15 +255,16 @@ class DataAcquisition
 
         /**
          * @brief For dynamic loading (streaming), gets a batch of event data.
-         * @param evt_data EventData object to populate with event/frame data
+         * @param evt_data EventData object to populate with event data.
          * @param param_store ParameterStore object with data from GUI.
-         * @return true if data was read, false otherwise.
+         * @param data_writer DataWriter for optional persistent storage.
+         * @param event_discard_odds Odds of keeping each event (1.0 = keep all).
+         * @return true if any data was read, false otherwise.
          */
         bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer,
                                 float event_discard_odds)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            // If reader is not properly initialized, return immediately
             if (!data_reader_ptr)
             {
                 acq_lock_ul.unlock();
@@ -258,36 +280,26 @@ class DataAcquisition
                 return false;
             }
 
-            // Discard threshold
             float threshold{1.0f / event_discard_odds};
-
-            // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-events-from-a-file
 
             try
             {
-                if (data_reader_ptr->isEventStreamAvailable() && data_reader_ptr->isRunning("events"))
+                if (data_reader_ptr->isEventStreamAvailable() && data_reader_ptr->isEventsRunning())
                 {
                     if (const auto events = data_reader_ptr->getNextEventBatch(); events.has_value())
                     {
-                        // In case of persistent storage
-                        // https://dv-processing.inivation.com/master/event_store.html
                         dv::EventStore event_store{};
-                        for (auto &evt : events.value())
+                        for (const auto &evt : *events)
                         {
-                            if (randFloat() > threshold) // Random discard
-                            {
-                                continue; // Discard
-                            }
-                            EventData::EventDatum evt_datum{
-                                .x = evt.x(), .y = evt.y(), .timestamp = evt.timestamp(), .polarity = evt.polarity()};
+                            if (randFloat() > threshold)
+                                continue;
 
-                            evt_data.write_evt_data(evt_datum);
+                            evt_data.write_evt_data(evt);
                             data_read = true;
 
-                            event_store.emplace_back(evt.timestamp(), evt.x(), evt.y(), evt.polarity());
+                            event_store.emplace_back(evt.timestamp, evt.x, evt.y, evt.polarity);
                         }
 
-                        // Add to queue for persistent storage in case of persistent storage
                         if (data_writer.get_writing_event_data())
                         {
                             data_writer.add_event_store(event_store);
@@ -308,14 +320,14 @@ class DataAcquisition
 
         /**
          * @brief For dynamic loading (streaming), gets a batch of frame data.
-         * @param evt_data EventData object to populate with event/frame data
+         * @param evt_data EventData object to populate with frame data.
          * @param param_store ParameterStore object with data from GUI.
+         * @param data_writer DataWriter for optional persistent storage.
          * @return true if data was read, false otherwise.
          */
         bool get_batch_frame_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
         {
             std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            // If reader is not initialized, return immediately
             if (!data_reader_ptr)
             {
                 acq_lock_ul.unlock();
@@ -323,29 +335,25 @@ class DataAcquisition
             }
             bool data_read = false;
 
-            // https://dv-processing.inivation.com/rel_1_7/reading_data.html#read-frames-from-a-file
-
             try
             {
-                if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isRunning("frames"))
+                if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isFramesRunning())
                 {
-                    if (const auto frame_data = data_reader_ptr->getNextFrame(); frame_data.has_value())
+                    if (const auto frame = data_reader_ptr->getNextFrame(); frame.has_value())
                     {
-                        cv::Mat out;
-                        // Convert frame data from BGR to RGB
-                        cv::cvtColor(frame_data->image, out, cv::COLOR_BGR2RGB);
-
-                        // CLone to ensure tightly packed frame bytes
-                        EventData::FrameDatum frame_datum{.frameData = out.clone(), .timestamp = frame_data->timestamp};
-
-                        evt_data.write_frame_data(frame_datum);
+                        // Convert BGR (native) to RGB for display
+                        cv::Mat rgb;
+                        cv::cvtColor(frame->frameData, rgb, cv::COLOR_BGR2RGB);
+                        EventData::FrameDatum display_frame{.frameData = rgb.clone(),
+                                                            .timestamp = frame->timestamp};
+                        evt_data.write_frame_data(display_frame);
                         data_read = true;
 
-                        // If saving stream, add to queue to write
+                        // Write original BGR image to file
                         if (data_writer.get_writing_frame_data())
                         {
-                            dv::Frame frame_datum(frame_data->timestamp, frame_data->image);
-                            data_writer.add_frame_data(frame_datum);
+                            dv::Frame dv_frame(frame->timestamp, frame->frameData);
+                            data_writer.add_frame_data(dv_frame);
                         }
                     }
                 }
