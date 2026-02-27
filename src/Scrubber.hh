@@ -185,21 +185,21 @@ class Scrubber
                     current_time = std::clamp(current_time, min_time, max_time);
                     time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                     time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                    lower_time = std::max(min_time, current_time - time_window);
+                    lower_time = (std::max)(min_time, current_time - time_window);
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PLAYING)
                 {
                     time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                     time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                     current_time = std::clamp(current_time + time_step, min_time, max_time);
-                    lower_time = std::max(min_time, current_time - time_window);
+                    lower_time = (std::max)(min_time, current_time - time_window);
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::LATEST)
                 {
                     current_time = max_time;
                     time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                     time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                    lower_time = std::max(min_time, current_time - time_window);
+                    lower_time = (std::max)(min_time, current_time - time_window);
                 }
 
                 // Convert time values to indices for internal use
@@ -234,7 +234,7 @@ class Scrubber
                                               event_data->get_evt_vector_ref().size() - 1);
                     index_step = std::clamp(index_step, static_cast<std::size_t>(0),
                                             event_data->get_evt_vector_ref().size() - 1);
-                    lower_index = std::max(static_cast<std::size_t>(0), current_index - index_window);
+                    lower_index = (std::max)(static_cast<std::size_t>(0), current_index - index_window);
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::PLAYING)
                 {
@@ -244,7 +244,7 @@ class Scrubber
                                               event_data->get_evt_vector_ref().size() - 1);
                     current_index = std::clamp(current_index + index_step, static_cast<std::size_t>(0),
                                                event_data->get_evt_vector_ref().size() - 1);
-                    lower_index = std::max(static_cast<std::size_t>(0), current_index - index_window);
+                    lower_index = (std::max)(static_cast<std::size_t>(0), current_index - index_window);
                 }
                 else if (parameter_store.get<ScrubberMode>("scrubber.mode") == ScrubberMode::LATEST)
                 {
@@ -253,7 +253,7 @@ class Scrubber
                     current_index = event_data_size;
                     index_window = std::clamp(index_window, static_cast<std::size_t>(0), event_data_size);
                     index_step = std::clamp(index_step, static_cast<std::size_t>(0), event_data_size);
-                    lower_index = std::max(static_cast<std::size_t>(0), current_index - index_window);
+                    lower_index = (std::max)(static_cast<std::size_t>(0), current_index - index_window);
                 }
 
                 parameter_store.add("scrubber.current_index", current_index);
@@ -311,7 +311,7 @@ class Scrubber
             }
 
             // Clamp to the actual size of the vector
-            num_points = std::min(num_points, evt_vector.size() - lower_index);
+            num_points = (std::min)(num_points, evt_vector.size() - lower_index);
 
             // If we have no points to upload, skip
             if (num_points == 0)

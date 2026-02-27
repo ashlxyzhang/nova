@@ -704,7 +704,7 @@ class GUI
                 {
                     size_t data_size = parameter_store->get<std::size_t>("scrubber.max_index") -
                                        parameter_store->get<std::size_t>("scrubber.min_index") + 1;
-                    max_window_size = std::max(static_cast<size_t>(1), data_size / window_div_factor);
+                    max_window_size = (std::max)(static_cast<size_t>(1), data_size / window_div_factor);
                 }
 
                 float max_window_size_float{static_cast<float>(max_window_size)};
@@ -816,7 +816,7 @@ class GUI
                 float time_window_unit_adjusted = time_window / unit_time_conversion_factor;
 
                 // Calculate maximum window size (1/2 or 1/100 of total time range, minimum 0.001)
-                float max_window_time = std::max(0.00001f, (max_time - min_time) / window_div_factor);
+                float max_window_time = (std::max)(0.00001f, (max_time - min_time) / window_div_factor);
                 float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
 
                 std::string time_window_label = "Time Window " + time_unit_suffix;

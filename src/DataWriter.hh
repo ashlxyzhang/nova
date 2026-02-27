@@ -113,8 +113,7 @@ class DataWriter
             {
                 dv::io::MonoCameraWriter::Config writer_config("Save Config");
 
-                cv::Size file_res{std::max(_camera_event_width, _camera_frame_width),
-                                  std::max(_camera_event_height, _camera_frame_height)};
+                cv::Size file_res((std::max)(_camera_event_width, _camera_frame_width), (std::max)(_camera_event_height, _camera_frame_height));
 
                 writing_event_data = event_data;
                 writing_frame_data = frame_data;
