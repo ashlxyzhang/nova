@@ -247,6 +247,7 @@ class DigitalCodedExposure
             }
         }
 
+        //! Left unimplemented from phase 2?
         void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
