@@ -162,8 +162,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // begin a copy pass, this is used to copy data from the cpu to the gpu
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    scrubber->copy_pass(upload_buffer, copy_pass);
-    visualizer->copy_pass(upload_buffer, copy_pass);
+    scrubber->copy_pass(*upload_buffer, copy_pass);
+    visualizer->copy_pass(*upload_buffer, copy_pass);
     digital_coded_exposure->copy_pass(upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 

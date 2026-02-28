@@ -12,6 +12,15 @@
 #include <algorithm>
 #include <array>
 
+// so the idea is that we give the user two options for scrubbing through the data,
+// an event and a time based system. however at the end of the day
+// everything is an index into an array, so we need to keep all these values in
+// sync in this class
+// since we are looking for streaming data support, lets make the window always face behind the
+// current stamp
+// - Phase 2 
+
+
 
 /**
  * @brief Provides functionality for scrubbing through subsets of event data.
@@ -33,9 +42,10 @@ class Scrubber
          */
         enum class ScrubberMode : std::uint8_t { PAUSED, PLAYING, LATEST };
 
+
+        // Public variable mutex - must be used by all modules (including Scrubber)
         mutable std::shared_mutex mutex;
 
-        // Mutex required variables -----
         ScrubberType type = ScrubberType::EVENT;
         ScrubberMode mode = ScrubberMode::PAUSED;
 
@@ -54,16 +64,8 @@ class Scrubber
         float max_time = 0.0f;
 
         bool show_frame_data = false;
-        // -----
     
     private:
-        // so the idea is that we give the user two options for scrubbing through the data,
-        // an event and a time based system. however at the end of the day
-        // everything is an index into an array, so we need to keep all these values in
-        // sync in this class
-        // since we are looking for streaming data support, lets make the window always face behind the
-        // current stamp
-        // - Phase 2 
         
         // Module dependencies
         EventData &event_data;
@@ -104,7 +106,6 @@ class Scrubber
                 SDL_ReleaseGPUTexture(gpu_device, frames);
             }
         }
-
 
         // Resets every value except for TYPE and MODE
         void clear() {
@@ -310,25 +311,20 @@ class Scrubber
             points_buffer = SDL_CreateGPUBuffer(gpu_device, &buffer_create_info);
 
 
-            bool show_frames = show_frame_data;
-            lock.unlock();
-            
-            // Upload data to the new buffer, unlocking read-only lock
+            // Unlock mutex while uploading the GPU 
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
+            lock.unlock();
             upload_buffer->upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
+            lock.lock();
 
 
-
-
-
-            const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data.get_frame_vector_ref();
-
+            
             // Below is frame texture generation code, skip if user does not want frames
+            const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data.get_frame_vector_ref();
             glm::vec2 current_frame_dimensions = event_data.get_camera_frame_resolution();
 
-
             // Also sanity check the dimensions of the frame
-            if (!show_frames || frame_vector.empty() ||
+            if (!show_frame_data || frame_vector.empty() ||
                 (current_frame_dimensions.x < 1.0f || current_frame_dimensions.y < 1.0f))
             {
                 event_data.unlock_data_vectors();

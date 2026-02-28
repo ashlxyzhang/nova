@@ -111,7 +111,7 @@ class Visualizer
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPUCopyPass unused
                  */
-                GridRenderer(SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass):  gpu_device(gpu_device)
+                GridRenderer(SDL_GPUDevice *gpu_device, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass):  gpu_device(gpu_device)
                 {
                     generate_grid_lines();
 
@@ -146,7 +146,7 @@ class Visualizer
                     vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
 
                     // Upload grid lines data to GPU
-                    upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
+                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
                                                  lines.size() * sizeof(glm::vec3));
 
                     // Create graphics pipeline for line rendering
@@ -208,7 +208,7 @@ class Visualizer
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPU_CopyPass for copying data to GPU
                  */
-                void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {   
                     // Currently grid sizes are static so don't do any updates
 
@@ -293,7 +293,7 @@ class Visualizer
                  * @param copy_pass SDL_GPUCopyPass unused
                  */
                 PointsRenderer(EventData &event_data, Scrubber &scrubber,
-                               SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                               SDL_GPUDevice *gpu_device, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
                     : event_data(event_data), scrubber(scrubber), gpu_device(gpu_device)
                 {
 
@@ -365,7 +365,7 @@ class Visualizer
                 {
                 }
 
-                void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                 }
 
@@ -690,7 +690,7 @@ class Visualizer
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass GPU copy pass
                  */
-                void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     if (vertices.empty() || indices.empty())
                         return;
@@ -713,8 +713,8 @@ class Visualizer
                     index_buffer = SDL_CreateGPUBuffer(gpu_device, &ibf_info);
 
                     // Upload data
-                    upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
-                    upload_buffer->upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
+                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
+                    upload_buffer.upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
                 }
 
                 /**
@@ -858,7 +858,7 @@ class Visualizer
                 {
                 }
 
-                void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                 }
 
@@ -926,6 +926,7 @@ class Visualizer
         float last_mouse_y = 0.0f;
         bool cursor_captured = false;
 
+        // Current constant, passed to GridRenderer in constructor
         uint32_t grid_x_subdivisions = 5;
         uint32_t grid_y_subdivisions = 5;
         uint32_t grid_z_subdivisions = 5;
@@ -933,20 +934,16 @@ class Visualizer
 
     public:
 
+        // Public variable mutex - must be used by all modules (including Visualizer)
         mutable std::shared_mutex mutex;
 
-        // Mutex required variables -----
-        float particle_scale;
-        glm::vec3 polarity_neg_color;
-        glm::vec3 polarity_pos_color;
+        float particle_scale = 3.0f;
+        glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
+        glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
 
-        // MS is default
-        TIME unit_type = TIME::UNIT_US; 
-        float unit_time_conversion_factor = 1.0f;
-        // -----
+        TIME unit_type = TIME::UNIT_US;             // MS is default
+        float unit_time_conversion_factor = 1.0f;   // MS is default
 
-
-        
 
         /**
          * @brief Constructor. Initializes render target of 3D Visualizer and GridRenderer, PointsRenderer,
@@ -1123,11 +1120,6 @@ class Visualizer
             text_renderer->cpu_update();
             frames_renderer->cpu_update();
 
-            // Add timestamp labels for each z subdivision
-            if (!scrubber)
-                return;
-
-
             // Get depth range from scrubber
             float lower_depth = scrubber.get_lower_depth();
             float upper_depth = scrubber.get_upper_depth();
@@ -1139,6 +1131,12 @@ class Visualizer
             glm::vec3 text_normal = {1.0f, 0.0f, 0.0f};
             SDL_FColor text_color = {0.0f, 0.0f, 0.0f, 1.0f}; // White color
 
+            // Take snapshot of current time unit settings
+            std::shared_lock lock(mutex);
+            TIME cur_unit_type = unit_type;
+            float cur_unit_time_conversion_factor = unit_time_conversion_factor;  
+            lock.unlock();
+            
             // Add labels for each z subdivision
             for (uint32_t i = 0; i <= grid_z_subdivisions; ++i)
             {
@@ -1147,30 +1145,19 @@ class Visualizer
 
                 // Convert normalized Z to actual depth value
                 float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
-
-                if (!parameter_store.exists("unit_time_conversion_factor"))
-                {
-                    parameter_store.add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
-                }
-                float unit_time_conversion_factor{parameter_store.get<float>("unit_time_conversion_factor")};
-
-                // Format timestamp as string with reasonable precision
-                if (!parameter_store.exists("unit_type"))
-                {
-                    parameter_store.add("unit_type", static_cast<uint8_t>(TIME::UNIT_US)); // Default to microsecond
-                }
-                uint8_t unit_type{parameter_store.get<uint8_t>("unit_type")};
+                
+                // Create text of current time
                 std::string timestamp_str{};
-                switch (static_cast<TIME>(unit_type))
+                switch (static_cast<TIME>(cur_unit_type))
                 {
                 case TIME::UNIT_US:
-                    timestamp_str = std::format("{:.2f}", timestamp / unit_time_conversion_factor);
+                    timestamp_str = std::format("{:.2f}", timestamp / cur_unit_time_conversion_factor);
                     break;
                 case TIME::UNIT_MS:
-                    timestamp_str = std::format("{:.4f}", timestamp / unit_time_conversion_factor);
+                    timestamp_str = std::format("{:.4f}", timestamp / cur_unit_time_conversion_factor);
                     break;
                 case TIME::UNIT_S:
-                    timestamp_str = std::format("{:.8f}", timestamp / unit_time_conversion_factor);
+                    timestamp_str = std::format("{:.8f}", timestamp / cur_unit_time_conversion_factor);
                     break;
                 }
 
@@ -1188,7 +1175,7 @@ class Visualizer
          * @param upload_buffer UploadBuffer object for uploading data to GPU.
          * @param copy_pass GPU copy pass.
          */
-        void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+        void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
             grid_renderer->copy_pass(upload_buffer, copy_pass);
             points_renderer->copy_pass(upload_buffer, copy_pass);
@@ -1256,8 +1243,13 @@ class Visualizer
             // Render the grid
             grid_renderer->render_pass(command_buffer, render_pass, vp);
 
-            // Render the points
-            points_renderer->render_pass(command_buffer, render_pass, vp, particle_scale, polarity_neg_color, polarity_pos_color);
+            // Render the points (take snapshot of current color settings)
+            std::shared_lock lock(mutex);
+            float cur_particle_scale = particle_scale;
+            glm::vec3 cur_polarity_neg_color = polarity_neg_color;
+            glm::vec3 cur_polarity_pos_color = polarity_pos_color;
+            lock.unlock();
+            points_renderer->render_pass(command_buffer, render_pass, vp, cur_particle_scale, cur_polarity_neg_color, cur_polarity_pos_color);
 
             // Render the frames
             frames_renderer->render_pass(command_buffer, render_pass, vp);
