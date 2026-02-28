@@ -12,6 +12,11 @@
 #include "Visualizer.hh"
 #include "threads.hh" 
 
+#include <memory>
+
+
+//! Current only supports a single GPU device
+SDL_GPUDevice *gpu_device = nullptr;
 
 //! SDL stuff
 SDL_Window *window = nullptr;
@@ -36,8 +41,6 @@ std::thread writer_thread_ptr;
 std::atomic<bool> data_acquisition_running = true;
 std::thread data_acquisition_thread_ptr;
 
-//! Current only supports a single GPU device
-SDL_GPUDevice *gpu_device = nullptr;
 
 /**
  * @brief Initializes the SDL window and GPU device then links them together. Called in SDL_AppInit()
@@ -94,11 +97,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     
     // Modules passed other modules by reference
     upload_buffer = std::make_unique<UploadBuffer>(gpu_device);
-    scrubber = std::make_unique<Scrubber>(*event_data, *gpu_device);
-    
-    gui = std::make_unique<GUI>(render_targets, parameter_store, window, gpu_device, scrubber);
-    visualizer = std::make_unique<Visualizer>(*parameter_store, render_targets, event_data, scrubber, window, gpu_device, upload_buffer, copy_pass);
+    scrubber = std::make_unique<Scrubber>(*event_data, gpu_device);
+    visualizer = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
+
     digital_coded_exposure std::make_unique<DigitalCodedExposure>(parameter_store, render_targets, event_data, window, gpu_device, upload_buffer, scrubber, copy_pass);
+    gui = std::make_unique<GUI>(render_targets, parameter_store, window, gpu_device, scrubber);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);

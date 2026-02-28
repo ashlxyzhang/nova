@@ -35,6 +35,7 @@ class Scrubber
 
         mutable std::shared_mutex mutex;
 
+        // Mutex required variables -----
         ScrubberType type = ScrubberType::EVENT;
         ScrubberMode mode = ScrubberMode::PAUSED;
 
@@ -53,6 +54,7 @@ class Scrubber
         float max_time = 0.0f;
 
         bool show_frame_data = false;
+        // -----
     
     private:
         // so the idea is that we give the user two options for scrubbing through the data,

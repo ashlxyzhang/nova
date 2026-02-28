@@ -7,7 +7,6 @@
 
 #include "Camera.hh"
 #include "EventData.hh"
-#include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
@@ -30,7 +29,7 @@ class Visualizer
 {
     private:
         /**
-         * @brief Provides functions for rendering the grid in the visualizer.
+         * @brief Provides functions for rendering the grid in the visualizer.  
          */
         class GridRenderer
         {
@@ -40,7 +39,6 @@ class Visualizer
                 uint32_t z_subdivisions = 5;
                 std::vector<glm::vec3> lines;
 
-                ParameterStore &parameter_store;
                 SDL_GPUDevice *gpu_device = nullptr;
                 SDL_GPUGraphicsPipeline *grid_pipeline = nullptr;
                 SDL_GPUBuffer *vertex_buffer = nullptr;
@@ -109,42 +107,12 @@ class Visualizer
             public:
                 /**
                  * @brief Constructor. Initializes necessary shaders for drawing grid.
-                 * @param parameter_store ParameterStore object containing global data
                  * @param gpu_device SDL_GPUDevice to create shader
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPUCopyPass unused
                  */
-                GridRenderer(ParameterStore &parameter_store, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
-                             SDL_GPUCopyPass *copy_pass)
-                    : parameter_store(parameter_store), gpu_device(gpu_device)
+                GridRenderer(SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass):  gpu_device(gpu_device)
                 {
-                    if (parameter_store.exists("visualizer.grid.x_subdivisions"))
-                    {
-                        x_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.x_subdivisions");
-                    }
-                    else
-                    {
-                        parameter_store.add<uint32_t>("visualizer.grid.x_subdivisions", x_subdivisions);
-                    }
-
-                    if (parameter_store.exists("visualizer.grid.y_subdivisions"))
-                    {
-                        y_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.y_subdivisions");
-                    }
-                    else
-                    {
-                        parameter_store.add<uint32_t>("visualizer.grid.y_subdivisions", y_subdivisions);
-                    }
-
-                    if (parameter_store.exists("visualizer.grid.z_subdivisions"))
-                    {
-                        z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
-                    }
-                    else
-                    {
-                        parameter_store.add<uint32_t>("visualizer.grid.z_subdivisions", z_subdivisions);
-                    }
-
                     generate_grid_lines();
 
                     SDL_GPUShaderCreateInfo vs_create_info = {0};
@@ -229,27 +197,10 @@ class Visualizer
                  * @brief Updates grid visualization on each frame.
                  */
                 void cpu_update()
-                {
-                    // Check if any subdivision parameters have changed
-                    bool needs_update = false;
+                {   
+                    // Grid sizes are currently static so don't update
 
-                    uint32_t current_x_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.x_subdivisions");
-                    uint32_t current_y_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.y_subdivisions");
-                    uint32_t current_z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
-
-                    if (current_x_subdivisions != x_subdivisions || current_y_subdivisions != y_subdivisions ||
-                        current_z_subdivisions != z_subdivisions)
-                    {
-                        x_subdivisions = current_x_subdivisions;
-                        y_subdivisions = current_y_subdivisions;
-                        z_subdivisions = current_z_subdivisions;
-                        needs_update = true;
-                    }
-
-                    if (needs_update)
-                    {
-                        generate_grid_lines();
-                    }
+                    // generate_grid_lines();
                 }
 
                 /**
@@ -258,38 +209,40 @@ class Visualizer
                  * @param copy_pass SDL_GPU_CopyPass for copying data to GPU
                  */
                 void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
-                {
-                    // Check if grid lines need to be updated
-                    bool needs_update = false;
+                {   
+                    // Currently grid sizes are static so don't do any updates
 
-                    uint32_t current_x_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.x_subdivisions");
-                    uint32_t current_y_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.y_subdivisions");
-                    uint32_t current_z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
+                    // // Check if grid lines need to be updated
+                    // bool needs_update = false;
 
-                    if (current_x_subdivisions != x_subdivisions || current_y_subdivisions != y_subdivisions ||
-                        current_z_subdivisions != z_subdivisions)
-                    {
-                        x_subdivisions = current_x_subdivisions;
-                        y_subdivisions = current_y_subdivisions;
-                        z_subdivisions = current_z_subdivisions;
-                        generate_grid_lines();
-                        needs_update = true;
-                    }
+                    // uint32_t current_x_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.x_subdivisions");
+                    // uint32_t current_y_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.y_subdivisions");
+                    // uint32_t current_z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
 
-                    if (needs_update && vertex_buffer)
-                    {
-                        // Recreate vertex buffer with new size if needed
-                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
+                    // if (current_x_subdivisions != x_subdivisions || current_y_subdivisions != y_subdivisions ||
+                    //     current_z_subdivisions != z_subdivisions)
+                    // {
+                    //     x_subdivisions = current_x_subdivisions;
+                    //     y_subdivisions = current_y_subdivisions;
+                    //     z_subdivisions = current_z_subdivisions;
+                    //     generate_grid_lines();
+                    //     needs_update = true;
+                    // }
 
-                        SDL_GPUBufferCreateInfo vertex_buffer_create_info = {0};
-                        vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-                        vertex_buffer_create_info.size = lines.size() * sizeof(glm::vec3);
-                        vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
+                    // if (needs_update && vertex_buffer)
+                    // {
+                    //     // Recreate vertex buffer with new size if needed
+                    //     SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
 
-                        // Upload updated grid lines data to GPU
-                        upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
-                                                     lines.size() * sizeof(glm::vec3));
-                    }
+                    //     SDL_GPUBufferCreateInfo vertex_buffer_create_info = {0};
+                    //     vertex_buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+                    //     vertex_buffer_create_info.size = lines.size() * sizeof(glm::vec3);
+                    //     vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
+
+                    //     // Upload updated grid lines data to GPU
+                    //     upload_buffer->upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
+                    //                                  lines.size() * sizeof(glm::vec3));
+                    // }
                 }
 
                 /**
@@ -325,25 +278,23 @@ class Visualizer
         class PointsRenderer
         {
             private:
-                ParameterStore &parameter_store;
-                Scrubber *scrubber = nullptr;
+                Scrubber &scrubber;
                 EventData &event_data;
+
                 SDL_GPUDevice *gpu_device = nullptr;
                 SDL_GPUGraphicsPipeline *points_pipeline = nullptr;
 
             public:
                 /**
                  * @brief Constructor. Initializes necessary shaders for drawing points.
-                 * @param parameter_store ParameterStore object containing global data
                  * @param scrubber Scrubber object containing points buffer to draw
                  * @param gpu_device SDL_GPUDevice to create shader
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPUCopyPass unused
                  */
-                PointsRenderer(ParameterStore &parameter_store, EventData &event_data, Scrubber *scrubber,
+                PointsRenderer(EventData &event_data, Scrubber &scrubber,
                                SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
-                    : parameter_store(parameter_store), event_data(event_data), scrubber(scrubber),
-                      gpu_device(gpu_device)
+                    : event_data(event_data), scrubber(scrubber), gpu_device(gpu_device)
                 {
 
                     SDL_GPUShaderCreateInfo vs_create_info = {0};
@@ -425,17 +376,17 @@ class Visualizer
                  * @param vp MVP matrix
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp)
+                                 const glm::mat4 &vp, float particle_scale, glm::vec3 polarity_neg_color, glm::vec3 polarity_pos_color)
                 {
 
-                    if (scrubber->get_points_buffer_size() == 0)
+                    if (scrubber.get_points_buffer_size() == 0)
                         return;
 
                     // Bind the graphics pipeline
                     SDL_BindGPUGraphicsPipeline(render_pass, points_pipeline);
 
                     // Bind the vertex buffer
-                    SDL_GPUBufferBinding vertex_buffer_binding[] = {scrubber->get_points_buffer(), 0};
+                    SDL_GPUBufferBinding vertex_buffer_binding[] = {scrubber.get_points_buffer(), 0};
                     SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_binding, 1);
 
                     // Create uniform buffer data for points shader
@@ -447,9 +398,9 @@ class Visualizer
                             float point_size;
                     } uniforms;
 
-                    glm::vec2 camera_resolution = scrubber->get_camera_resolution();
-                    float lower_depth = scrubber->get_lower_depth();
-                    float upper_depth = scrubber->get_upper_depth();
+                    glm::vec2 camera_resolution = scrubber.get_camera_resolution();
+                    float lower_depth = scrubber.get_lower_depth();
+                    float upper_depth = scrubber.get_upper_depth();
                     float depth_range = upper_depth - lower_depth;
 
                     // Initialize as an identity matrix
@@ -464,19 +415,18 @@ class Visualizer
                         glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
                     glm::mat4 reflect_yz = glm::scale(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 1.0f));
 
-                    uniforms.mvp =
-                        vp * reflect_yz * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
+                    uniforms.mvp = vp * reflect_yz * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
                     // Get camera dimensions for scaling
-                    uniforms.negative_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_neg_color"), 1.0f);
-                    uniforms.positive_color = glm::vec4(parameter_store.get<glm::vec3>("polarity_pos_color"), 1.0f);
-                    uniforms.point_size = parameter_store.get<float>("particle_scale");
+                    uniforms.negative_color = glm::vec4(polarity_neg_color, 1.0f);
+                    uniforms.positive_color = glm::vec4(polarity_pos_color, 1.0f);
+                    uniforms.point_size = particle_scale;
 
                     // Push the uniform data
                     SDL_PushGPUVertexUniformData(command_buffer, 0, &uniforms, sizeof(uniforms));
 
                     // Draw the points
-                    SDL_DrawGPUPrimitives(render_pass, scrubber->get_points_buffer_size(), 1, 0, 0);
+                    SDL_DrawGPUPrimitives(render_pass, scrubber.get_points_buffer_size(), 1, 0, 0);
                 }
         };
 
@@ -504,7 +454,6 @@ class Visualizer
                         Sint32 base_vertex;
                 };
 
-                ParameterStore &parameter_store;
                 SDL_GPUDevice *gpu_device = nullptr;
                 SDL_GPUGraphicsPipeline *text_pipeline = nullptr;
                 TTF_TextEngine *text_engine = nullptr;
@@ -527,11 +476,9 @@ class Visualizer
             public:
                 /**
                  * @brief Constructor. Creates necessary shaders.
-                 * @param parameter_store ParameterStore object containing global data
                  * @param gpu_device SDL_GPUDevice to create shader
                  */
-                TextRenderer(ParameterStore &parameter_store, SDL_GPUDevice *gpu_device)
-                    : parameter_store(parameter_store), gpu_device(gpu_device)
+                TextRenderer(SDL_GPUDevice *gpu_device): gpu_device(gpu_device)
                 {
                     TTF_Init();
                     text_engine = TTF_CreateGPUTextEngine(gpu_device);
@@ -814,21 +761,20 @@ class Visualizer
         class FramesRenderer
         {
             private:
-                ParameterStore *parameter_store = nullptr;
+                Scrubber &scrubber;
+
                 SDL_GPUDevice *gpu_device = nullptr;
-                Scrubber *scrubber = nullptr;
                 SDL_GPUGraphicsPipeline *frames_pipeline = nullptr;
                 SDL_GPUSampler *sampler = nullptr;
 
             public:
                 /**
                  * @brief Constructor. Initializes necessary shaders.
-                 * @param parameter_store ParameterStore object containing program global data
                  * @param gpu_device GPU device
                  * @param scrubber Data scrubber containing frames to interpolate and draw.
                  */
-                FramesRenderer(ParameterStore *parameter_store, SDL_GPUDevice *gpu_device, Scrubber *scrubber)
-                    : parameter_store(parameter_store), gpu_device(gpu_device), scrubber(scrubber)
+                FramesRenderer(SDL_GPUDevice *gpu_device, Scrubber &scrubber): 
+                    gpu_device(gpu_device), scrubber(scrubber)
                 {
                     SDL_GPUShaderCreateInfo vs_create_info = {0};
                     vs_create_info.code_size = sizeof frames_vert;
@@ -925,7 +871,7 @@ class Visualizer
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp)
                 {
-                    if (!frames_pipeline || scrubber->get_frames_timestamps()[0] < 0.0f)
+                    if (!frames_pipeline || scrubber.get_frames_timestamps()[0] < 0.0f)
                     {
                         return;
                     }
@@ -937,12 +883,12 @@ class Visualizer
                     SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
 
                     SDL_GPUTextureSamplerBinding sampler_binding = {};
-                    sampler_binding.texture = scrubber->get_frames_texture();
+                    sampler_binding.texture = scrubber.get_frames_texture();
                     sampler_binding.sampler = sampler;
                     SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
 
-                    glm::vec4 frame_data = {scrubber->get_frames_timestamps()[0], scrubber->get_frames_timestamps()[1],
-                                            scrubber->get_upper_depth(), 0.0f};
+                    glm::vec4 frame_data = {scrubber.get_frames_timestamps()[0], scrubber.get_frames_timestamps()[1],
+                                            scrubber.get_upper_depth(), 0.0f};
                     SDL_PushGPUFragmentUniformData(command_buffer, 0, &frame_data, sizeof(frame_data));
 
                     SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
@@ -962,10 +908,9 @@ class Visualizer
         glm::vec3 box_min;
         glm::vec3 box_max;
 
-        ParameterStore &parameter_store;
-        std::unordered_map<std::string, RenderTarget> &render_targets;
         EventData &event_data;
-        Scrubber *scrubber = nullptr;
+        Scrubber &scrubber;
+        std::unordered_map<std::string, RenderTarget> &render_targets;
 
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
@@ -981,11 +926,32 @@ class Visualizer
         float last_mouse_y = 0.0f;
         bool cursor_captured = false;
 
+        uint32_t grid_x_subdivisions = 5;
+        uint32_t grid_y_subdivisions = 5;
+        uint32_t grid_z_subdivisions = 5;
+
+
     public:
+
+        mutable std::shared_mutex mutex;
+
+        // Mutex required variables -----
+        float particle_scale;
+        glm::vec3 polarity_neg_color;
+        glm::vec3 polarity_pos_color;
+
+        // MS is default
+        TIME unit_type = TIME::UNIT_US; 
+        float unit_time_conversion_factor = 1.0f;
+        // -----
+
+
+        
+
         /**
          * @brief Constructor. Initializes render target of 3D Visualizer and GridRenderer, PointsRenderer,
          * TextRenderer, and FramesRenderer objects.
-         * @param parameter_store ParameterStore object containing data from GUI
+
          * @param render_targets Render targets of the program
          * @param event_data EventData object containing event/frame data
          * @param scrubber Scrubber object with data to compute DCE on
@@ -994,11 +960,10 @@ class Visualizer
          * @param upload_buffer UploadBuffer object for uploading data to gpu
          * @param copy_pass SDL_GPUCopyPass unused
          */
-        Visualizer(ParameterStore &parameter_store, std::unordered_map<std::string, RenderTarget> &render_targets,
-                   EventData &event_data, Scrubber *scrubber, SDL_Window *window, SDL_GPUDevice *gpu_device,
-                   UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
-            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data),
-              scrubber(scrubber), window(window), gpu_device(gpu_device)
+        Visualizer(EventData &event_data, Scrubber &scrubber, UploadBuffer &upload_buffer, 
+                    std::unordered_map<std::string, RenderTarget> &render_targets, SDL_Window *window, 
+                    SDL_GPUDevice *gpu_device, SDL_GPUCopyPass *copy_pass): 
+                    event_data(event_data), scrubber(scrubber), render_targets(render_targets), window(window), gpu_device(gpu_device)
         {
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
@@ -1027,11 +992,10 @@ class Visualizer
 
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
-            grid_renderer = new GridRenderer(parameter_store, gpu_device, upload_buffer, copy_pass);
-            points_renderer =
-                new PointsRenderer(parameter_store, event_data, scrubber, gpu_device, upload_buffer, copy_pass);
-            text_renderer = new TextRenderer(parameter_store, gpu_device);
-            frames_renderer = new FramesRenderer(&parameter_store, gpu_device, scrubber);
+            grid_renderer = new GridRenderer(gpu_device, upload_buffer, copy_pass);
+            points_renderer = new PointsRenderer(event_data, scrubber, gpu_device, upload_buffer, copy_pass);
+            text_renderer = new TextRenderer(gpu_device);
+            frames_renderer = new FramesRenderer(gpu_device, scrubber);
         }
 
         /**
@@ -1163,12 +1127,10 @@ class Visualizer
             if (!scrubber)
                 return;
 
-            // Get z subdivisions from parameter store
-            uint32_t z_subdivisions = parameter_store.get<uint32_t>("visualizer.grid.z_subdivisions");
 
             // Get depth range from scrubber
-            float lower_depth = scrubber->get_lower_depth();
-            float upper_depth = scrubber->get_upper_depth();
+            float lower_depth = scrubber.get_lower_depth();
+            float upper_depth = scrubber.get_upper_depth();
             float depth_range = upper_depth - lower_depth;
 
             // Position for labels: near the bottom of the grid (Y = -1.0f), slightly offset in X
@@ -1178,10 +1140,10 @@ class Visualizer
             SDL_FColor text_color = {0.0f, 0.0f, 0.0f, 1.0f}; // White color
 
             // Add labels for each z subdivision
-            for (uint32_t i = 0; i <= z_subdivisions; ++i)
+            for (uint32_t i = 0; i <= grid_z_subdivisions; ++i)
             {
                 // Calculate normalized Z position [-1, 1]
-                float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(z_subdivisions) - 1.0f;
+                float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(grid_z_subdivisions) - 1.0f;
 
                 // Convert normalized Z to actual depth value
                 float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
@@ -1244,12 +1206,12 @@ class Visualizer
          */
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
-            // auto ts = scrubber->get_frames_timestamps();
+            // auto ts = scrubber.get_frames_timestamps();
             // if (ts[0] > 0.0f)
             // {
             //     // debug blit the frame to the back to test it
-            //     auto frame_texture = scrubber->get_frames_texture();
-            //     auto dims = scrubber->get_frame_dimensions();
+            //     auto frame_texture = scrubber.get_frames_texture();
+            //     auto dims = scrubber.get_frame_dimensions();
             //     SDL_GPUBlitInfo blit_info = {};
             //     blit_info.source = SDL_GPUBlitRegion{frame_texture, 0, 0, 0, 0, (uint32_t)dims[0],
             //     (uint32_t)dims[1]}; blit_info.destination = SDL_GPUBlitRegion{
@@ -1295,7 +1257,7 @@ class Visualizer
             grid_renderer->render_pass(command_buffer, render_pass, vp);
 
             // Render the points
-            points_renderer->render_pass(command_buffer, render_pass, vp);
+            points_renderer->render_pass(command_buffer, render_pass, vp, particle_scale, polarity_neg_color, polarity_pos_color);
 
             // Render the frames
             frames_renderer->render_pass(command_buffer, render_pass, vp);
