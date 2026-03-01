@@ -131,7 +131,7 @@ class Scrubber
         void cpu_update()
         {     
             
-            std::unique_lock lock(mutex);   // Unique lock self b/c cpu_update writes values
+            std::unique_lock scrubber_read_write_lock(mutex);   // Unique lock self b/c cpu_update writes values
             event_data.lock_data_vectors(); // Lock event data to prevent further events from being written
 
             const auto &event_vector = event_data.get_evt_vector_ref();
@@ -235,12 +235,12 @@ class Scrubber
          * @param upload_buffer UploadBuffer object for uploading data to gpu
          * @param copy_pass SDL_GPUCopyPass for copying data to GPU
          */
-        void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+        void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
-            if (!upload_buffer || !copy_pass) return;
+            if (!copy_pass) return;
 
             // Lock resources
-            std::shared_lock lock(mutex);
+            std::shared_lock scrubber_read_write_lock(mutex);
             event_data.lock_data_vectors();
 
             // Get reference to data we need to copy
@@ -313,9 +313,9 @@ class Scrubber
 
             // Unlock mutex while uploading the GPU 
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
-            lock.unlock();
-            upload_buffer->upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
-            lock.lock();
+            scrubber_read_write_lock.unlock();
+            upload_buffer.upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
+            scrubber_read_write_lock.lock();
 
 
             
@@ -449,12 +449,12 @@ class Scrubber
             // Upload frames and set timestamps
             if (found_valid_frames)
             {
-                upload_buffer->upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_0].first, 0);
+                upload_buffer.upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_0].first, 0);
                 frame_timestamps[0] = frame_vector[frame_idx_0].second;
 
                 if (frame_idx_1 != frame_idx_0 && frame_idx_1 < frame_vector.size())
                 {
-                    upload_buffer->upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_1].first, 1);
+                    upload_buffer.upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_1].first, 1);
                     frame_timestamps[1] = frame_vector[frame_idx_1].second;
                 }
                 else

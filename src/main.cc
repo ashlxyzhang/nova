@@ -14,7 +14,6 @@
 
 #include <memory>
 
-
 //! Current only supports a single GPU device
 SDL_GPUDevice *gpu_device = nullptr;
 
@@ -96,12 +95,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     
     // Modules passed other modules by reference
-    upload_buffer = std::make_unique<UploadBuffer>(gpu_device);
-    scrubber = std::make_unique<Scrubber>(*event_data, gpu_device);
-    visualizer = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
-
-    digital_coded_exposure std::make_unique<DigitalCodedExposure>(parameter_store, render_targets, event_data, window, gpu_device, upload_buffer, scrubber, copy_pass);
-    gui = std::make_unique<GUI>(render_targets, parameter_store, window, gpu_device, scrubber);
+    upload_buffer               = std::make_unique<UploadBuffer>(gpu_device);
+    scrubber                    = std::make_unique<Scrubber>(*event_data, gpu_device);
+    visualizer                  = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
+    digital_coded_exposure      = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
+    gui                         = std::make_unique<GUI>(render_targets, parameter_store, window, gpu_device, scrubber);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -109,11 +107,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 
     // Initialize threads
-    writer_thread_ptr = new std::thread(program_thread::writer_thread, std::ref(writer_running),
-                                          std::ref(data_writer), std::ref(*parameter_store));
-    data_acquisition_thread_ptr = new std::thread(
-        program_thread::data_acquisition_thread, std::ref(data_acquisition_running), std::ref(data_acq),
-        std::ref(*parameter_store), std::ref(event_data), std::ref(data_writer));
+    writer_thread_ptr = new std::thread(program_thread::writer_thread, 
+                                        std::ref(writer_running),
+                                        std::ref(data_writer), 
+                                        std::ref(*parameter_store));
+
+    data_acquisition_thread_ptr = new std::thread(program_thread::data_acquisition_thread, 
+                                                std::ref(data_acquisition_running), 
+                                                std::ref(data_acq),
+                                                std::ref(*parameter_store), 
+                                                std::ref(event_data), 
+                                                std::ref(data_writer));
     // -----
     
     return SDL_APP_CONTINUE;

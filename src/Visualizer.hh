@@ -1132,10 +1132,10 @@ class Visualizer
             SDL_FColor text_color = {0.0f, 0.0f, 0.0f, 1.0f}; // White color
 
             // Take snapshot of current time unit settings
-            std::shared_lock lock(mutex);
+            std::shared_lock visualizer_read_lock(mutex);
             TIME cur_unit_type = unit_type;
             float cur_unit_time_conversion_factor = unit_time_conversion_factor;  
-            lock.unlock();
+            visualizer_read_lock.unlock();
             
             // Add labels for each z subdivision
             for (uint32_t i = 0; i <= grid_z_subdivisions; ++i)
@@ -1240,21 +1240,17 @@ class Visualizer
             glm::mat4 projection = camera.getProjectionMatrix();
             glm::mat4 vp = projection * view;
 
-            // Render the grid
-            grid_renderer->render_pass(command_buffer, render_pass, vp);
-
             // Render the points (take snapshot of current color settings)
-            std::shared_lock lock(mutex);
+            std::shared_lock visualizer_read_lock(mutex);
             float cur_particle_scale = particle_scale;
             glm::vec3 cur_polarity_neg_color = polarity_neg_color;
             glm::vec3 cur_polarity_pos_color = polarity_pos_color;
-            lock.unlock();
+            visualizer_read_lock.unlock();
+
+            // Render all sub-renderers
+            grid_renderer->render_pass(command_buffer, render_pass, vp);
             points_renderer->render_pass(command_buffer, render_pass, vp, cur_particle_scale, cur_polarity_neg_color, cur_polarity_pos_color);
-
-            // Render the frames
             frames_renderer->render_pass(command_buffer, render_pass, vp);
-
-            // Render the text
             text_renderer->render_pass(command_buffer, render_pass, vp);
 
             SDL_EndGPURenderPass(render_pass);
