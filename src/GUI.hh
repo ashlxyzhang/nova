@@ -1109,34 +1109,6 @@ class GUI
         }
 
     public:
-        /**
-         * @brief Represents time units used by NOVA.
-         */
-        enum class TIME : uint8_t
-        {
-            UNIT_S = 0,  // seconds
-            UNIT_MS = 1, // milliseconds
-            UNIT_US = 2  // microseconds
-        };
-
-        /**
-         * @brief Two types of shutter (time or event based)
-         */
-        enum class SHUTTER
-        {
-            TIME_BASED = 0,
-            EVENT_BASED = 1
-        };
-
-        /**
-         * @brief State the program is in.
-         */
-        enum class PROGRAM_STATE : uint8_t
-        {
-            IDLE = 0,         // Program is doing nothing
-            FILE_STREAM = 2,  // Program is streaming from a file
-            CAMERA_STREAM = 3 // Program is streaming from a camera
-        };
 
         /**
          * @brief Constructor for GUI.

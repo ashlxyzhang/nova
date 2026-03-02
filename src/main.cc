@@ -10,9 +10,13 @@
 #include "SpinningCube.hh"
 #include "UploadBuffer.hh"
 #include "Visualizer.hh"
+#include "ErrorQueue.hh"
 #include "threads.hh" 
 
 #include <memory>
+
+
+
 
 //! Current only supports a single GPU device
 SDL_GPUDevice *gpu_device = nullptr;
@@ -98,7 +102,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     upload_buffer               = std::make_unique<UploadBuffer>(gpu_device);
     scrubber                    = std::make_unique<Scrubber>(*event_data, gpu_device);
     visualizer                  = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
-    digital_coded_exposure      = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
+    digital_coded_exposure      = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, render_targets, window, gpu_device);
+    data_acq                    = std::make_unique<DataAcquisition>();
+
     gui                         = std::make_unique<GUI>(render_targets, parameter_store, window, gpu_device, scrubber);
 
     SDL_EndGPUCopyPass(copy_pass);
@@ -106,7 +112,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     // -----
 
 
-    // Initialize threads
+    // Initialize threads (references passed to std::thread decay to normal value unless you use std::ref)
     writer_thread_ptr = new std::thread(program_thread::writer_thread, 
                                         std::ref(writer_running),
                                         std::ref(data_writer), 

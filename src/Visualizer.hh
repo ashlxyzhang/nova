@@ -935,7 +935,7 @@ class Visualizer
     public:
 
         // Public variable mutex - must be used by all modules (including Visualizer)
-        mutable std::shared_mutex mutex;
+        std::shared_mutex mutex;
 
         float particle_scale = 3.0f;
         glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);

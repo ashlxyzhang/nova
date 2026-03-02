@@ -124,13 +124,6 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 {
     while (running)
     {
-        // These always run
-        // To be responsive when scanning for camera
-        if (param_store.exists("start_camera_scan") && param_store.get<bool>("start_camera_scan"))
-        {
-            data_acq.discover_cameras(param_store);
-            param_store.add("start_camera_scan", false);
-        }
 
         // DATA ACQUISITION CODE
         if (param_store.exists("program_state"))
@@ -195,7 +188,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     {
                         data_acq.clear_reader();
                         evt_data.clear();
-
+3
                         bool init_success{
                             data_acq.init_camera_reader(param_store.get<int32_t>("camera_index"), param_store)};
 
@@ -223,8 +216,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     if (!camera_stream_paused)
                     {
                         // Get event/frame data in batches every frame
-                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer,
-                                                    param_store.get<float>("event_discard_odds"));
+                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer, param_store.get<float>("event_discard_odds"));
                         data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
                     }
                 }

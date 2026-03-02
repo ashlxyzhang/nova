@@ -2,17 +2,18 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
-#include "DVEventReader.hh"
 #include "DataWriter.hh"
 #include "EventData.hh"
+
 #include "IEventReader.hh"
-#include "ParameterStore.hh"
+#include "DVEventReader.hh"
+#include "MetavisionEventReader.hh"
+
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
 #include <opencv2/imgproc.hpp>
-#include <vector>
 
-#include "MetavisionEventReader.hh"
+#include <vector>
 
 /**
  * @brief This class provides functions for getting event/frame data
@@ -38,19 +39,41 @@ class DataAcquisition
         int32_t camera_frame_width;
         int32_t camera_frame_height;
 
-        std::mutex acq_lock; // For thread safety
-
         float randFloat()
         {
             return static_cast<float>(rand()) / RAND_MAX;
         };
 
     public:
-        DataAcquisition()
-            : data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
-              camera_frame_height{}, acq_lock{}
+        
+        enum class PROGRAM_STATE : uint8_t
         {
-        }
+            IDLE = 0,         
+            FILE_STREAM = 2,  
+            CAMERA_STREAM = 3 
+        };
+        
+
+        std::shared_mutex mutex;
+
+        PROGRAM_STATE program_state = PROGRAM_STATE::IDLE;
+
+        // Man wtf was phase 2 doing...
+        bool camera_changed = false;
+        bool stream_file_changed = false;       
+        bool stream_paused = false;
+        bool camera_stream_paused = false;
+        
+        int32_t camera_index = -1; // -1 if no camera currently selected
+        std::vector<std::string> discovered_camera_names;
+       
+         std::string stream_file_name = "";
+
+        float event_discard_odds = 1.0f; // 1.0 keeps all, 0 keeps none 
+
+
+        DataAcquisition():  data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
+                            camera_frame_height{} {}
 
         /**
          * @brief Clears member variables pertaining to reader, including reseting the data reader.
@@ -76,29 +99,26 @@ class DataAcquisition
         }
 
         /**
-         * @brief Scan for cameras and populate parameter store with GUI values to choose from.
-         * @param param_store Parameter store to populate.
+         * @brief Scan for available USB cameras load camera names and their pointers into discovered_camera_names and 
+         * scanned_cameras respectively
          */
-        void discover_cameras(ParameterStore &param_store)
+        void discover_cameras()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            std::unique_lock da_read_write_lock(mutex);
+            
             scanned_cameras.clear();
-
+            discovered_camera_names.clear();
+            
             const auto discovered_cameras{dv::io::camera::discover()};
-
-            std::vector<std::string> cameras_vec{};
-
             for (const auto &camera : discovered_cameras)
             {
-                std::stringstream str_stream{};
                 scanned_cameras.push_back(camera);
+                
+                std::stringstream str_stream;
                 str_stream << "Model: " << camera.cameraModel << " ";
                 str_stream << "Serial Number: " << camera.serialNumber << "\0";
-                cameras_vec.push_back(str_stream.str());
+                discovered_camera_names.push_back(str_stream.str());
             }
-            param_store.add("discovered_cameras", cameras_vec);
-
-            acq_lock_ul.unlock();
         }
 
         /**
@@ -107,27 +127,26 @@ class DataAcquisition
          * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
          */
-        bool init_camera_reader(int32_t camera_index, ParameterStore &param_store)
+        bool init_camera_reader()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            std::unique_lock da_read_write_lock(mutex);
 
-            if (scanned_cameras.empty() || camera_index < 0 || camera_index >= scanned_cameras.size())
-            {
-                acq_lock_ul.unlock();
-                return false;
-            }
+            // Ensure valid parameters
+            if (scanned_cameras.empty() || camera_index < 0 || camera_index >= scanned_cameras.size()) return false;
+
+
 
             try
             {
-                data_reader_ptr = std::make_unique<DVEventReader>(
-                    dv::io::camera::open(scanned_cameras[camera_index]));
+                data_reader_ptr = std::make_unique<DVEventReader>(dv::io::camera::open(scanned_cameras[camera_index]));
             }
             catch (const std::exception &e)
             {
                 std::string pop_up_err_str{"Camera reader error: "};
                 pop_up_err_str += e.what();
                 param_store.add("pop_up_err_str", pop_up_err_str);
-                acq_lock_ul.unlock();
+
+                
                 return false;
             }
 

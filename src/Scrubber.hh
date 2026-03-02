@@ -44,7 +44,7 @@ class Scrubber
 
 
         // Public variable mutex - must be used by all modules (including Scrubber)
-        mutable std::shared_mutex mutex;
+        std::shared_mutex mutex;
 
         ScrubberType type = ScrubberType::EVENT;
         ScrubberMode mode = ScrubberMode::PAUSED;

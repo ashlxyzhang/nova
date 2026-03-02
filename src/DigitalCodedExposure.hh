@@ -6,7 +6,6 @@
 
 #include "Camera.hh"
 #include "EventData.hh"
-#include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
@@ -85,10 +84,10 @@ class DigitalCodedExposure
         float morlet_frequency = 0.0f;
         float morlet_width = 0.01f;
 
-        bool texture_initialization_required = false;
+        bool texture_initialization_required = false; // Flag set by data acqusition thread after a new file/camera is loaded
         bool shutter_is_morlet = false;
         bool shutter_is_positive_only = false;
-        bool combine_color = false;
+        bool combine_color = false; // Unused by phase 2, purpose unknown
 
         int32_t dce_color = 0;              // 0 - High/Low, 1 - Tricolor, 2 - Use same colors as visualizer
         int32_t activation_function = 0;    // 0 - Linear, 1 - Sigmoid
@@ -97,22 +96,18 @@ class DigitalCodedExposure
         glm::vec3 polarity_pos_color = glm::vec3(1.0f, 1.0f, 1.0f);
         glm::vec3 polarity_neut_color = glm::vec3(0.5f, 0.5f, 0.5f);
 
-
         /**
          * @brief Constructor. Initializes compute pipelines.
-         * @param render_targets Render targets of the program
          * @param event_data EventData object containing event/frame data
+         * @param scrubber Scrubber object with data to compute DCE on
+         * @param render_targets Render targets of the program
          * @param window SDL_Window to draw on
          * @param gpu_device SDL_GPUDevice to create texture on
-         * @param upload_buffer UploadBuffer object for uploading data to GPU
-         * @param scrubber Scrubber object with data to compute DCE on
-         * @param copy_pass SDL_GPUCopyPass unused
          */
-        DigitalCodedExposure(EventData &event_data, Scrubber &scrubber, UploadBuffer &upload_buffer, 
-                             std::unordered_map<std::string, RenderTarget> &render_targets, 
-                             SDL_Window *window, SDL_GPUDevice *gpu_device, SDL_GPUCopyPass *copy_pass): 
-                event_data(event_data), scrubber(scrubber), render_targets(render_targets),
-                window(window), gpu_device(gpu_device), width{}, height{} // Make sure to zero width and height
+        DigitalCodedExposure(EventData& event_data, Scrubber& scrubber, std::unordered_map<std::string, RenderTarget>& render_targets, 
+                            SDL_Window* window, SDL_GPUDevice* gpu_device): 
+                            event_data(event_data), scrubber(scrubber), render_targets(render_targets), window(window), 
+                            gpu_device(gpu_device), width{}, height{}
         {
             // create the color texture, this is the texture that will store the color data
             SDL_GPUTextureCreateInfo color_create_info = {
@@ -228,7 +223,7 @@ class DigitalCodedExposure
             // Only generate textures when a new file has been loaded with new resolution
             std::unique_lock dce_read_write_lock(mutex);
             if (texture_initialization_required)
-            {      
+            {        
                 // This only needs to happen once when threads.hh loads a new file/camera so set back to false
                 texture_initialization_required = false;
                 dce_read_write_lock.unlock();
@@ -337,7 +332,6 @@ class DigitalCodedExposure
 
             // Lock dce while reading parameters
             std::shared_lock dce_read_lock(mutex);
-
 
             // Shader parameters
             glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight, static_cast<float>(activation_function), 0.0f);
