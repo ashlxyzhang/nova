@@ -66,7 +66,7 @@ class DataAcquisition
         // -----
         
         // Selected file
-        std::string stream_file_name = "";
+        std::string file_stream_name = "";
         
         bool file_stream_paused = false; // previously stream_paused
         bool file_stream_changed = false; // previously stream_file_changed
@@ -90,7 +90,9 @@ class DataAcquisition
          * @brief Clears every member variable
          */
         void clear()
-        {
+        {   
+            std::unique_lock da_read_write_lock(mutex);
+            
             data_reader_ptr.reset();
             scanned_cameras.clear();
             scanned_camera_names.clear();
@@ -99,6 +101,12 @@ class DataAcquisition
             camera_event_height = 0;
             camera_frame_width = 0;
             camera_frame_height = 0;
+
+            file_stream_paused = false; 
+            file_stream_changed = false;
+            
+            camera_stream_paused = false;
+            camera_stream_changed = false; 
         }
 
 
@@ -182,7 +190,7 @@ class DataAcquisition
 
 
             // Check for file extension
-            size_t extension_pos = stream_file_name.find_last_of('.');
+            size_t extension_pos = file_stream_name.find_last_of('.');
             if (extension_pos == std::string::npos)
             {
                 error_queue.push_error("File has no extension!");
@@ -192,12 +200,12 @@ class DataAcquisition
 
 
             // Check for valid file extension
-            std::string ext = stream_file_name.substr(extension_pos);
+            std::string ext = file_stream_name.substr(extension_pos);
             if (ext == ".aedat4")
             {
                 try
                 {
-                    data_reader_ptr = std::make_unique<DVEventReader>(std::make_unique<dv::io::MonoCameraRecording>(stream_file_name));
+                    data_reader_ptr = std::make_unique<DVEventReader>(std::make_unique<dv::io::MonoCameraRecording>(file_stream_name));
                 }
                 catch (const std::exception &e)
                 {
@@ -209,7 +217,7 @@ class DataAcquisition
             {
                 try
                 {
-                    data_reader_ptr = std::make_unique<MetavisionEventReader>(stream_file_name);
+                    data_reader_ptr = std::make_unique<MetavisionEventReader>(file_stream_name);
                 }
                 catch (const std::exception &e)
                 {
@@ -423,7 +431,7 @@ class DataAcquisition
         int32_t get_camera_index() { std::shared_lock lock(mutex); return camera_index; }
         bool is_camera_stream_paused() { std::shared_lock lock(mutex); return camera_stream_paused; }
         bool has_camera_stream_changed() { std::shared_lock lock(mutex); return camera_stream_changed; }
-        std::string get_stream_file_name() { std::shared_lock lock(mutex); return stream_file_name; }
+        std::string get_file_stream_name() { std::shared_lock lock(mutex); return file_stream_name; }
         bool is_file_stream_paused() { std::shared_lock lock(mutex); return file_stream_paused; }
         bool has_file_stream_changed() { std::shared_lock lock(mutex); return file_stream_changed; }
 
@@ -433,7 +441,7 @@ class DataAcquisition
         void set_camera_index(int32_t index) { std::unique_lock lock(mutex); camera_index = index; camera_stream_changed = true; }
         void set_camera_stream_paused(bool paused) { std::unique_lock lock(mutex); camera_stream_paused = paused; }
         void set_camera_stream_changed(bool changed) { std::unique_lock lock(mutex); camera_stream_changed = changed; }
-        void set_stream_file_name(const std::string &name) { std::unique_lock lock(mutex); stream_file_name = name; file_stream_changed = true; }
+        void set_file_stream_name(const std::string &name) { std::unique_lock lock(mutex); file_stream_name = name; file_stream_changed = true; }
         void set_file_stream_paused(bool paused) { std::unique_lock lock(mutex); file_stream_paused = paused; }
         void set_file_stream_changed(bool changed) { std::unique_lock lock(mutex); file_stream_changed = changed; }
         void set_state(const STATE new_state) { std::unique_lock lock(mutex); state = new_state; }

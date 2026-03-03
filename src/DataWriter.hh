@@ -3,6 +3,7 @@
 #define DATA_WRITER_HH
 
 #include "ErrorQueue.hh"
+#include "DataAcquisition.hh"
 
 #include <dv-processing/io/mono_camera_recording.hpp>
 #include <dv-processing/io/mono_camera_writer.hpp>
@@ -19,6 +20,7 @@ class DataWriter
         std::shared_mutex mutex;
         
         // Modules 
+        DataAcquisition &data_acq;
         ErrorQueue &error_queue;
 
         // data writer pointer
@@ -28,7 +30,7 @@ class DataWriter
         std::queue<dv::EventStore> writer_event_queue;
         std::queue<dv::Frame> writer_frame_queue;
 
-        // Toggles for GUI
+        // Toggles for GUI to save these values starting the next reader initialized
         bool save_events_toggle = false;
         bool save_frames_toggle = false;
 
@@ -106,10 +108,70 @@ class DataWriter
         /**
          * @brief Constructor, zero initializes all values
          */
-        DataWriter(ErrorQueue &error_queue):    data_writer_ptr{}, writer_event_queue{}, writer_frame_queue{}, 
-                                                writing_frame_data{false}, writing_event_data{false}, 
-                                                error_queue(error_queue) {}
+        DataWriter(DataAcquisition &data_acq, ErrorQueue &error_queue): data_acq(data_acq), error_queue(error_queue) {}
+    
+        /**
+         * @brief Sets up the DataWriter object for writing data to a file.
+         * @param data_acq DataAcquisition object that will write data to DataWriter.
+         * @param data_writer DataWriter object that will write data to file.
+         * @param param_store ParameterStore object that contains global data from GUI.
+         * @param prog_state State of the program.
+         */
+        void setup()
+        {   
+            clear(); // clear() also uses lock so make sure this is before the new lock is created
+            std::unique_lock dw_read_write_lock(mutex); 
+            
+            // Ensure the output file has a valid type
+            if (!stream_save_file_name.ends_with(".aedat4")) stream_save_file_name.append(".aedat4");
 
+            // If we are reading from a file, make sure the output file doesn't have the same name as the input file
+            if (data_acq.get_state() == DataAcquisition::STATE::FILE_STREAM)
+            {
+                if (stream_save_file_name == data_acq.get_file_stream_name())
+                {
+                    size_t aedat_index = stream_save_file_name.find(".aedat4");
+                    stream_save_file_name.insert(aedat_index, "new");
+                }
+            }
+
+            
+            // Check whether the user has toggled to save events and/or frames to the output file
+            if (save_events_toggle || save_frames_toggle)
+            {                   
+                // Attempt to initialize the writer 
+                if (init_data_writer())
+                {   
+
+                    // Compose a message to tell user what is being saved
+                    std::string saving_message = "Currently Saving ";
+
+                    if (save_events_toggle)
+                    {
+                        saving_message.append("Event Data ");
+                    }
+                    if (save_frames_toggle)
+                    {
+                        saving_message.append(save_events_toggle ? "And Frame Data " : "Frame Data ");
+                    }
+                    saving_message.append("To ");
+                    saving_message.append(stream_save_file_name);
+
+                    // Reset saving controls
+                    stream_save_file_name = "";
+                    save_events_toggle = false;
+                    save_frames_toggle = false;
+
+                }
+                else
+                {   
+                    // If initialization failed, just clear everything
+                    error_queue.push_error("Data Reader Initialization failed for some god damn reason 🤷");
+                    dw_read_write_lock.unlock();
+                    clear(); // clear() requires the lock so you need to unlock prior
+                }
+            }
+        }
 
         /**
          * @brief Clears all data from internal structures.
@@ -133,52 +195,45 @@ class DataWriter
             {
                 writer_frame_queue.pop();
             }
+
+            saving_message = "Nothing Being Saved Currently";
         }
 
         /**
          * @brief Initializes writer with DAVIS camera configs (event, frame, and IMU data).
-         * @param file_name Output file of data.
-         * @param _camera_event_width Width of camera event resolution.
-         * @param _camera_event_height Height of camera event resolution.
-         * @param _camera_frame_width Width of camera frame resolution.
-         * @param _camera_frame_height Height of camera frame resolution.
-         * @param event_data True if event stream is being written.
-         * @param frame_data True if frame stream is being written.
-         * @param param_store ParameterStore object to store error message into
+         * 
+         * NOT THREAD-SAFE, is only called within setup(), which acquires the mutex. I do this to
+         * prevent any of the values changing between unlocking in setup() and relocking here in init_data_writer()
+         * Blame phase 2
+         * - Ryan
+         * 
          * @return true if successful initialization of data writer, false otherwise.
          */
-        bool init_data_writer(const std::string &file_name, int32_t _camera_event_width, int32_t _camera_event_height,
-                              int32_t _camera_frame_width, int32_t _camera_frame_height, bool event_data,
-                              bool frame_data)
+        bool init_data_writer()
         {
-            std::unique_lock dw_read_write_lock(mutex);
-
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
             try
             {
                 dv::io::MonoCameraWriter::Config writer_config("Save Config");
 
-                cv::Size file_res((std::max)(_camera_event_width, _camera_frame_width), (std::max)(_camera_event_height, _camera_frame_height));
+                cv::Size file_res((std::max)(data_acq.get_camera_event_width(), data_acq.get_camera_frame_width()), 
+                                  (std::max)(data_acq.get_camera_event_height(), data_acq.get_camera_frame_height()));
 
-                writing_event_data = event_data;
-                writing_frame_data = frame_data;
-                if (event_data)
+                writing_event_data = save_events_toggle;
+                writing_frame_data = save_frames_toggle;
+
+                if (save_events_toggle)
                 {
                     writer_config.addEventStream(file_res);
                 }
 
-                if (frame_data)
+                if (save_frames_toggle)
                 {
                     writer_config.addFrameStream(file_res);
                 }
 
-                std::string file_name_appended{file_name};
-                if (!file_name_appended.ends_with(".aedat4"))
-                {
-                    file_name_appended.append(".aedat4");
-                }
-                data_writer_ptr = std::make_unique<dv::io::MonoCameraWriter>(file_name_appended, writer_config);
+                data_writer_ptr = std::make_unique<dv::io::MonoCameraWriter>(stream_save_file_name, writer_config);
             }
             catch (...)
             {
