@@ -3,8 +3,11 @@
 #define DATA_WRITER_HH
 
 #include "ParameterStore.hh"
+#include "ErrorQueue.hh"
+
 #include <dv-processing/io/mono_camera_recording.hpp>
 #include <dv-processing/io/mono_camera_writer.hpp>
+
 #include <queue>
 
 /**
@@ -15,7 +18,10 @@ class DataWriter
 {
     private:
         std::shared_mutex mutex;
-                
+        
+        // Modules 
+        ErrorQueue &error_queue;
+
         // data writer pointer
         std::unique_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
 
@@ -101,7 +107,9 @@ class DataWriter
         /**
          * @brief Constructor, zero initializes all values
          */
-        DataWriter(): data_writer_ptr{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{false}, writing_event_data{false} {}
+        DataWriter(ErrorQueue &error_queue):    data_writer_ptr{}, writer_event_queue{}, writer_frame_queue{}, 
+                                                writing_frame_data{false}, writing_event_data{false}, 
+                                                error_queue(error_queue) {}
 
 
         /**
@@ -109,7 +117,7 @@ class DataWriter
          */
         void clear()
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            std::unique_lock dw_read_write_lock(mutex);
             data_writer_ptr.reset();
 
             // Clear states
@@ -126,7 +134,6 @@ class DataWriter
             {
                 writer_frame_queue.pop();
             }
-            writer_lock_ul.unlock();
         }
 
         /**
@@ -143,9 +150,9 @@ class DataWriter
          */
         bool init_data_writer(const std::string &file_name, int32_t _camera_event_width, int32_t _camera_event_height,
                               int32_t _camera_frame_width, int32_t _camera_frame_height, bool event_data,
-                              bool frame_data, ParameterStore &param_store)
+                              bool frame_data)
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            std::unique_lock dw_read_write_lock(mutex);
 
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
@@ -176,13 +183,9 @@ class DataWriter
             }
             catch (...)
             {
-                std::string pop_up_err_str{"Something went wrong initializing file to save to!"};
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                writer_lock_ul.unlock();
+                error_queue.push_error("Something went wrong initializing file to save to!");
                 return false;
             }
-
-            writer_lock_ul.unlock();
 
             return true;
         }
@@ -193,9 +196,8 @@ class DataWriter
          */
         void add_event_store(dv::EventStore evt_store)
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            std::unique_lock dw_read_write_lock(mutex);
             writer_event_queue.push(evt_store);
-            writer_lock_ul.unlock();
         }
 
         /**
@@ -204,9 +206,8 @@ class DataWriter
          */
         void add_frame_data(dv::Frame frame_data)
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            std::unique_lock dw_read_write_lock(mutex);
             writer_frame_queue.push(frame_data);
-            writer_lock_ul.unlock();
         }
 
         /**
@@ -216,16 +217,12 @@ class DataWriter
          *                    in case writing fails.
          * @return false if write failed, true otherwise.
          */
-        bool write_event_store(ParameterStore &param_store)
+        bool write_event_store()
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            std::unique_lock dw_read_write_lock(mutex);
 
-            if (writer_event_queue.empty() || !data_writer_ptr || !writing_event_data)
-            {
-                writer_lock_ul.unlock();
-                return false;
-            }
-
+            if (writer_event_queue.empty() || !data_writer_ptr || !writing_event_data) return false;
+        
             dv::EventStore evt_store{writer_event_queue.front()};
             writer_event_queue.pop();
 
@@ -235,13 +232,10 @@ class DataWriter
             }
             catch (...)
             {
-                std::string pop_up_err_str{"Something went wrong with saving event data!"};
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                writer_lock_ul.unlock();
+                error_queue.push_error("Something went wrong with saving event data!");
                 return false;
             }
 
-            writer_lock_ul.unlock();
             return true;
         }
 
@@ -252,15 +246,11 @@ class DataWriter
          *                    in case writing fails.
          * @return false if write failed, true otherwise.
          */
-        bool write_frame_data(ParameterStore &param_store)
+        bool write_frame_data()
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
+            std::unique_lock dw_read_write_lock(mutex);
 
-            if (writer_frame_queue.empty() || !data_writer_ptr || !writing_frame_data)
-            {
-                writer_lock_ul.unlock();
-                return false;
-            }
+            if (writer_frame_queue.empty() || !data_writer_ptr || !writing_frame_data) return false;
 
             dv::Frame frame_data{writer_frame_queue.front()};
             writer_frame_queue.pop();
@@ -271,13 +261,10 @@ class DataWriter
             }
             catch (...)
             {
-                std::string pop_up_err_str{"Something went wrong with saving frame data!"};
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                writer_lock_ul.unlock();
+                error_queue.push_error("Something went wrong with saving frame data!");
                 return false;
             }
 
-            writer_lock_ul.unlock();
             return true;
         }
 };

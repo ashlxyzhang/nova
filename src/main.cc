@@ -106,6 +106,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     visualizer              = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass, *error_queue);
     digital_coded_exposure  = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, render_targets, window, gpu_device, *error_queue);
     data_acq                = std::make_unique<DataAcquisition>(*error_queue);
+    data_writer             = std::make_unique<DataWriter>(*error_queue);
     gui                     = std::make_unique<GUI>(render_targets, window, gpu_device, scrubber, *error_queue);
 
     SDL_EndGPUCopyPass(copy_pass);
