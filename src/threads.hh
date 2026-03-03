@@ -6,7 +6,6 @@
 #include "DataWriter.hh"
 #include "EventData.hh"
 #include "GUI.hh"
-#include "ParameterStore.hh"
 
 // Anonymous helper functions
 namespace
@@ -19,8 +18,7 @@ namespace
  * @param param_store ParameterStore object that contains global data from GUI.
  * @param prog_state State of the program.
  */
-inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store,
-                         GUI::PROGRAM_STATE prog_state)
+inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store, GUI::PROGRAM_STATE prog_state)
 {
     data_writer.clear();
     std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
@@ -101,13 +99,13 @@ namespace program_thread
  *
  */
 
-inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer, ParameterStore &param_store)
+inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer)
 {
     // For now let us spin
     while (running)
     {
-        data_writer.write_event_store(param_store);
-        data_writer.write_frame_data(param_store);
+        data_writer.write_event_store();
+        data_writer.write_frame_data();
     }
 }
 
@@ -119,8 +117,7 @@ inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer, P
  * @param data_writer DataWriter object to store event/frame data into to be saved to persistent storage.
  */
 // Thread for data acquisition, storing into event_data
-inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, ParameterStore &param_store,
-                                    EventData &evt_data, DataWriter &data_writer)
+inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, EventData &evt_data, DataWriter &data_writer)
 {
     while (running)
     {

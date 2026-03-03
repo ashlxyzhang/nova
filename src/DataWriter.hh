@@ -2,7 +2,6 @@
 #ifndef DATA_WRITER_HH
 #define DATA_WRITER_HH
 
-#include "ParameterStore.hh"
 #include "ErrorQueue.hh"
 
 #include <dv-processing/io/mono_camera_recording.hpp>

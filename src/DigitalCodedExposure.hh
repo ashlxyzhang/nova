@@ -287,7 +287,7 @@ class DigitalCodedExposure
         /**
          * @brief Does nothing atm
          */
-        void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+        void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
 

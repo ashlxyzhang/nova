@@ -40,10 +40,10 @@ std::unique_ptr<ErrorQueue>             error_queue;
 
 //! Worker threads run until their respective boolean flag is set false (see SDL_Quit)
 std::atomic<bool> writer_running = true;
-std::thread writer_thread_ptr;
+std::thread writer_thread;
 
-std::atomic<bool> data_acquisition_running = true;
-std::thread data_acquisition_thread_ptr;
+std::atomic<bool> data_acquisition_thread_running = true;
+std::thread data_acquisition_thread;
 
 
 /**
@@ -115,18 +115,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 
     // Initialize threads (references passed to std::thread decay to normal value unless you use std::ref)
-    writer_thread_ptr = new std::thread(program_thread::writer_thread, 
-                                        std::ref(writer_running),
-                                        std::ref(data_writer), 
-                                        std::ref(*parameter_store));
+    writer_thread = std::thread(program_thread::writer_thread, 
+                                    std::ref(writer_running),
+                                    std::ref(data_writer));
 
-    data_acquisition_thread_ptr = new std::thread(program_thread::data_acquisition_thread, 
-                                                std::ref(data_acquisition_running), 
+    data_acquisition_thread = std::thread(program_thread::data_acquisition_thread, 
+                                                std::ref(data_acquisition_thread_running), 
                                                 std::ref(data_acq),
-                                                std::ref(*parameter_store), 
                                                 std::ref(event_data), 
-                                                std::ref(data_writer),
-                                                std::ref(*digital_coded_exposure));
+                                                std::ref(data_writer));
     // -----
     
     return SDL_APP_CONTINUE;
@@ -177,7 +174,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     scrubber->copy_pass(*upload_buffer, copy_pass);
     visualizer->copy_pass(*upload_buffer, copy_pass);
-    digital_coded_exposure->copy_pass(upload_buffer, copy_pass);
+    digital_coded_exposure->copy_pass(*upload_buffer, copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
 
     // now that data is ready on the cpu and gpu, we can do our main compute tasks
@@ -234,29 +231,19 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
     // Ensure writer thread exits
     writer_running = false;
-    writer_thread_ptr->join();
+    writer_thread.join();
 
     // Ensure data acquisition thread exits
-    data_acquisition_running = false;
-    data_acquisition_thread_ptr->join();
+    data_acquisition_thread_running = false;
+    data_acquisition_thread.join();
 
     // Flush file write buffer?
-    data_writer.clear();
+    data_writer->clear();
 
     // Ensure camera disconnect
-    data_acq.clear_reader();
-
-    delete writer_thread_ptr;
-    delete data_acquisition_thread_ptr;
+    data_acq->clear();
 
     SDL_WaitForGPUIdle(gpu_device);
-
-    delete visualizer;
-    delete digital_coded_exposure;
-    delete scrubber;
-    delete gui;
-    delete upload_buffer;
-
     SDL_ReleaseWindowFromGPUDevice(gpu_device, window);
     SDL_DestroyGPUDevice(gpu_device);
     SDL_DestroyWindow(window);
