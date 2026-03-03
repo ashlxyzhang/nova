@@ -36,6 +36,7 @@ std::unique_ptr<DigitalCodedExposure>   digital_coded_exposure;
 std::unique_ptr<EventData>              event_data;
 std::unique_ptr<DataAcquisition>        data_acq;
 std::unique_ptr<DataWriter>             data_writer;
+std::unique_ptr<ErrorQueue>             error_queue;
 
 //! Worker threads run until their respective boolean flag is set false (see SDL_Quit)
 std::atomic<bool> writer_running = true;
@@ -99,13 +100,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     
     // Modules passed other modules by reference
-    upload_buffer               = std::make_unique<UploadBuffer>(gpu_device);
-    scrubber                    = std::make_unique<Scrubber>(*event_data, gpu_device);
-    visualizer                  = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass);
-    digital_coded_exposure      = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, render_targets, window, gpu_device);
-    data_acq                    = std::make_unique<DataAcquisition>();
-
-    gui                         = std::make_unique<GUI>(render_targets, parameter_store, window, gpu_device, scrubber);
+    error_queue             = std::make_unique<ErrorQueue>();
+    upload_buffer           = std::make_unique<UploadBuffer>(gpu_device);
+    scrubber                = std::make_unique<Scrubber>(*event_data, gpu_device, *error_queue);
+    visualizer              = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass, *error_queue);
+    digital_coded_exposure  = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, render_targets, window, gpu_device, *error_queue);
+    data_acq                = std::make_unique<DataAcquisition>(*error_queue);
+    gui                     = std::make_unique<GUI>(render_targets, window, gpu_device, scrubber, *error_queue);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -123,7 +124,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
                                                 std::ref(data_acq),
                                                 std::ref(*parameter_store), 
                                                 std::ref(event_data), 
-                                                std::ref(data_writer));
+                                                std::ref(data_writer),
+                                                std::ref(*digital_coded_exposure));
     // -----
     
     return SDL_APP_CONTINUE;

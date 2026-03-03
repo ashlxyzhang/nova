@@ -4,6 +4,7 @@
 
 #include "DataWriter.hh"
 #include "EventData.hh"
+#include "ErrorQueue.hh"
 
 #include "IEventReader.hh"
 #include "DVEventReader.hh"
@@ -25,81 +26,84 @@
  */
 class DataAcquisition
 {
+    public:
+        enum class STATE : uint8_t
+        {
+            IDLE = 0,         
+            FILE_STREAM = 2,  
+            CAMERA_STREAM = 3 
+        };
 
     private:
-        // For storing currently detected cameras
-        std::vector<dv::io::camera::USBDevice::DeviceDescriptor> scanned_cameras;
+        std::shared_mutex mutex;
+        
+        // Modules
+        ErrorQueue &error_queue;
+        // -----
 
-        // Backend-agnostic event reader; created by init_file_reader / init_camera_reader
+        // Available camera
+        std::vector<dv::io::camera::USBDevice::DeviceDescriptor> scanned_cameras;
+        std::vector<std::string> scanned_camera_names;
+        // -----
+        
+        // Reader state
+        STATE state = STATE::IDLE;
         std::unique_ptr<IEventReader> data_reader_ptr;
 
-        int32_t camera_event_width;
+        int32_t camera_event_width; 
         int32_t camera_event_height;
-
         int32_t camera_frame_width;
         int32_t camera_frame_height;
+
+        float event_discard_odds = 1.0f; // 1.0 keeps all, 0.0 keeps none 
+        // -----
+
+        // Selected camera        
+        int32_t camera_index = -1; // -1 if none selected
+
+        bool camera_stream_paused = false;
+        bool camera_stream_changed = false; // previously camera_chnaged
+        // -----
+        
+        // Selected file
+        std::string stream_file_name = "";
+        
+        bool file_stream_paused = false; // previously stream_paused
+        bool file_stream_changed = false; // previously stream_file_changed
+        // -----
 
         float randFloat()
         {
             return static_cast<float>(rand()) / RAND_MAX;
         };
 
+
     public:
-        
-        enum class PROGRAM_STATE : uint8_t
-        {
-            IDLE = 0,         
-            FILE_STREAM = 2,  
-            CAMERA_STREAM = 3 
-        };
-        
-
-        std::shared_mutex mutex;
-
-        PROGRAM_STATE program_state = PROGRAM_STATE::IDLE;
-
-        // Man wtf was phase 2 doing...
-        bool camera_changed = false;
-        bool stream_file_changed = false;       
-        bool stream_paused = false;
-        bool camera_stream_paused = false;
-        
-        int32_t camera_index = -1; // -1 if no camera currently selected
-        std::vector<std::string> discovered_camera_names;
-       
-         std::string stream_file_name = "";
-
-        float event_discard_odds = 1.0f; // 1.0 keeps all, 0 keeps none 
-
-
-        DataAcquisition():  data_reader_ptr{}, camera_event_width{}, camera_event_height{}, camera_frame_width{},
-                            camera_frame_height{} {}
-
         /**
-         * @brief Clears member variables pertaining to reader, including reseting the data reader.
+         * @param error_queue ErrorQueue object used to report errors to be displayed and/or logged
          */
-        void clear_reader()
-        {
-            data_reader_ptr.reset();
+        DataAcquisition(ErrorQueue &error_queue):   error_queue(error_queue), data_reader_ptr{}, camera_event_width{}, 
+                                                    camera_event_height{}, camera_frame_width{}, camera_frame_height{} {}
 
-            camera_event_width = 0;
-            camera_event_height = 0;
-
-            camera_frame_width = 0;
-            camera_frame_height = 0;
-        }
 
         /**
          * @brief Clears every member variable
          */
         void clear()
         {
-            clear_reader();
+            data_reader_ptr.reset();
             scanned_cameras.clear();
+            scanned_camera_names.clear();
+
+            camera_event_width = 0;
+            camera_event_height = 0;
+            camera_frame_width = 0;
+            camera_frame_height = 0;
         }
 
+
         /**
-         * @brief Scan for available USB cameras load camera names and their pointers into discovered_camera_names and 
+         * @brief Scan for available USB cameras load camera names and their pointers into scanned_camera_names and 
          * scanned_cameras respectively
          */
         void discover_cameras()
@@ -107,7 +111,7 @@ class DataAcquisition
             std::unique_lock da_read_write_lock(mutex);
             
             scanned_cameras.clear();
-            discovered_camera_names.clear();
+            scanned_camera_names.clear();
             
             const auto discovered_cameras{dv::io::camera::discover()};
             for (const auto &camera : discovered_cameras)
@@ -117,14 +121,12 @@ class DataAcquisition
                 std::stringstream str_stream;
                 str_stream << "Model: " << camera.cameraModel << " ";
                 str_stream << "Serial Number: " << camera.serialNumber << "\0";
-                discovered_camera_names.push_back(str_stream.str());
+                scanned_camera_names.push_back(str_stream.str());
             }
         }
 
         /**
          * @brief Loads camera to read. Initializes internal reader with camera.
-         * @param camera_index Index of camera in scanned_cameras vector to stream from.
-         * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
          */
         bool init_camera_reader()
@@ -142,11 +144,7 @@ class DataAcquisition
             }
             catch (const std::exception &e)
             {
-                std::string pop_up_err_str{"Camera reader error: "};
-                pop_up_err_str += e.what();
-                param_store.add("pop_up_err_str", pop_up_err_str);
-
-                
+                error_queue.push_error("Camera reader error: " + std::string(e.what()));
                 return false;
             }
 
@@ -168,7 +166,7 @@ class DataAcquisition
                     camera_frame_height = frame_resolution->height;
                 }
             }
-            acq_lock_ul.unlock();
+
             return true;
         }
 
@@ -176,38 +174,34 @@ class DataAcquisition
          * @brief Loads file to read. Initializes internal reader based on file extension:
          *          .aedat4        -> dv-processing backend
          *          .raw / .dat    -> OpenEB/Metavision backend
-         * @param file_name the name of the data file to read.
-         * @param param_store ParameterStore necessary for storing error messages in cases of failure.
          * @return false if failed to init reader, true otherwise.
          */
-        bool init_file_reader(std::string file_name, ParameterStore &param_store)
+        bool init_file_reader()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
+            std::unique_lock da_read_write_lock(mutex);
 
-            size_t extension_pos = file_name.find_last_of('.');
+
+            // Check for file extension
+            size_t extension_pos = stream_file_name.find_last_of('.');
             if (extension_pos == std::string::npos)
             {
-                std::string pop_up_err_str{"File has no extension!"};
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                acq_lock_ul.unlock();
+                error_queue.push_error("File has no extension!");
+
                 return false;
             }
 
-            std::string ext = file_name.substr(extension_pos);
 
+            // Check for valid file extension
+            std::string ext = stream_file_name.substr(extension_pos);
             if (ext == ".aedat4")
             {
                 try
                 {
-                    data_reader_ptr = std::make_unique<DVEventReader>(
-                        std::make_unique<dv::io::MonoCameraRecording>(file_name));
+                    data_reader_ptr = std::make_unique<DVEventReader>(std::make_unique<dv::io::MonoCameraRecording>(stream_file_name));
                 }
                 catch (const std::exception &e)
                 {
-                    std::string pop_up_err_str{"aedat4 reader error: "};
-                    pop_up_err_str += e.what();
-                    param_store.add("pop_up_err_str", pop_up_err_str);
-                    acq_lock_ul.unlock();
+                    error_queue.push_error("aedat4 reader error: " + std::string(e.what()));
                     return false;
                 }
             }
@@ -215,25 +209,22 @@ class DataAcquisition
             {
                 try
                 {
-                    data_reader_ptr = std::make_unique<MetavisionEventReader>(file_name);
+                    data_reader_ptr = std::make_unique<MetavisionEventReader>(stream_file_name);
                 }
                 catch (const std::exception &e)
                 {
-                    std::string pop_up_err_str{"Metavision reader error: "};
-                    pop_up_err_str += e.what();
-                    param_store.add("pop_up_err_str", pop_up_err_str);
-                    acq_lock_ul.unlock();
+                    error_queue.push_error("Metavision reader error: " + std::string(e.what()));
                     return false;
                 }
             }
             else
             {
-                std::string pop_up_err_str{"Unsupported file extension. Supported formats: .aedat4, .raw, .dat"};
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                acq_lock_ul.unlock();
+                error_queue.push_error("Unsupported file extension. Supported formats: .aedat4, .raw, .dat");
                 return false;
             }
 
+
+            // Read the event-resolution of the targeted input
             if (data_reader_ptr->isEventStreamAvailable())
             {
                 auto evt_resolution = data_reader_ptr->getEventResolution();
@@ -252,7 +243,8 @@ class DataAcquisition
                     camera_frame_height = frame_resolution->height;
                 }
             }
-            acq_lock_ul.unlock();
+
+            file_stream_changed = false;
             return true;
         }
 
@@ -277,32 +269,30 @@ class DataAcquisition
         /**
          * @brief For dynamic loading (streaming), gets a batch of event data.
          * @param evt_data EventData object to populate with event data.
-         * @param param_store ParameterStore object with data from GUI.
          * @param data_writer DataWriter for optional persistent storage.
-         * @param event_discard_odds Odds of keeping each event (1.0 = keep all).
          * @return true if any data was read, false otherwise.
          */
-        bool get_batch_evt_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer,
-                                float event_discard_odds)
-        {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            if (!data_reader_ptr)
-            {
-                acq_lock_ul.unlock();
-                return false;
-            }
-            bool data_read = false;
+        bool get_batch_evt_data(EventData &evt_data,DataWriter &data_writer)
+        {   
+            // data_reader_ptr is being changed here but it could possibility be switched to a shared_lock if it's too slow
+            std::unique_lock da_read_write_lock(mutex);
 
+
+            // Ensure a reader has been initialized
+            if (!data_reader_ptr) return false;
+
+
+            // Calculate drop out threshold
             if (event_discard_odds < 0.00001)
             {
-                std::string pop_up_err_str{"Event Discard Odds are too low!"};
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                acq_lock_ul.unlock();
+                error_queue.push_error("Event Discard Odds are too low!");
                 return false;
             }
+            float threshold = 1.0f / event_discard_odds;
 
-            float threshold{1.0f / event_discard_odds};
 
+            // Attempt to read data 
+            bool any_data_read = false;
             try
             {
                 if (data_reader_ptr->isEventStreamAvailable() && data_reader_ptr->isEventsRunning())
@@ -316,7 +306,7 @@ class DataAcquisition
                                 continue;
 
                             evt_data.write_evt_data(evt);
-                            data_read = true;
+                            any_data_read = true;
 
                             event_store.emplace_back(evt.timestamp, evt.x, evt.y, evt.polarity);
                         }
@@ -330,33 +320,29 @@ class DataAcquisition
             }
             catch (const std::exception &e)
             {
-                std::string pop_up_err_str{"Event read error: "};
-                pop_up_err_str += e.what();
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                acq_lock_ul.unlock();
+                error_queue.push_error("Event read error: " + std::string(e.what()));
                 return false;
             }
-            acq_lock_ul.unlock();
-            return data_read;
+
+            return any_data_read;
         }
 
         /**
          * @brief For dynamic loading (streaming), gets a batch of frame data.
          * @param evt_data EventData object to populate with frame data.
-         * @param param_store ParameterStore object with data from GUI.
          * @param data_writer DataWriter for optional persistent storage.
          * @return true if data was read, false otherwise.
          */
-        bool get_batch_frame_data(EventData &evt_data, ParameterStore &param_store, DataWriter &data_writer)
+        bool get_batch_frame_data(EventData &evt_data, DataWriter &data_writer)
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            if (!data_reader_ptr)
-            {
-                acq_lock_ul.unlock();
-                return false;
-            }
-            bool data_read = false;
+            std::unique_lock da_read_write_lock(mutex);
 
+            // Ensure a reader has been initialized
+            if (!data_reader_ptr) return false;
+
+
+            // Attempt to read data
+            bool any_data_read = false;
             try
             {
                 if (data_reader_ptr->isFrameStreamAvailable() && data_reader_ptr->isFramesRunning())
@@ -369,7 +355,7 @@ class DataAcquisition
                         EventData::FrameDatum display_frame{.frameData = rgb.clone(),
                                                             .timestamp = frame->timestamp};
                         evt_data.write_frame_data(display_frame);
-                        data_read = true;
+                        any_data_read = true;
 
                         // Write original BGR image to file
                         if (data_writer.get_writing_frame_data())
@@ -382,14 +368,12 @@ class DataAcquisition
             }
             catch (const std::exception &e)
             {
-                std::string pop_up_err_str{"Frame read error: "};
-                pop_up_err_str += e.what();
-                param_store.add("pop_up_err_str", pop_up_err_str);
-                acq_lock_ul.unlock();
+                error_queue.push_error("Frame read error: " + std::string(e.what()));
                 return false;
             }
-            acq_lock_ul.unlock();
-            return data_read;
+
+
+            return any_data_read;
         }
 
         /**
@@ -398,10 +382,8 @@ class DataAcquisition
          */
         int32_t get_camera_event_width()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            int32_t ret_camera_width{camera_event_width};
-            acq_lock_ul.unlock();
-            return ret_camera_width;
+            std::shared_lock da_read_lock(mutex);
+            return camera_event_width;
         }
 
         /**
@@ -410,10 +392,8 @@ class DataAcquisition
          */
         int32_t get_camera_frame_width()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            int32_t ret_camera_width{camera_frame_width};
-            acq_lock_ul.unlock();
-            return ret_camera_width;
+            std::shared_lock da_read_lock(mutex);
+            return camera_frame_width;
         }
 
         /**
@@ -422,10 +402,8 @@ class DataAcquisition
          */
         int32_t get_camera_event_height()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            int32_t ret_camera_height{camera_event_height};
-            acq_lock_ul.unlock();
-            return ret_camera_height;
+            std::shared_lock da_read_lock(mutex);
+            return camera_event_height;
         }
 
         /**
@@ -434,11 +412,31 @@ class DataAcquisition
          */
         int32_t get_camera_frame_height()
         {
-            std::unique_lock<std::mutex> acq_lock_ul{acq_lock};
-            int32_t ret_camera_height{camera_frame_height};
-            acq_lock_ul.unlock();
-            return ret_camera_height;
+            std::shared_lock da_read_lock(mutex);
+            return camera_frame_height;
         }
+
+
+        // Thread-safe getters
+        STATE get_state() { std::shared_lock lock(mutex); return state; }
+        float get_event_discard_odds() { std::shared_lock lock(mutex); return event_discard_odds; }
+        int32_t get_camera_index() { std::shared_lock lock(mutex); return camera_index; }
+        bool is_camera_stream_paused() { std::shared_lock lock(mutex); return camera_stream_paused; }
+        bool has_camera_stream_changed() { std::shared_lock lock(mutex); return camera_stream_changed; }
+        std::string get_stream_file_name() { std::shared_lock lock(mutex); return stream_file_name; }
+        bool is_file_stream_paused() { std::shared_lock lock(mutex); return file_stream_paused; }
+        bool has_file_stream_changed() { std::shared_lock lock(mutex); return file_stream_changed; }
+
+
+        // Thread-safe setters
+        void set_event_discard_odds(float odds) { std::unique_lock lock(mutex); event_discard_odds = odds; }
+        void set_camera_index(int32_t index) { std::unique_lock lock(mutex); camera_index = index; camera_stream_changed = true; }
+        void set_camera_stream_paused(bool paused) { std::unique_lock lock(mutex); camera_stream_paused = paused; }
+        void set_camera_stream_changed(bool changed) { std::unique_lock lock(mutex); camera_stream_changed = changed; }
+        void set_stream_file_name(const std::string &name) { std::unique_lock lock(mutex); stream_file_name = name; file_stream_changed = true; }
+        void set_file_stream_paused(bool paused) { std::unique_lock lock(mutex); file_stream_paused = paused; }
+        void set_file_stream_changed(bool changed) { std::unique_lock lock(mutex); file_stream_changed = changed; }
+        void set_state(const STATE new_state) { std::unique_lock lock(mutex); state = new_state; }
 };
 
 #endif // DATA_ACQUISITION_HH

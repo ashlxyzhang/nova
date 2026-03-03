@@ -13,31 +13,68 @@
  */
 class DataWriter
 {
-
     private:
+        std::shared_mutex mutex;
+                
         // data writer pointer
         std::unique_ptr<dv::io::MonoCameraWriter> data_writer_ptr;
 
-        std::mutex writer_lock; // For thread safety
-
-        // Queue of event stores
+        // Queues of event & frame data
         std::queue<dv::EventStore> writer_event_queue;
-
-        // Queue of frame data
         std::queue<dv::Frame> writer_frame_queue;
 
-        // Determine if writing event or frame data
-        bool writing_frame_data;
-        bool writing_event_data;
+        // Toggles for GUI
+        bool save_events_toggle = false;
+        bool save_frames_toggle = false;
+
+        // Currently writing data flags
+        bool writing_frame_data = false;
+        bool writing_event_data = false;
+
+        // Name of file to save data to and GUI message 
+        std::string stream_save_file_name = "";
+        std::string saving_message = "Nothing Being Saved Currently";
 
     public:
-        /**
-         * @brief Constructor, zero initializes all values
-         */
-        DataWriter()
-            : data_writer_ptr{}, writer_lock{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{false},
-              writing_event_data{false}
-        {
+
+        void set_save_frames_toggle(const bool toggle) {
+            std::unique_lock lock(mutex);
+            save_frames_toggle = toggle;
+        }
+
+        bool get_save_frames_toggle() {
+            std::shared_lock lock(mutex);
+            return save_frames_toggle;
+        }
+
+        void set_save_events_toggle(const bool toggle) {
+            std::unique_lock lock(mutex);
+            save_events_toggle = toggle;
+        }
+
+        bool get_save_events_toggle() {
+            std::shared_lock lock(mutex);
+            return save_events_toggle;
+        }
+
+        void set_saving_message(const std::string& message) {
+            std::unique_lock lock(mutex);
+            saving_message = message;
+        }
+
+        std::string get_saving_message() {
+            std::shared_lock lock(mutex);
+            return saving_message;
+        }
+
+        void set_stream_save_file_name(const std::string &file_name) {
+            std::unique_lock lock(mutex);
+            stream_save_file_name = file_name;
+        }
+
+        std::string get_stream_save_file_name() {
+            std::shared_lock lock(mutex);
+            return stream_save_file_name;
         }
 
         /**
@@ -46,10 +83,8 @@ class DataWriter
          */
         bool get_writing_frame_data()
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
-            bool ret_bool{writing_frame_data};
-            writer_lock_ul.unlock();
-            return ret_bool;
+            std::shared_lock lock(mutex);
+            return writing_frame_data;
         }
 
         /**
@@ -58,11 +93,16 @@ class DataWriter
          */
         bool get_writing_event_data()
         {
-            std::unique_lock<std::mutex> writer_lock_ul{writer_lock};
-            bool ret_bool{writing_event_data};
-            writer_lock_ul.unlock();
-            return ret_bool;
+            std::shared_lock lock(mutex);
+            return writing_event_data;
         }
+
+
+        /**
+         * @brief Constructor, zero initializes all values
+         */
+        DataWriter(): data_writer_ptr{}, writer_event_queue{}, writer_frame_queue{}, writing_frame_data{false}, writing_event_data{false} {}
+
 
         /**
          * @brief Clears all data from internal structures.

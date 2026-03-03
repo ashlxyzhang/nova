@@ -10,6 +10,7 @@
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
+#include "ErrorQueue.hh"
 
 #include "shaders/visualizer/frames/frames_frag.h"
 #include "shaders/visualizer/frames/frames_vert.h"
@@ -27,6 +28,24 @@
  */
 class Visualizer
 {
+    public:
+        // Enum for easily identifying time codes, duplicated in GUI.hh
+        enum class TIME : uint8_t { UNIT_S = 0, UNIT_MS = 1, UNIT_US = 2 };
+
+        struct VisualizerParameters {
+            uint32_t grid_x_subdivisions = 5;
+            uint32_t grid_y_subdivisions = 5;
+            uint32_t grid_z_subdivisions = 5;
+
+            float particle_scale = 3.0f;
+            glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
+            glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
+
+            TIME unit_type = TIME::UNIT_US;             // MS is default
+            float unit_time_conversion_factor = 1.0f;                   // MS is default
+        };
+
+
     private:
         /**
          * @brief Provides functions for rendering the grid in the visualizer.  
@@ -34,9 +53,7 @@ class Visualizer
         class GridRenderer
         {
             private:
-                uint32_t x_subdivisions = 5;
-                uint32_t y_subdivisions = 5;
-                uint32_t z_subdivisions = 5;
+                VisualizerParameters &params;
                 std::vector<glm::vec3> lines;
 
                 SDL_GPUDevice *gpu_device = nullptr;
@@ -56,48 +73,48 @@ class Visualizer
                     // 3. Left face (X = -1.0f)
 
                     // Front face (Z = +1.0f) - lines parallel to X and Y axes
-                    for (uint32_t i = 0; i <= x_subdivisions; ++i)
+                    for (uint32_t i = 0; i <= params.grid_x_subdivisions; ++i)
                     {
-                        float x = 2.0f * static_cast<float>(i) / static_cast<float>(x_subdivisions) - 1.0f;
+                        float x = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_x_subdivisions) - 1.0f;
                         // Lines parallel to Y-axis on front face
                         lines.push_back(glm::vec3(x, -1.0f, 1.0f));
                         lines.push_back(glm::vec3(x, 1.0f, 1.0f));
                     }
-                    for (uint32_t i = 0; i <= y_subdivisions; ++i)
+                    for (uint32_t i = 0; i <= params.grid_y_subdivisions; ++i)
                     {
-                        float y = 2.0f * static_cast<float>(i) / static_cast<float>(y_subdivisions) - 1.0f;
+                        float y = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_y_subdivisions) - 1.0f;
                         // Lines parallel to X-axis on front face
                         lines.push_back(glm::vec3(-1.0f, y, 1.0f));
                         lines.push_back(glm::vec3(1.0f, y, 1.0f));
                     }
 
                     // Bottom face (Y = -1.0f) - lines parallel to X and Z axes
-                    for (uint32_t i = 0; i <= x_subdivisions; ++i)
+                    for (uint32_t i = 0; i <= params.grid_x_subdivisions; ++i)
                     {
-                        float x = 2.0f * static_cast<float>(i) / static_cast<float>(x_subdivisions) - 1.0f;
+                        float x = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_x_subdivisions) - 1.0f;
                         // Lines parallel to Z-axis on bottom face
                         lines.push_back(glm::vec3(x, -1.0f, -1.0f));
                         lines.push_back(glm::vec3(x, -1.0f, 1.0f));
                     }
-                    for (uint32_t i = 0; i <= z_subdivisions; ++i)
+                    for (uint32_t i = 0; i <= params.grid_z_subdivisions; ++i)
                     {
-                        float z = 2.0f * static_cast<float>(i) / static_cast<float>(z_subdivisions) - 1.0f;
+                        float z = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_z_subdivisions) - 1.0f;
                         // Lines parallel to X-axis on bottom face
                         lines.push_back(glm::vec3(-1.0f, -1.0f, z));
                         lines.push_back(glm::vec3(1.0f, -1.0f, z));
                     }
 
                     // Left face (X = -1.0f) - lines parallel to Y and Z axes
-                    for (uint32_t i = 0; i <= y_subdivisions; ++i)
+                    for (uint32_t i = 0; i <= params.grid_y_subdivisions; ++i)
                     {
-                        float y = 2.0f * static_cast<float>(i) / static_cast<float>(y_subdivisions) - 1.0f;
+                        float y = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_y_subdivisions) - 1.0f;
                         // Lines parallel to Z-axis on left face
                         lines.push_back(glm::vec3(-1.0f, y, -1.0f));
                         lines.push_back(glm::vec3(-1.0f, y, 1.0f));
                     }
-                    for (uint32_t i = 0; i <= z_subdivisions; ++i)
+                    for (uint32_t i = 0; i <= params.grid_z_subdivisions; ++i)
                     {
-                        float z = 2.0f * static_cast<float>(i) / static_cast<float>(z_subdivisions) - 1.0f;
+                        float z = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_z_subdivisions) - 1.0f;
                         // Lines parallel to Y-axis on left face
                         lines.push_back(glm::vec3(-1.0f, -1.0f, z));
                         lines.push_back(glm::vec3(-1.0f, 1.0f, z));
@@ -111,7 +128,8 @@ class Visualizer
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPUCopyPass unused
                  */
-                GridRenderer(SDL_GPUDevice *gpu_device, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass):  gpu_device(gpu_device)
+                GridRenderer(SDL_GPUDevice *gpu_device, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass, VisualizerParameters &params):  
+                            gpu_device(gpu_device), params(params)
                 {
                     generate_grid_lines();
 
@@ -199,8 +217,9 @@ class Visualizer
                 void cpu_update()
                 {   
                     // Grid sizes are currently static so don't update
-
-                    // generate_grid_lines();
+                    
+                    //! This could be optimized to only be called when the grid sizes change
+                    generate_grid_lines();
                 }
 
                 /**
@@ -252,7 +271,7 @@ class Visualizer
                  * @param vp MVP matrix.
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp)
+                                    const glm::mat4 &vp)
                 {
                     if (!grid_pipeline || !vertex_buffer)
                         return;
@@ -278,6 +297,7 @@ class Visualizer
         class PointsRenderer
         {
             private:
+                VisualizerParameters &params;
                 Scrubber &scrubber;
                 EventData &event_data;
 
@@ -292,9 +312,9 @@ class Visualizer
                  * @param upload_buffer UploadBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPUCopyPass unused
                  */
-                PointsRenderer(EventData &event_data, Scrubber &scrubber,
-                               SDL_GPUDevice *gpu_device, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
-                    : event_data(event_data), scrubber(scrubber), gpu_device(gpu_device)
+                PointsRenderer(EventData &event_data, Scrubber &scrubber, SDL_GPUDevice *gpu_device, 
+                                UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass, VisualizerParameters &params)
+                    : event_data(event_data), scrubber(scrubber), gpu_device(gpu_device), params(params)
                 {
 
                     SDL_GPUShaderCreateInfo vs_create_info = {0};
@@ -375,8 +395,7 @@ class Visualizer
                  * @param render_pass GPU render pass
                  * @param vp MVP matrix
                  */
-                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, float particle_scale, glm::vec3 polarity_neg_color, glm::vec3 polarity_pos_color)
+                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass, const glm::mat4 &vp)
                 {
 
                     if (scrubber.get_points_buffer_size() == 0)
@@ -418,9 +437,9 @@ class Visualizer
                     uniforms.mvp = vp * reflect_yz * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
                     // Get camera dimensions for scaling
-                    uniforms.negative_color = glm::vec4(polarity_neg_color, 1.0f);
-                    uniforms.positive_color = glm::vec4(polarity_pos_color, 1.0f);
-                    uniforms.point_size = particle_scale;
+                    uniforms.negative_color = glm::vec4(params.polarity_neg_color, 1.0f);
+                    uniforms.positive_color = glm::vec4(params.polarity_pos_color, 1.0f);
+                    uniforms.point_size = params.particle_scale;
 
                     // Push the uniform data
                     SDL_PushGPUVertexUniformData(command_buffer, 0, &uniforms, sizeof(uniforms));
@@ -895,23 +914,31 @@ class Visualizer
                 }
         };
 
-        // Enum for easily identifying time codes, duplicated in GUI.hh, TODO: figure out if we should move enums
-        // to program wide file
-        enum class TIME : uint8_t
-        {
-            UNIT_S = 0,
-            UNIT_MS = 1,
-            UNIT_US = 2
-        };
 
+        // Mutex used by getters, setters, and internal methods performing bulk atomic operations
+        std::shared_mutex mutex; 
+
+        // Parameters
+        VisualizerParameters params;
+        // -----
+
+
+        // Camera
         Camera camera;
         glm::vec3 box_min;
         glm::vec3 box_max;
+        // -----
 
+
+        // Modules
         EventData &event_data;
         Scrubber &scrubber;
+        ErrorQueue &error_queue;
         std::unordered_map<std::string, RenderTarget> &render_targets;
+        // -----
 
+
+        // GPU 
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
 
@@ -919,32 +946,18 @@ class Visualizer
         PointsRenderer *points_renderer = nullptr;
         TextRenderer *text_renderer = nullptr;
         FramesRenderer *frames_renderer = nullptr;
+        // -----
 
-        // Mouse state for camera orbiting
+        
+        // Mouse state (for orbiting camera)
         bool is_mouse_dragging = false;
         float last_mouse_x = 0.0f;
         float last_mouse_y = 0.0f;
         bool cursor_captured = false;
-
-        // Current constant, passed to GridRenderer in constructor
-        uint32_t grid_x_subdivisions = 5;
-        uint32_t grid_y_subdivisions = 5;
-        uint32_t grid_z_subdivisions = 5;
+        // -----
 
 
     public:
-
-        // Public variable mutex - must be used by all modules (including Visualizer)
-        std::shared_mutex mutex;
-
-        float particle_scale = 3.0f;
-        glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
-        glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
-
-        TIME unit_type = TIME::UNIT_US;             // MS is default
-        float unit_time_conversion_factor = 1.0f;   // MS is default
-
-
         /**
          * @brief Constructor. Initializes render target of 3D Visualizer and GridRenderer, PointsRenderer,
          * TextRenderer, and FramesRenderer objects.
@@ -956,11 +969,13 @@ class Visualizer
          * @param gpu_device SDL_GPUDevice to create texture on
          * @param upload_buffer UploadBuffer object for uploading data to gpu
          * @param copy_pass SDL_GPUCopyPass unused
+         * @param error_queue ErrorQueue object used to report errors to be displayed and/or logged
          */
         Visualizer(EventData &event_data, Scrubber &scrubber, UploadBuffer &upload_buffer, 
                     std::unordered_map<std::string, RenderTarget> &render_targets, SDL_Window *window, 
-                    SDL_GPUDevice *gpu_device, SDL_GPUCopyPass *copy_pass): 
-                    event_data(event_data), scrubber(scrubber), render_targets(render_targets), window(window), gpu_device(gpu_device)
+                    SDL_GPUDevice *gpu_device, SDL_GPUCopyPass *copy_pass, ErrorQueue &error_queue): 
+                    event_data(event_data), scrubber(scrubber), render_targets(render_targets), window(window), 
+                    gpu_device(gpu_device), error_queue(error_queue)
         {
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
@@ -989,8 +1004,8 @@ class Visualizer
 
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
-            grid_renderer = new GridRenderer(gpu_device, upload_buffer, copy_pass);
-            points_renderer = new PointsRenderer(event_data, scrubber, gpu_device, upload_buffer, copy_pass);
+            grid_renderer = new GridRenderer(gpu_device, upload_buffer, copy_pass, params);
+            points_renderer = new PointsRenderer(event_data, scrubber, gpu_device, upload_buffer, copy_pass, params);
             text_renderer = new TextRenderer(gpu_device);
             frames_renderer = new FramesRenderer(gpu_device, scrubber);
         }
@@ -1133,15 +1148,15 @@ class Visualizer
 
             // Take snapshot of current time unit settings
             std::shared_lock visualizer_read_lock(mutex);
-            TIME cur_unit_type = unit_type;
-            float cur_unit_time_conversion_factor = unit_time_conversion_factor;  
+            TIME cur_unit_type = params.unit_type;
+            float cur_unit_time_conversion_factor = params.unit_time_conversion_factor;  
             visualizer_read_lock.unlock();
             
             // Add labels for each z subdivision
-            for (uint32_t i = 0; i <= grid_z_subdivisions; ++i)
+            for (uint32_t i = 0; i <= params.grid_z_subdivisions; ++i)
             {
                 // Calculate normalized Z position [-1, 1]
-                float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(grid_z_subdivisions) - 1.0f;
+                float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_z_subdivisions) - 1.0f;
 
                 // Convert normalized Z to actual depth value
                 float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
@@ -1176,7 +1191,8 @@ class Visualizer
          * @param copy_pass GPU copy pass.
          */
         void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
-        {
+        {   
+            std::shared_lock visualizer_read_lock(mutex);
             grid_renderer->copy_pass(upload_buffer, copy_pass);
             points_renderer->copy_pass(upload_buffer, copy_pass);
             text_renderer->copy_pass(upload_buffer, copy_pass);
@@ -1240,16 +1256,12 @@ class Visualizer
             glm::mat4 projection = camera.getProjectionMatrix();
             glm::mat4 vp = projection * view;
 
-            // Render the points (take snapshot of current color settings)
+            // Lock so params don't change mid render
             std::shared_lock visualizer_read_lock(mutex);
-            float cur_particle_scale = particle_scale;
-            glm::vec3 cur_polarity_neg_color = polarity_neg_color;
-            glm::vec3 cur_polarity_pos_color = polarity_pos_color;
-            visualizer_read_lock.unlock();
 
             // Render all sub-renderers
             grid_renderer->render_pass(command_buffer, render_pass, vp);
-            points_renderer->render_pass(command_buffer, render_pass, vp, cur_particle_scale, cur_polarity_neg_color, cur_polarity_pos_color);
+            points_renderer->render_pass(command_buffer, render_pass, vp);
             frames_renderer->render_pass(command_buffer, render_pass, vp);
             text_renderer->render_pass(command_buffer, render_pass, vp);
 
