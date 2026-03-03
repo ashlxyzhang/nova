@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <array>
+#include <mutex>
+#include <shared_mutex>
 
 // so the idea is that we give the user two options for scrubbing through the data,
 // an event and a time based system. however at the end of the day
@@ -174,7 +176,7 @@ class Scrubber
     
     
     private:
-        std::shared_mutex mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
+        mutable std::shared_mutex mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
 
         // State
         ScrubberState state;

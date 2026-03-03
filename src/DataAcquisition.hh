@@ -2,10 +2,8 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
-#include "DataWriter.hh"
 #include "EventData.hh"
 #include "ErrorQueue.hh"
-
 #include "IEventReader.hh"
 #include "DVEventReader.hh"
 #include "MetavisionEventReader.hh"
@@ -15,6 +13,10 @@
 #include <opencv2/imgproc.hpp>
 
 #include <vector>
+#include <mutex>
+#include <shared_mutex>
+
+class DataWriter;
 
 /**
  * @brief This class provides functions for getting event/frame data
@@ -35,7 +37,7 @@ class DataAcquisition
         };
 
     private:
-        std::shared_mutex mutex;
+        mutable std::shared_mutex mutex;
         
         // Modules
         ErrorQueue &error_queue;
@@ -92,7 +94,7 @@ class DataAcquisition
         void clear()
         {   
             std::unique_lock da_read_write_lock(mutex);
-            
+
             data_reader_ptr.reset();
             scanned_cameras.clear();
             scanned_camera_names.clear();
@@ -280,7 +282,7 @@ class DataAcquisition
          * @param data_writer DataWriter for optional persistent storage.
          * @return true if any data was read, false otherwise.
          */
-        bool get_batch_evt_data(EventData &evt_data,DataWriter &data_writer)
+        bool get_batch_evt_data(EventData &evt_data, DataWriter &data_writer)
         {   
             // data_reader_ptr is being changed here but it could possibility be switched to a shared_lock if it's too slow
             std::unique_lock da_read_write_lock(mutex);
@@ -434,6 +436,7 @@ class DataAcquisition
         std::string get_file_stream_name() { std::shared_lock lock(mutex); return file_stream_name; }
         bool is_file_stream_paused() { std::shared_lock lock(mutex); return file_stream_paused; }
         bool has_file_stream_changed() { std::shared_lock lock(mutex); return file_stream_changed; }
+        std::vector<std::string> get_scanned_camera_names() {std::shared_lock lock(mutex); return scanned_camera_names; }
 
 
         // Thread-safe setters
@@ -446,5 +449,7 @@ class DataAcquisition
         void set_file_stream_changed(bool changed) { std::unique_lock lock(mutex); file_stream_changed = changed; }
         void set_state(const STATE new_state) { std::unique_lock lock(mutex); state = new_state; }
 };
+
+
 
 #endif // DATA_ACQUISITION_HH

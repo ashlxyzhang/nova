@@ -14,7 +14,7 @@
 class ErrorQueue
 {
 	private:
-		std::mutex mutex;
+		mutable std::mutex mutex;
 		std::queue<std::string> error_message_queue;
 
 	public:

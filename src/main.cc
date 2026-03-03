@@ -4,7 +4,6 @@
 #include "DataWriter.hh"
 #include "DigitalCodedExposure.hh"
 #include "GUI.hh"
-#include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "SpinningCube.hh"
@@ -107,7 +106,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     digital_coded_exposure  = std::make_unique<DigitalCodedExposure>(*event_data, *scrubber, render_targets, window, gpu_device, *error_queue);
     data_acq                = std::make_unique<DataAcquisition>(*error_queue);
     data_writer             = std::make_unique<DataWriter>(*error_queue);
-    gui                     = std::make_unique<GUI>(render_targets, window, gpu_device, scrubber, *error_queue);
+    gui                     = std::make_unique<GUI>(render_targets,
+                                                    *data_acq,
+                                                    *data_writer,
+                                                    *scrubber,
+                                                    *visualizer,
+                                                    *digital_coded_exposure,
+                                                    *error_queue,
+                                                    window,
+                                                    gpu_device);
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -117,14 +124,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     // Initialize threads (references passed to std::thread decay to normal value unless you use std::ref)
     writer_thread = std::thread(program_thread::writer_thread, 
                                     std::ref(writer_running),
-                                    std::ref(data_writer));
+                                    std::ref(*data_writer));
 
     data_acquisition_thread = std::thread(program_thread::data_acquisition_thread, 
                                                 std::ref(data_acquisition_thread_running), 
-                                                std::ref(data_acq),
-                                                std::ref(event_data), 
-                                                std::ref(data_writer),
-                                                std::ref(digital_coded_exposure));
+                                                std::ref(*data_acq),
+                                                std::ref(*event_data), 
+                                                std::ref(*data_writer),
+                                                std::ref(*digital_coded_exposure));
     // -----
     
     return SDL_APP_CONTINUE;

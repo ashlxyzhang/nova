@@ -16,6 +16,8 @@
 #include "shaders/digital_coded_exposure/process_comp.h"
 
 #include <iostream>
+#include <mutex>
+#include <shared_mutex>
 
 /**
  * @brief Flags passed to the compute shaders to determine how DCE is computed.
@@ -58,7 +60,7 @@ class DigitalCodedExposure
         };
 
     private:
-        std::shared_mutex mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
+        mutable std::shared_mutex mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
 
         // Modules
         EventData &event_data;

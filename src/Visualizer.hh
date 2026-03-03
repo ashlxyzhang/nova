@@ -23,6 +23,9 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
+#include <mutex>
+#include <shared_mutex>
+
 /**
  * @brief Provides functions for rendering the 3D event data particle plot visualization (3D Visualizer window).
  */
@@ -916,7 +919,7 @@ class Visualizer
 
 
         // Mutex used by getters, setters, and internal methods performing bulk atomic operations
-        std::shared_mutex mutex; 
+        mutable std::shared_mutex mutex; 
 
         // Parameters
         VisualizerParameters params;
@@ -1123,6 +1126,19 @@ class Visualizer
                 return true;
             }
             return false;
+        }
+
+
+         // Thread safe state getter
+        VisualizerParameters get_parameters() const {
+            std::shared_lock lock(mutex);
+            return params;
+        }
+
+        // Thread safe state setter
+        void set_parameters(const VisualizerParameters& new_params) {
+            std::unique_lock lock(mutex);
+            params = new_params;
         }
 
         /**

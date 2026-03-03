@@ -8,6 +8,9 @@
 #include "EventData.hh"
 #include "GUI.hh"
 
+#include <mutex>
+#include <shared_mutex>
+
 // Program threads
 /**
  * @brief Namespace for functions that serve as entrypoints to threads in this program.
@@ -72,7 +75,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     }
                     
                     // If the user has set a file to save data to, setup a writer for that file
-                    if (data_writer.get_stream_save_file_name() != "") data_writer.setup();
+                    if (data_writer.get_stream_save_file_name() != "") data_writer.setup(data_acq);
 
                 }
 
@@ -112,10 +115,8 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     }
 
                     // If the user has set a file to save data to, setup a writer for that file
-                    if (data_writer.get_stream_save_file_name() != "")
-                    {
-                        data_writer.setup();
-                    }
+                    if (data_writer.get_stream_save_file_name() != "") data_writer.setup(data_acq);
+                    
                 }
 
                 // Check if stream is paused

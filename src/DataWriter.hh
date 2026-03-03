@@ -3,12 +3,16 @@
 #define DATA_WRITER_HH
 
 #include "ErrorQueue.hh"
-#include "DataAcquisition.hh"
 
 #include <dv-processing/io/mono_camera_recording.hpp>
 #include <dv-processing/io/mono_camera_writer.hpp>
 
 #include <queue>
+#include <mutex>
+#include <shared_mutex>
+
+
+class DataAcquisition;
 
 /**
  * @brief This class provides functionality to write event and frame data
@@ -17,10 +21,9 @@
 class DataWriter
 {
     private:
-        std::shared_mutex mutex;
+        mutable std::shared_mutex mutex;
         
         // Modules 
-        DataAcquisition &data_acq;
         ErrorQueue &error_queue;
 
         // data writer pointer
@@ -108,7 +111,7 @@ class DataWriter
         /**
          * @brief Constructor, zero initializes all values
          */
-        DataWriter(DataAcquisition &data_acq, ErrorQueue &error_queue): data_acq(data_acq), error_queue(error_queue) {}
+        DataWriter(ErrorQueue &error_queue): error_queue(error_queue) {}
     
         /**
          * @brief Sets up the DataWriter object for writing data to a file.
@@ -117,7 +120,7 @@ class DataWriter
          * @param param_store ParameterStore object that contains global data from GUI.
          * @param prog_state State of the program.
          */
-        void setup()
+        void setup(DataAcquisition &data_acq)
         {   
             clear(); // clear() also uses lock so make sure this is before the new lock is created
             std::unique_lock dw_read_write_lock(mutex); 
@@ -140,7 +143,7 @@ class DataWriter
             if (save_events_toggle || save_frames_toggle)
             {                   
                 // Attempt to initialize the writer 
-                if (init_data_writer())
+                if (init_data_writer(data_acq))
                 {   
 
                     // Compose a message to tell user what is being saved
@@ -209,7 +212,7 @@ class DataWriter
          * 
          * @return true if successful initialization of data writer, false otherwise.
          */
-        bool init_data_writer()
+        bool init_data_writer(DataAcquisition &data_acq)
         {
             // Create config for writing all types of data (event, frame, IMU) for DAVIS Camera
             // https://dv-processing.inivation.com/131-add-wengen-to-dv-processing-2-0/writing_data.html
