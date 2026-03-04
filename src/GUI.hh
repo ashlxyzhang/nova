@@ -37,6 +37,12 @@ class GUI
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
+        // Timeline visual constants
+        static constexpr ImU32 kTrackColor      = IM_COL32(60, 60, 60, 255);
+        static constexpr ImU32 kWindowHighlight = IM_COL32(80, 130, 200, 100);
+        static constexpr ImU32 kPositionMarker  = IM_COL32(255, 200, 50, 255);
+        static constexpr ImU32 kBorderColor     = IM_COL32(120, 120, 120, 255);
+
         // Circular fps buffer
         std::vector<float> fps_history_buf;
         size_t fps_buf_index;
@@ -617,257 +623,500 @@ class GUI
         }
 
         /**
+         * @brief Custom-draw a horizontal timeline bar with window highlight and position marker.
+         * @return true if user dragged to a new position (written to out_new_val)
+         */
+        bool draw_timeline_bar(float min_val, float max_val, float current_val, float window_val,
+                               float *out_new_val, const char *format, const char *unit_suffix, bool interactive)
+        {
+            bool changed = false;
+            ImDrawList *draw_list = ImGui::GetWindowDrawList();
+            float frame_h = ImGui::GetFrameHeight();
+            float track_h = frame_h * 1.2f;
+            float avail_w = ImGui::GetContentRegionAvail().x;
+
+            // Min/max labels
+            char min_buf[64], max_buf[64];
+            snprintf(min_buf, sizeof(min_buf), format, min_val);
+            snprintf(max_buf, sizeof(max_buf), format, max_val);
+            ImVec2 min_text_size = ImGui::CalcTextSize(min_buf);
+            ImVec2 max_text_size = ImGui::CalcTextSize(max_buf);
+            float label_w = std::max(min_text_size.x, max_text_size.x) + 4.0f;
+            float track_w = avail_w - 2.0f * label_w;
+            if (track_w < 20.0f)
+                track_w = 20.0f;
+
+            ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+            // Draw min label
+            draw_list->AddText(ImVec2(cursor.x, cursor.y + (track_h - min_text_size.y) * 0.5f),
+                               IM_COL32(200, 200, 200, 255), min_buf);
+
+            // Track rect
+            ImVec2 track_tl = ImVec2(cursor.x + label_w, cursor.y);
+            ImVec2 track_br = ImVec2(track_tl.x + track_w, track_tl.y + track_h);
+            draw_list->AddRectFilled(track_tl, track_br, kTrackColor);
+            draw_list->AddRect(track_tl, track_br, kBorderColor);
+
+            float range = max_val - min_val;
+            if (range > 0.0f)
+            {
+                // Window highlight (from current - window to current)
+                float win_start = std::max(current_val - window_val, min_val);
+                float win_end = std::min(current_val, max_val);
+                float win_start_frac = (win_start - min_val) / range;
+                float win_end_frac = (win_end - min_val) / range;
+
+                ImVec2 win_tl = ImVec2(track_tl.x + win_start_frac * track_w, track_tl.y);
+                ImVec2 win_br = ImVec2(track_tl.x + win_end_frac * track_w, track_br.y);
+                draw_list->AddRectFilled(win_tl, win_br, kWindowHighlight);
+
+                // Position marker (vertical line + triangle)
+                float pos_frac = (current_val - min_val) / range;
+                float pos_x = track_tl.x + pos_frac * track_w;
+                draw_list->AddLine(ImVec2(pos_x, track_tl.y), ImVec2(pos_x, track_br.y), kPositionMarker, 2.0f);
+                float tri_size = 6.0f;
+                draw_list->AddTriangleFilled(ImVec2(pos_x - tri_size, track_tl.y - 1.0f),
+                                             ImVec2(pos_x + tri_size, track_tl.y - 1.0f),
+                                             ImVec2(pos_x, track_tl.y + tri_size), kPositionMarker);
+            }
+
+            // Draw max label
+            draw_list->AddText(ImVec2(track_br.x + 4.0f, cursor.y + (track_h - max_text_size.y) * 0.5f),
+                               IM_COL32(200, 200, 200, 255), max_buf);
+
+            // Invisible button for drag interaction
+            ImGui::SetCursorScreenPos(track_tl);
+            ImGui::InvisibleButton("##timeline", ImVec2(track_w, track_h));
+
+            if (interactive && range > 0.0f)
+            {
+                if (ImGui::IsItemActive())
+                {
+                    float mouse_x = ImGui::GetIO().MousePos.x;
+                    float frac = std::clamp((mouse_x - track_tl.x) / track_w, 0.0f, 1.0f);
+                    *out_new_val = min_val + frac * range;
+                    changed = true;
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    float mouse_x = ImGui::GetIO().MousePos.x;
+                    float frac = std::clamp((mouse_x - track_tl.x) / track_w, 0.0f, 1.0f);
+                    float hover_val = min_val + frac * range;
+                    char tip[128];
+                    snprintf(tip, sizeof(tip), format, hover_val);
+                    ImGui::SetTooltip("%s %s", tip, unit_suffix);
+                }
+            }
+
+            // Move cursor past the track
+            ImGui::SetCursorScreenPos(ImVec2(cursor.x, track_br.y + 2.0f));
+
+            // Text readout of current position
+            char pos_buf[128];
+            snprintf(pos_buf, sizeof(pos_buf), format, current_val);
+            ImGui::Text("Position: %s %s", pos_buf, unit_suffix);
+
+            return changed;
+        }
+
+        /**
+         * @brief Draw a row of playback control buttons (|<, <<, Play/Pause, >>, >|/LIVE).
+         */
+        void draw_playback_controls(Scrubber::ScrubberMode current_mode, Scrubber::ScrubberType scrubber_type)
+        {
+            float button_w = ImGui::GetFrameHeight() * 2.0f;
+            float button_h = ImGui::GetFrameHeight();
+
+            // |< Jump to start
+            if (ImGui::Button("|<", ImVec2(button_w, button_h)))
+            {
+                if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                {
+                    if (scrubber)
+                    {
+                        size_t min_idx = parameter_store->get<std::size_t>("scrubber.min_index");
+                        parameter_store->add("scrubber.current_index", min_idx);
+                    }
+                }
+                else
+                {
+                    if (scrubber)
+                    {
+                        float min_time = parameter_store->get<float>("scrubber.min_time");
+                        parameter_store->add("scrubber.current_time", min_time);
+                    }
+                }
+                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+            }
+            ImGui::SetItemTooltip("Jump to start");
+
+            ImGui::SameLine();
+
+            // << Step backward
+            bool step_zero = false;
+            if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                step_zero = parameter_store->get<std::size_t>("scrubber.index_step") == 0;
+            else
+                step_zero = parameter_store->get<float>("scrubber.time_step") <= 0.00001f;
+
+            if (step_zero)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("<<", ImVec2(button_w, button_h)))
+            {
+                if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                {
+                    size_t cur = parameter_store->get<std::size_t>("scrubber.current_index");
+                    size_t step = parameter_store->get<std::size_t>("scrubber.index_step");
+                    size_t min_idx = parameter_store->get<std::size_t>("scrubber.min_index");
+                    cur = (cur > step + min_idx) ? cur - step : min_idx;
+                    parameter_store->add("scrubber.current_index", cur);
+                }
+                else
+                {
+                    float cur = parameter_store->get<float>("scrubber.current_time");
+                    float step = parameter_store->get<float>("scrubber.time_step");
+                    float min_t = parameter_store->get<float>("scrubber.min_time");
+                    cur = std::max(cur - step, min_t);
+                    parameter_store->add("scrubber.current_time", cur);
+                }
+                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+            }
+            ImGui::SetItemTooltip("Step backward");
+            if (step_zero)
+                ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            // Play / Pause toggle
+            if (current_mode == Scrubber::ScrubberMode::PLAYING)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
+                if (ImGui::Button("Pause", ImVec2(button_w * 1.5f, button_h)))
+                    parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+                ImGui::SetItemTooltip("Pause playback");
+                ImGui::PopStyleColor(2);
+            }
+            else
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.3f, 1.0f));
+                if (ImGui::Button("Play", ImVec2(button_w * 1.5f, button_h)))
+                    parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PLAYING);
+                ImGui::SetItemTooltip("Start playback");
+                ImGui::PopStyleColor(2);
+            }
+
+            ImGui::SameLine();
+
+            // >> Step forward
+            if (step_zero)
+                ImGui::BeginDisabled();
+            if (ImGui::Button(">>", ImVec2(button_w, button_h)))
+            {
+                if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                {
+                    size_t cur = parameter_store->get<std::size_t>("scrubber.current_index");
+                    size_t step = parameter_store->get<std::size_t>("scrubber.index_step");
+                    size_t max_idx = parameter_store->get<std::size_t>("scrubber.max_index");
+                    cur = std::min(cur + step, max_idx);
+                    parameter_store->add("scrubber.current_index", cur);
+                }
+                else
+                {
+                    float cur = parameter_store->get<float>("scrubber.current_time");
+                    float step = parameter_store->get<float>("scrubber.time_step");
+                    float max_t = parameter_store->get<float>("scrubber.max_time");
+                    cur = std::min(cur + step, max_t);
+                    parameter_store->add("scrubber.current_time", cur);
+                }
+                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+            }
+            ImGui::SetItemTooltip("Step forward");
+            if (step_zero)
+                ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            // >| or LIVE
+            if (current_mode == Scrubber::ScrubberMode::LATEST)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.8f, 0.1f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.9f, 0.2f, 1.0f));
+                if (ImGui::Button("LIVE", ImVec2(button_w * 1.5f, button_h)))
+                    parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+                ImGui::SetItemTooltip("Currently tracking latest data. Click to pause.");
+                ImGui::PopStyleColor(2);
+            }
+            else
+            {
+                if (ImGui::Button(">|", ImVec2(button_w, button_h)))
+                {
+                    if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                    {
+                        if (scrubber)
+                        {
+                            size_t max_idx = parameter_store->get<std::size_t>("scrubber.max_index");
+                            parameter_store->add("scrubber.current_index", max_idx);
+                        }
+                    }
+                    else
+                    {
+                        if (scrubber)
+                        {
+                            float max_time = parameter_store->get<float>("scrubber.max_time");
+                            parameter_store->add("scrubber.current_time", max_time);
+                        }
+                    }
+                    parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::LATEST);
+                }
+                ImGui::SetItemTooltip("Jump to end / track latest");
+            }
+        }
+
+        /**
          * @brief Draws scrubber window with controls for scrubbing through event data.
          */
         void draw_scrubber_window()
         {
             ImGui::Begin("Scrubber");
 
-            int scrubber_type_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberType>("scrubber.type"));
-            const char *scrubber_type_names[] = {"Event", "Time"};
-            if (ImGui::Combo("Scrubber Type", &scrubber_type_int, scrubber_type_names, 2))
+            Scrubber::ScrubberType scrubber_type = parameter_store->get<Scrubber::ScrubberType>("scrubber.type");
+            Scrubber::ScrubberMode scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
+
+            // Section 1 — Type selection via tab bar
+            Scrubber::ScrubberType prev_type = scrubber_type;
+            if (ImGui::BeginTabBar("##ScrubberTypeTabs"))
             {
-                parameter_store->add("scrubber.type", static_cast<Scrubber::ScrubberType>(scrubber_type_int));
+                if (ImGui::BeginTabItem("Event"))
+                {
+                    scrubber_type = Scrubber::ScrubberType::EVENT;
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Time"))
+                {
+                    scrubber_type = Scrubber::ScrubberType::TIME;
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
+            if (scrubber_type != prev_type)
+                parameter_store->add("scrubber.type", scrubber_type);
 
             ImGui::Separator();
 
-            // Scrubber Mode
-            int scrubber_mode_int = static_cast<int>(parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode"));
-            const char *scrubber_mode_names[] = {"Paused", "Playing", "Latest"};
-            if (ImGui::Combo("Mode", &scrubber_mode_int, scrubber_mode_names, 3))
-            {
-                parameter_store->add("scrubber.mode", static_cast<Scrubber::ScrubberMode>(scrubber_mode_int));
-            }
-
-            ImGui::Separator();
-
+            // Cap mode (for div factor calculations)
             if (!parameter_store->exists("scrubber.cap_mode"))
-            {
                 parameter_store->add("scrubber.cap_mode", 0);
-            }
             int cap_mode_int = parameter_store->get<int>("scrubber.cap_mode");
-            const char *cap_mode_names[] = {"Capped", "Uncapped"};
-            if (ImGui::Combo("Scrubber Cap", &cap_mode_int, cap_mode_names, 2))
-            {
-                parameter_store->add("scrubber.cap_mode", cap_mode_int);
-            }
-            int window_div_factor = 100; // Default to 100 for capped mode
-            int step_div_factor = 100;   // Default to 1 for step size
-            if (cap_mode_int != 0)       // Uncapped mode
-            {
-                window_div_factor = 2; // Use 2 for uncapped mode
-                step_div_factor = 10;  // Use 10 for uncapped mode
-            }
+            int window_div_factor = (cap_mode_int != 0) ? 2 : 100;
+            int step_div_factor = (cap_mode_int != 0) ? 10 : 100;
 
-            ImGui::Separator();
-
-            // Current Index (for EVENT type)
-            if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::EVENT)
+            // Section 2-4 — Timeline, playback, settings
+            if (scrubber_type == Scrubber::ScrubberType::EVENT)
             {
-                size_t current_index_size_t = parameter_store->get<std::size_t>("scrubber.current_index");
-
-                // Get min/max values from scrubber if available
-                size_t min_index_size_t = 0;
-                size_t max_index_size_t = 0;
+                // Initialize defaults
+                size_t current_index = parameter_store->get<std::size_t>("scrubber.current_index");
+                size_t min_index = 0, max_index = 0;
                 if (scrubber)
                 {
-                    min_index_size_t = parameter_store->get<std::size_t>("scrubber.min_index");
-                    max_index_size_t = parameter_store->get<std::size_t>("scrubber.max_index");
+                    min_index = parameter_store->get<std::size_t>("scrubber.min_index");
+                    max_index = parameter_store->get<std::size_t>("scrubber.max_index");
                 }
-
-                float current_index_float{static_cast<float>(current_index_size_t)};
-                float min_index_float{static_cast<float>(min_index_size_t)};
-                float max_index_float{static_cast<float>(max_index_size_t)};
-
-                if (ImGui::SliderFloat("Current Index", &current_index_float, min_index_float, max_index_float))
-                {
-                    if (current_index_float < min_index_float)
-                        current_index_float = min_index_float;
-                    if (current_index_float > max_index_float)
-                        current_index_float = max_index_float;
-                    parameter_store->add("scrubber.current_index", static_cast<std::size_t>(current_index_float));
-                }
-
-                // Index Window
                 if (!parameter_store->exists("scrubber.index_window"))
-                {
                     parameter_store->add("scrubber.index_window", static_cast<std::size_t>(50));
-                }
-                size_t index_window_size_t = parameter_store->get<std::size_t>("scrubber.index_window");
-
-                float index_window_float{static_cast<float>(index_window_size_t)};
-
-                // Calculate maximum window size (1/2 or 1/100 of data size, minimum 1)
-                size_t max_window_size = 1;
-                if (scrubber)
-                {
-                    size_t data_size = parameter_store->get<std::size_t>("scrubber.max_index") -
-                                       parameter_store->get<std::size_t>("scrubber.min_index") + 1;
-                    max_window_size = std::max(static_cast<size_t>(1), data_size / window_div_factor);
-                }
-
-                float max_window_size_float{static_cast<float>(max_window_size)};
-
-                if (ImGui::SliderFloat("Index Window", &index_window_float, 1.0f, max_window_size_float))
-                {
-                    if (index_window_float < 1.0f)
-                        index_window_float = 1.0f;
-                    if (index_window_float > max_window_size_float)
-                        index_window_float = max_window_size_float;
-                    parameter_store->add("scrubber.index_window", static_cast<std::size_t>(index_window_float));
-                }
-
-                // Time Step
                 if (!parameter_store->exists("scrubber.index_step"))
+                    parameter_store->add("scrubber.index_step", static_cast<std::size_t>(0));
+
+                float min_f = static_cast<float>(min_index);
+                float max_f = static_cast<float>(max_index);
+                float cur_f = static_cast<float>(current_index);
+                float win_f = static_cast<float>(parameter_store->get<std::size_t>("scrubber.index_window"));
+
+                if (max_f <= min_f)
                 {
-                    size_t default_step{0};
-                    parameter_store->add("scrubber.index_step", default_step);
+                    ImGui::TextDisabled("No data loaded");
                 }
-                size_t event_step = parameter_store->get<std::size_t>("scrubber.index_step");
-
-                // Calculate maximum step size (total time range)
-                size_t max_step_size_t = (max_index_size_t - min_index_size_t) / step_div_factor;
-                float max_step_float{static_cast<float>(max_step_size_t)};
-
-                float event_step_float = static_cast<float>(event_step);
-                std::string event_step_label{"Index Step"};
-                if (ImGui::SliderFloat(event_step_label.c_str(), &event_step_float, 0.0f, max_step_float))
+                else
                 {
-                    if (max_step_float >= 0.0f)
+                    // Timeline
+                    float new_val = cur_f;
+                    if (draw_timeline_bar(min_f, max_f, cur_f, win_f, &new_val, "%.0f", "events", true))
                     {
-                        event_step_float = event_step_float;
-                        float lowest_step_float{0.0f};
-                        event_step_float = std::clamp(event_step_float, lowest_step_float, max_step_float);
-                        parameter_store->add("scrubber.index_step", static_cast<size_t>(event_step_float));
+                        if (scrubber_mode == Scrubber::ScrubberMode::LATEST)
+                            parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+                        new_val = std::clamp(new_val, min_f, max_f);
+                        parameter_store->add("scrubber.current_index", static_cast<std::size_t>(new_val));
+                    }
+
+                    ImGui::Separator();
+
+                    // Playback controls
+                    scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
+                    draw_playback_controls(scrubber_mode, scrubber_type);
+
+                    ImGui::Separator();
+
+                    // Window slider (always visible)
+                    size_t data_size = max_index - min_index + 1;
+                    size_t max_window = std::max(static_cast<size_t>(1), data_size / window_div_factor);
+                    float max_window_f = static_cast<float>(max_window);
+                    float win_slider = win_f;
+                    if (ImGui::SliderFloat("Window", &win_slider, 1.0f, max_window_f, "%.0f"))
+                    {
+                        win_slider = std::clamp(win_slider, 1.0f, max_window_f);
+                        parameter_store->add("scrubber.index_window", static_cast<std::size_t>(win_slider));
+                    }
+                    ImGui::SetItemTooltip("Number of events behind position to display");
+
+                    // Step slider (hidden when PAUSED)
+                    scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
+                    if (scrubber_mode != Scrubber::ScrubberMode::PAUSED)
+                    {
+                        size_t step = parameter_store->get<std::size_t>("scrubber.index_step");
+                        size_t max_step = (max_index - min_index) / step_div_factor;
+                        float max_step_f = static_cast<float>(max_step);
+                        float step_f = static_cast<float>(step);
+                        if (ImGui::SliderFloat("Step", &step_f, 0.0f, max_step_f, "%.0f"))
+                        {
+                            if (max_step_f >= 0.0f)
+                            {
+                                step_f = std::clamp(step_f, 0.0f, max_step_f);
+                                parameter_store->add("scrubber.index_step", static_cast<size_t>(step_f));
+                            }
+                        }
+                        ImGui::SetItemTooltip("Events to advance per frame during playback");
                     }
                 }
             }
-            // Time-based controls (for TIME type)
-            else if (parameter_store->get<Scrubber::ScrubberType>("scrubber.type") == Scrubber::ScrubberType::TIME)
+            else // TIME
             {
                 // Get time unit information
                 uint8_t unit_type = parameter_store->get<uint8_t>("unit_type");
                 std::string time_unit_suffix = time_units[unit_type];
 
-                // Determine format string based on time unit
                 std::string time_format_str{};
                 switch (static_cast<TIME>(unit_type))
                 {
                 case TIME::UNIT_US:
-                    time_format_str = std::string{"%.2f"};
+                    time_format_str = "%.2f";
                     break;
                 case TIME::UNIT_MS:
-                    time_format_str = std::string{"%.4f"};
+                    time_format_str = "%.4f";
                     break;
                 case TIME::UNIT_S:
-                    time_format_str = std::string{"%.8f"};
+                    time_format_str = "%.8f";
                     break;
                 }
 
-                // Current Time
+                // Initialize defaults
                 if (!parameter_store->exists("scrubber.current_time"))
-                {
                     parameter_store->add("scrubber.current_time", 0.0f);
-                }
                 float current_time = parameter_store->get<float>("scrubber.current_time");
 
                 if (!parameter_store->exists("unit_time_conversion_factor"))
-                {
-                    parameter_store->add("unit_time_conversion_factor", 1.0f); // Assume default unit of microseconds
-                }
-                float unit_time_conversion_factor{parameter_store->get<float>("unit_time_conversion_factor")};
-                float current_time_unit_adjusted = current_time / unit_time_conversion_factor;
+                    parameter_store->add("unit_time_conversion_factor", 1.0f);
+                float unit_conv = parameter_store->get<float>("unit_time_conversion_factor");
+                float current_time_adj = current_time / unit_conv;
 
-                // Get min/max time values from scrubber if available
-                float min_time = 0.0f;
-                float max_time = 0.0f;
+                float min_time = 0.0f, max_time = 0.0f;
                 if (scrubber)
                 {
                     min_time = parameter_store->get<float>("scrubber.min_time");
                     max_time = parameter_store->get<float>("scrubber.max_time");
                 }
+                float min_adj = min_time / unit_conv;
+                float max_adj = max_time / unit_conv;
 
-                float min_time_unit_adjusted = min_time / unit_time_conversion_factor;
-                float max_time_unit_adjusted = max_time / unit_time_conversion_factor;
-
-                std::string current_time_label = "Current Time " + time_unit_suffix;
-                if (ImGui::SliderFloat(current_time_label.c_str(), &current_time_unit_adjusted, min_time_unit_adjusted,
-                                       max_time_unit_adjusted, time_format_str.c_str()))
-                {
-                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
-                    if (max_time_unit_adjusted > min_time_unit_adjusted)
-                    {
-                        current_time_unit_adjusted =
-                            std::clamp(current_time_unit_adjusted, min_time_unit_adjusted, max_time_unit_adjusted);
-                        current_time = current_time_unit_adjusted *
-                                       unit_time_conversion_factor; // Revert conversion to store back into scrubber
-                        // Scrubber deals in us time unit
-                        parameter_store->add("scrubber.current_time", current_time);
-                    }
-                }
-
-                // Time Window
                 if (!parameter_store->exists("scrubber.time_window"))
-                {
                     parameter_store->add("scrubber.time_window", 1.0f);
-                }
                 float time_window = parameter_store->get<float>("scrubber.time_window");
-                float time_window_unit_adjusted = time_window / unit_time_conversion_factor;
+                float time_window_adj = time_window / unit_conv;
 
-                // Calculate maximum window size (1/2 or 1/100 of total time range, minimum 0.001)
-                float max_window_time = std::max(0.00001f, (max_time - min_time) / window_div_factor);
-                float max_window_time_unit_adjusted = max_window_time / unit_time_conversion_factor;
-
-                std::string time_window_label = "Time Window " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_window_label.c_str(), &time_window_unit_adjusted, 0.00001f,
-                                       max_window_time_unit_adjusted, time_format_str.c_str()))
-                {
-                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
-                    if (max_window_time_unit_adjusted > 0.00001f)
-                    {
-                        time_window_unit_adjusted =
-                            std::clamp(time_window_unit_adjusted, 0.00001f, max_window_time_unit_adjusted);
-                        // Adjust back to us to store into scrubber
-                        time_window = time_window_unit_adjusted * unit_time_conversion_factor;
-                        parameter_store->add("scrubber.time_window", time_window);
-                    }
-                }
-
-                // Time Step
                 if (!parameter_store->exists("scrubber.time_step"))
-                {
                     parameter_store->add("scrubber.time_step", 0.1f);
-                }
-                float time_step = parameter_store->get<float>("scrubber.time_step");
-                float time_step_unit_adjusted = time_step / unit_time_conversion_factor;
 
-                // Calculate maximum step size (total time range)
-                float max_step_time = (max_time - min_time) / step_div_factor;
-                float max_step_time_unit_adjusted = max_step_time / unit_time_conversion_factor;
-
-                std::string time_step_label = "Time Step " + time_unit_suffix;
-                if (ImGui::SliderFloat(time_step_label.c_str(), &time_step_unit_adjusted, 0.00001f,
-                                       max_step_time_unit_adjusted, time_format_str.c_str()))
+                if (max_adj <= min_adj)
                 {
-                    // STOP CLAMP FROM CRASHING THE PROGRAM FOR THE NTH TIME
-                    if (max_step_time_unit_adjusted > 0.00001f)
+                    ImGui::TextDisabled("No data loaded");
+                }
+                else
+                {
+                    // Timeline
+                    float new_val = current_time_adj;
+                    if (draw_timeline_bar(min_adj, max_adj, current_time_adj, time_window_adj, &new_val,
+                                          time_format_str.c_str(), time_unit_suffix.c_str(), true))
                     {
-                        time_step_unit_adjusted =
-                            std::clamp(time_step_unit_adjusted, 0.00001f, max_step_time_unit_adjusted);
-                        // Adjust back to us to store into data scrubber
-                        time_step = time_step_unit_adjusted * unit_time_conversion_factor;
-                        parameter_store->add("scrubber.time_step", time_step);
+                        if (scrubber_mode == Scrubber::ScrubberMode::LATEST)
+                            parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+                        if (max_adj > min_adj)
+                        {
+                            new_val = std::clamp(new_val, min_adj, max_adj);
+                            parameter_store->add("scrubber.current_time", new_val * unit_conv);
+                        }
+                    }
+
+                    ImGui::Separator();
+
+                    // Playback controls
+                    scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
+                    draw_playback_controls(scrubber_mode, scrubber_type);
+
+                    ImGui::Separator();
+
+                    // Window slider (always visible)
+                    float max_window_time = std::max(0.00001f, (max_time - min_time) / window_div_factor);
+                    float max_window_adj = max_window_time / unit_conv;
+                    if (ImGui::SliderFloat("Window", &time_window_adj, 0.00001f, max_window_adj,
+                                           time_format_str.c_str()))
+                    {
+                        if (max_window_adj > 0.00001f)
+                        {
+                            time_window_adj = std::clamp(time_window_adj, 0.00001f, max_window_adj);
+                            parameter_store->add("scrubber.time_window", time_window_adj * unit_conv);
+                        }
+                    }
+                    ImGui::SetItemTooltip("Time window behind position to display");
+
+                    // Step slider (hidden when PAUSED)
+                    scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
+                    if (scrubber_mode != Scrubber::ScrubberMode::PAUSED)
+                    {
+                        float time_step = parameter_store->get<float>("scrubber.time_step");
+                        float time_step_adj = time_step / unit_conv;
+                        float max_step = (max_time - min_time) / step_div_factor;
+                        float max_step_adj = max_step / unit_conv;
+                        if (ImGui::SliderFloat("Step", &time_step_adj, 0.00001f, max_step_adj,
+                                               time_format_str.c_str()))
+                        {
+                            if (max_step_adj > 0.00001f)
+                            {
+                                time_step_adj = std::clamp(time_step_adj, 0.00001f, max_step_adj);
+                                parameter_store->add("scrubber.time_step", time_step_adj * unit_conv);
+                            }
+                        }
+                        ImGui::SetItemTooltip("Time to advance per frame during playback");
                     }
                 }
             }
 
-            // Control if frame data shows up with event data
+            ImGui::Separator();
+
+            // Cap mode — radio buttons
+            int cap = parameter_store->get<int>("scrubber.cap_mode");
+            if (ImGui::RadioButton("Capped", cap == 0))
+                parameter_store->add("scrubber.cap_mode", 0);
+            ImGui::SetItemTooltip("Limit slider ranges for finer control");
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Uncapped", cap != 0))
+                parameter_store->add("scrubber.cap_mode", 1);
+            ImGui::SetItemTooltip("Full slider ranges");
+
+            // Show Frame Data checkbox
             if (!parameter_store->exists("scrubber.show_frame_data"))
-            {
                 parameter_store->add("scrubber.show_frame_data", false);
-            }
-            bool show_frame_data{parameter_store->get<bool>("scrubber.show_frame_data")};
+            bool show_frame_data = parameter_store->get<bool>("scrubber.show_frame_data");
             ImGui::Checkbox("Show Frame Data", &show_frame_data);
             parameter_store->add("scrubber.show_frame_data", show_frame_data);
 
