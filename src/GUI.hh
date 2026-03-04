@@ -902,7 +902,10 @@ class GUI
                 ImGui::EndTabBar();
             }
             if (scrubber_type != prev_type)
+            {
                 parameter_store->add("scrubber.type", scrubber_type);
+                parameter_store->add("scrubber.mode", Scrubber::ScrubberMode::PAUSED);
+            }
 
             ImGui::Separator();
 
