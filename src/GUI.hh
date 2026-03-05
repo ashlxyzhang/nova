@@ -17,6 +17,8 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
+#include <iostream>
+
 // Structure to pass pointers to callbacks (callback functions need pointers to both)
 struct CallbackData {
     DataAcquisition* data_acquisition;
@@ -122,21 +124,25 @@ class GUI
          * @brief Draws error popup window.
          */
         void draw_error_popup_window()
-        {
-            std::string error_msg = error_queue.pop_error();
+        {   
+            
+            std::string error_msg = error_queue.top_error();
+
             if (!error_msg.empty())
             {
                 ImGui::OpenPopup("Error");
-            }
 
-            if (ImGui::BeginPopup("Error"))
-            {
+                ImGui::BeginPopup("Error");
+
                 ImGui::Text("%s", error_msg.c_str());
 
                 if (ImGui::Button("Acknowledged"))
                 {
                     ImGui::CloseCurrentPopup();
+                    error_queue.pop_error();
                 }
+                
+
                 ImGui::EndPopup();
             }
         }

@@ -22,6 +22,13 @@ class ErrorQueue
 
 		ErrorQueue() = default;
 
+		std::string top_error() {
+			std::lock_guard lock(mutex);
+
+			if (error_message_queue.empty()) return "";
+			return error_message_queue.front();
+		}
+
 		/**
 		 * @brief Adds message to the queue, is thread-safe
 		 */
@@ -35,14 +42,14 @@ class ErrorQueue
 		/**
 		 * @brief Gets oldest error message, returns empty string if there is none
 		 */
-		std::string pop_error()
+		void pop_error()
 		{
 			std::lock_guard lock(mutex);
 
-			if (error_message_queue.empty()) return "";
-			std::string error = std::move(error_message_queue.front());
-			error_message_queue.pop();
-			return error;
+			if (!error_message_queue.empty()) 
+			{
+				error_message_queue.pop();
+			}
 		}
 
 		/**
