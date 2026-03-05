@@ -889,14 +889,14 @@ class GUI
             Scrubber::ScrubberType prev_type = scrubber_type;
             if (ImGui::BeginTabBar("##ScrubberTypeTabs"))
             {
-                if (ImGui::BeginTabItem("Event"))
-                {
-                    scrubber_type = Scrubber::ScrubberType::EVENT;
-                    ImGui::EndTabItem();
-                }
                 if (ImGui::BeginTabItem("Time"))
                 {
                     scrubber_type = Scrubber::ScrubberType::TIME;
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Event"))
+                {
+                    scrubber_type = Scrubber::ScrubberType::EVENT;
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
@@ -973,9 +973,7 @@ class GUI
                     }
                     ImGui::SetItemTooltip("Number of events behind position to display");
 
-                    // Step slider (hidden when PAUSED)
-                    scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
-                    if (scrubber_mode != Scrubber::ScrubberMode::PAUSED)
+                    // Step slider
                     {
                         size_t step = parameter_store->get<std::size_t>("scrubber.index_step");
                         size_t max_step = (max_index - min_index) / step_div_factor;
@@ -1033,12 +1031,12 @@ class GUI
                 float max_adj = max_time / unit_conv;
 
                 if (!parameter_store->exists("scrubber.time_window"))
-                    parameter_store->add("scrubber.time_window", 1.0f);
+                    parameter_store->add("scrubber.time_window", 10000.0f);
                 float time_window = parameter_store->get<float>("scrubber.time_window");
                 float time_window_adj = time_window / unit_conv;
 
                 if (!parameter_store->exists("scrubber.time_step"))
-                    parameter_store->add("scrubber.time_step", 0.1f);
+                    parameter_store->add("scrubber.time_step", 33333.0f);
 
                 if (max_adj <= min_adj)
                 {
@@ -1082,9 +1080,7 @@ class GUI
                     }
                     ImGui::SetItemTooltip("Time window behind position to display");
 
-                    // Step slider (hidden when PAUSED)
-                    scrubber_mode = parameter_store->get<Scrubber::ScrubberMode>("scrubber.mode");
-                    if (scrubber_mode != Scrubber::ScrubberMode::PAUSED)
+                    // Step slider
                     {
                         float time_step = parameter_store->get<float>("scrubber.time_step");
                         float time_step_adj = time_step / unit_conv;

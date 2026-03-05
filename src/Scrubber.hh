@@ -84,8 +84,15 @@ class Scrubber
         Scrubber(ParameterStore &parameter_store, EventData *event_data, SDL_GPUDevice *gpu_device)
             : parameter_store(parameter_store), event_data(event_data), gpu_device(gpu_device)
         {
-            parameter_store.add("scrubber.type", ScrubberType::EVENT);
-            parameter_store.add("scrubber.mode", ScrubberMode::PAUSED);
+            // Defaults match Prophesee metavision_viewer:
+            //   accumulation time = 10 ms  (time_window = 10 000 us)
+            //   display rate      = 30 fps (time_step   ~ 33 333 us)
+            //   time-based, tracking latest data
+            time_window = 10000.0f;
+            time_step   = 33333.0f;
+
+            parameter_store.add("scrubber.type", ScrubberType::TIME);
+            parameter_store.add("scrubber.mode", ScrubberMode::PLAYING);
 
             parameter_store.add("scrubber.current_index", current_index);
             parameter_store.add("scrubber.index_window", index_window);
@@ -131,29 +138,20 @@ class Scrubber
             {
                 event_data->unlock_data_vectors();
 
-                // No event data? Scrubber has nothing to scrub.
+                // No event data — reset position and bounds but preserve window/step settings.
                 parameter_store.add("scrubber.current_index", static_cast<std::size_t>(0));
-                parameter_store.add("scrubber.index_window", static_cast<std::size_t>(0));
-                parameter_store.add("scrubber.index_step", static_cast<std::size_t>(0));
                 parameter_store.add("scrubber.min_index", static_cast<std::size_t>(0));
                 parameter_store.add("scrubber.max_index", static_cast<std::size_t>(0));
 
                 parameter_store.add("scrubber.current_time", 0.0f);
-                parameter_store.add("scrubber.time_window", 0.0f);
-                parameter_store.add("scrubber.time_step", 0.0f);
                 parameter_store.add("scrubber.min_time", 0.0f);
                 parameter_store.add("scrubber.max_time", 0.0f);
-                parameter_store.add("scrubber.show_frame_data", false);
 
                 lower_index = 0;
                 current_index = 0;
-                index_step = 0;
-                index_window = 0;
 
                 lower_time = 0.0f;
                 current_time = 0.0f;
-                time_step = 0.0f;
-                time_window = 0.0f;
 
                 return;
             }
