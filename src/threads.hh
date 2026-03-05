@@ -10,6 +10,7 @@
 
 #include <mutex>
 #include <shared_mutex>
+#include <iostream>
 
 // Program threads
 /**
@@ -133,7 +134,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
             // -----------------------------------------------------------------------------------
             case DataAcquisition::STATE::IDLE:
                 // Nothing being saved
-                data_acq.clear();
+                // data_acq.clear();
                 break;
         }
     

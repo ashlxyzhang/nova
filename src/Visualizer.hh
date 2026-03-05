@@ -45,7 +45,7 @@ class Visualizer
             glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
 
             TIME unit_type = TIME::UNIT_US;             // MS is default
-            float unit_time_conversion_factor = 1.0f;                   // MS is default
+            float unit_time_conversion_factor = 1.0f;   // MS is default
         };
 
 

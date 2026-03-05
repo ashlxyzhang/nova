@@ -14,6 +14,7 @@
 #include <array>
 #include <mutex>
 #include <shared_mutex>
+#include <iostream>
 
 // so the idea is that we give the user two options for scrubbing through the data,
 // an event and a time based system. however at the end of the day
@@ -73,6 +74,7 @@ class Scrubber
                 min_index = 0;
                 max_index = 0;
                 lower_index = 0;
+
                 lower_time = 0.0f;
                 current_time = 0.0f;
                 time_window = 0.0f;
@@ -143,7 +145,6 @@ class Scrubber
                     // Event-based Updates
                     if (type == ScrubberType::EVENT)
                     {   
-                        
                         // Update based on mode
                         if (mode == ScrubberMode::PAUSED)
                         {

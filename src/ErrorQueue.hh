@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <optional>
+#include <iostream>
 
 /**
  * @brief Modules can report error messages here to be logged and reported to GUI for pop up window
@@ -27,6 +28,7 @@ class ErrorQueue
 		void push_error(const std::string& error)
 		{
 			std::lock_guard lock(mutex);
+			std::cout << error << std::endl;
 			error_message_queue.push(error);
 		}
 

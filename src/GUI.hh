@@ -17,7 +17,7 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
-// Structure to pass pointers to callbacks
+// Structure to pass pointers to callbacks (callback functions need pointers to both)
 struct CallbackData {
     DataAcquisition* data_acquisition;
     DataWriter* data_writer;
@@ -32,12 +32,9 @@ inline void SDLCALL save_stream_handle_callback(void *user_data, const char *con
  */
 class GUI
 {
-    public:
-        // Enum for easily identifying time codes, duplicated in Visualizer.hh
-        enum class TIME : uint8_t { UNIT_S = 0, UNIT_MS = 1, UNIT_US = 2 };
-
     private:
-        // References to modules
+
+        // Modules
         std::unordered_map<std::string, RenderTarget> &render_targets;
         DataAcquisition &data_acquisition;
         DataWriter &data_writer;
@@ -46,6 +43,7 @@ class GUI
         DigitalCodedExposure &dce;
         ErrorQueue &error_queue;
 
+        // GPU
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
         ImDrawData *draw_data = nullptr;
@@ -282,15 +280,13 @@ class GUI
             int32_t camera_index = data_acquisition.get_camera_index();
             int32_t camera_index_copy = camera_index;
 
-            // Get camera names - you'll need to add this getter to DataAcquisition
-            // For now using a placeholder
+            // Get camera names
             std::vector<const char *> discovered_cameras_char;
-            // TODO: Add get_scanned_camera_names() to DataAcquisition and use it here
-            // std::vector<std::string> discovered_cameras = data_acquisition.get_scanned_camera_names();
-            // for (const auto &name : discovered_cameras)
-            // {
-            //     discovered_cameras_char.push_back(name.c_str());
-            // }
+            std::vector<std::string> discovered_cameras = data_acquisition.get_scanned_camera_names();
+            for (const auto &name : discovered_cameras)
+            {
+                discovered_cameras_char.push_back(name.c_str());
+            }
 
             ImGui::Combo("Camera", &camera_index, discovered_cameras_char.data(), discovered_cameras_char.size());
 
@@ -468,7 +464,7 @@ class GUI
 
             ImGui::Separator();
 
-            // Scrubber cap mode (simplified - stored locally since it's UI-only state)
+            // Scrubber cap mode (currently unused by scrubber, no clue what it's for)
             static int cap_mode_int = 0;
             const char *cap_mode_names[] = {"Capped", "Uncapped"};
             ImGui::Combo("Scrubber Cap", &cap_mode_int, cap_mode_names, 2);
@@ -494,8 +490,7 @@ class GUI
                 }
 
                 float index_window_float = static_cast<float>(state.index_window);
-                size_t max_window_size = (std::max)(static_cast<size_t>(1), 
-                    (state.max_index - state.min_index + 1) / window_div_factor);
+                size_t max_window_size = (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
                 float max_window_size_float = static_cast<float>(max_window_size);
 
                 if (ImGui::SliderFloat("Index Window", &index_window_float, 1.0f, max_window_size_float))
@@ -901,6 +896,7 @@ inline void SDLCALL stream_file_handle_callback(void *user_data, const char *con
     {
         std::string file_name{*data_file_list};
         data->data_acquisition->set_file_stream_name(file_name);
+        data->data_acquisition->set_camera_stream_changed(true);
         data->data_acquisition->set_state(DataAcquisition::STATE::FILE_STREAM);
     }
     else

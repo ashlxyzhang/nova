@@ -100,6 +100,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     
     // Modules passed other modules by reference
     error_queue             = std::make_unique<ErrorQueue>();
+    event_data              = std::make_unique<EventData>();
     upload_buffer           = std::make_unique<UploadBuffer>(gpu_device);
     scrubber                = std::make_unique<Scrubber>(*event_data, gpu_device, *error_queue);
     visualizer              = std::make_unique<Visualizer>(*event_data, *scrubber, *upload_buffer, render_targets, window, gpu_device, copy_pass, *error_queue);
@@ -250,6 +251,17 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
     // Ensure camera disconnect
     data_acq->clear();
+
+    // Free objects before GPU is shutdown
+    upload_buffer.reset();
+    gui.reset();
+    scrubber.reset();
+    visualizer.reset();
+    digital_coded_exposure.reset();
+    event_data.reset();
+    data_acq.reset();
+    data_writer.reset();
+    error_queue.reset();
 
     SDL_WaitForGPUIdle(gpu_device);
     SDL_ReleaseWindowFromGPUDevice(gpu_device, window);
