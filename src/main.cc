@@ -132,7 +132,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
                                                 std::ref(*data_acq),
                                                 std::ref(*event_data), 
                                                 std::ref(*data_writer),
-                                                std::ref(*digital_coded_exposure));
+                                                std::ref(*digital_coded_exposure),
+                                                std::ref(*scrubber));
     // -----
     
     return SDL_APP_CONTINUE;

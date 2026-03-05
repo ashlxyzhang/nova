@@ -501,6 +501,11 @@ class Scrubber
             std::unique_lock lock(mutex);
             state = new_state;
         }
+
+        void clear() {
+            std::unique_lock lock(mutex);
+            state.clear();
+        }
     
         // Non thread-safe getters
         SDL_GPUBuffer* get_points_buffer() const { return points_buffer; }

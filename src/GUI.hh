@@ -293,6 +293,8 @@ class GUI
             if (camera_index_copy != camera_index)
             {
                 data_acquisition.set_camera_index(camera_index);
+                data_acquisition.set_camera_stream_paused(true);
+                data_acquisition.set_camera_stream_changed(true);
             }
 
             if (ImGui::Button(program_state == DataAcquisition::STATE::CAMERA_STREAM ? "Stop Streaming" : "Stream From Camera"))
@@ -896,7 +898,8 @@ inline void SDLCALL stream_file_handle_callback(void *user_data, const char *con
     {
         std::string file_name{*data_file_list};
         data->data_acquisition->set_file_stream_name(file_name);
-        data->data_acquisition->set_camera_stream_changed(true);
+        data->data_acquisition->set_file_stream_paused(true);
+        data->data_acquisition->set_file_stream_changed(true);
         data->data_acquisition->set_state(DataAcquisition::STATE::FILE_STREAM);
     }
     else

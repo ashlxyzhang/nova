@@ -7,6 +7,7 @@
 #include "DataWriter.hh"
 #include "EventData.hh"
 #include "GUI.hh"
+#include "Scrubber.hh"
 
 #include <mutex>
 #include <shared_mutex>
@@ -46,7 +47,7 @@ inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer)
  */
 // Thread for data acquisition, storing into event_data
 inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, EventData &evt_data, 
-                                    DataWriter &data_writer, DigitalCodedExposure &dce)
+                                    DataWriter &data_writer, DigitalCodedExposure &dce, Scrubber &scrubber)
 {
     while (running)
     {
@@ -65,6 +66,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     data_acq.clear();
                     evt_data.clear();
                     data_writer.clear();
+                    scrubber.clear();
 
                     // Attempt to initialize a afile reader for the selected file
                     if (data_acq.init_file_reader())
@@ -104,6 +106,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
                     data_acq.clear();
                     evt_data.clear();
                     data_writer.clear();
+                    scrubber.clear();
                     
                     // Attempt to initialize a camera reader for the selected camera
                     if (data_acq.init_camera_reader())
