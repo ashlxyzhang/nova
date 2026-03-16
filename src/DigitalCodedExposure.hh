@@ -138,10 +138,10 @@ class DigitalCodedExposure
             // create the color texture, this is the texture that will store the color data
             SDL_GPUTextureCreateInfo color_create_info = {
                 .type = SDL_GPU_TEXTURETYPE_2D,
-                .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
-                .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
                 .width = 1920,
-                .height = 1200,
+                .height = 1080,
                 .layer_count_or_depth = 1,
                 .num_levels = 1,
                 .sample_count = SDL_GPU_SAMPLECOUNT_1,
@@ -266,7 +266,8 @@ class DigitalCodedExposure
                 SDL_GPUTextureCreateInfo color_create_info = {
                     .type = SDL_GPU_TEXTURETYPE_2D,
                     .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                    .usage =
+                        SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
                     .width = width,
                     .height = height,
                     .layer_count_or_depth = 1,
@@ -315,7 +316,6 @@ class DigitalCodedExposure
 
             SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
 
-            // First texture: DigitalCodedExposure
             texture_buffer_bindings[0].texture = render_targets["DigitalCodedExposure"].texture;
             texture_buffer_bindings[0].mip_level = 0;
             texture_buffer_bindings[0].layer = 0;
@@ -331,22 +331,21 @@ class DigitalCodedExposure
             texture_buffer_bindings[2].layer = 0;
             texture_buffer_bindings[2].cycle = false;
 
-            SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-            SDL_BindGPUComputePipeline(compute_pass, clear_compute_pipeline);
-            SDL_DispatchGPUCompute(compute_pass, width, height, 1);
+            // --- Pass A: Clear all textures ---
+            SDL_GPUComputePass *clear_pass =
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_BindGPUComputePipeline(clear_pass, clear_compute_pipeline);
+            SDL_DispatchGPUCompute(clear_pass, width, height, 1);
+            SDL_EndGPUComputePass(clear_pass);
 
-            SDL_GPUBuffer *points_buffer = scrubber.get_points_buffer();
-            if (!points_buffer) // Points buffer is null due to racing - Phase 2,  🗿 - Phase 3
+            // Bail before accumulation if points buffer is unavailable
+            SDL_GPUBuffer *points_buffer = scrubber->get_points_buffer();
+            if (!points_buffer)
             {
-                SDL_EndGPUComputePass(compute_pass);
                 return;
             }
 
             int point_count = scrubber.get_points_buffer_size();
-
-            SDL_BindGPUComputeStorageBuffers(compute_pass, 0, &points_buffer, 1);
-            SDL_BindGPUComputePipeline(compute_pass, compute_pipeline);
-
 
             // Read current time from scrubber 
             Scrubber::ScrubberState scrubber_state = scrubber.get_state();
@@ -378,13 +377,23 @@ class DigitalCodedExposure
             pass_data.floatFlags = floatFlags;
             pass_data.flags = flags;
             pass_data.morletParams = morletParams;
+
+            // --- Pass B: Accumulate events into intermediate textures ---
+            SDL_GPUComputePass *dce_pass =
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_BindGPUComputePipeline(dce_pass, compute_pipeline);
+            SDL_BindGPUComputeStorageBuffers(dce_pass, 0, &points_buffer, 1);
             SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-            SDL_DispatchGPUCompute(compute_pass, point_count, 1, 1);
+            SDL_DispatchGPUCompute(dce_pass, point_count, 1, 1);
+            SDL_EndGPUComputePass(dce_pass);
 
-            SDL_BindGPUComputePipeline(compute_pass, process_compute_pipeline);
-            SDL_DispatchGPUCompute(compute_pass, width, height, 1);
-
-            SDL_EndGPUComputePass(compute_pass);
+            // --- Pass C: Process intermediate textures into final output ---
+            SDL_GPUComputePass *process_pass =
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_BindGPUComputePipeline(process_pass, process_compute_pipeline);
+            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_DispatchGPUCompute(process_pass, width, height, 1);
+            SDL_EndGPUComputePass(process_pass);
         }
 
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
