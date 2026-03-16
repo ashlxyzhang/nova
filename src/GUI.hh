@@ -421,7 +421,7 @@ class GUI
             snprintf(max_buf, sizeof(max_buf), format, max_val);
             ImVec2 min_text_size = ImGui::CalcTextSize(min_buf);
             ImVec2 max_text_size = ImGui::CalcTextSize(max_buf);
-            float label_w = std::max(min_text_size.x, max_text_size.x) + 4.0f;
+            float label_w = (std::max)(min_text_size.x, max_text_size.x) + 4.0f;
             float track_w = avail_w - 2.0f * label_w;
             if (track_w < 20.0f)
                 track_w = 20.0f;
@@ -442,8 +442,8 @@ class GUI
             if (range > 0.0f)
             {
                 // Window highlight (from current - window to current)
-                float win_start = std::max(current_val - window_val, min_val);
-                float win_end = std::min(current_val, max_val);
+                float win_start = (std::max)(current_val - window_val, min_val);
+                float win_end = (std::min)(current_val, max_val);
                 float win_start_frac = (win_start - min_val) / range;
                 float win_end_frac = (win_end - min_val) / range;
                 ImVec2 win_tl = ImVec2(track_tl.x + win_start_frac * track_w, track_tl.y);
@@ -542,7 +542,7 @@ class GUI
                 }
                 else
                 {
-                    state.current_time = std::max(state.current_time - state.time_step, state.min_time);
+                    state.current_time = (std::max)(state.current_time - state.time_step, state.min_time);
                 }
                 state.mode = Scrubber::ScrubberMode::PAUSED;
             }
@@ -579,11 +579,11 @@ class GUI
             {
                 if (scrubber_type == Scrubber::ScrubberType::EVENT)
                 {
-                    state.current_index = std::min(state.current_index + state.index_step, state.max_index);
+                    state.current_index = (std::min)(state.current_index + state.index_step, state.max_index);
                 }
                 else
                 {
-                    state.current_time = std::min(state.current_time + state.time_step, state.max_time);
+                    state.current_time = (std::min)(state.current_time + state.time_step, state.max_time);
                 }
                 state.mode = Scrubber::ScrubberMode::PAUSED;
             }
@@ -694,7 +694,7 @@ class GUI
                     ImGui::Separator();
 
                     // Window slider
-                    size_t max_window = std::max(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
+                    size_t max_window = (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
                     float max_window_f = static_cast<float>(max_window);
                     float win_slider = win_f;
                     if (ImGui::SliderFloat("Window", &win_slider, 1.0f, max_window_f, "%.0f"))
@@ -769,7 +769,7 @@ class GUI
                     ImGui::Separator();
 
                     // Window slider
-                    float max_window_time = std::max(0.00001f, (state.max_time - state.min_time) / window_div_factor);
+                    float max_window_time = (std::max)(0.00001f, (state.max_time - state.min_time) / window_div_factor);
                     float max_window_adj = max_window_time / vis_params.unit_time_conversion_factor;
                     if (ImGui::SliderFloat("Window", &time_window_adj, 0.00001f, max_window_adj,
                                            time_format_str.c_str()))

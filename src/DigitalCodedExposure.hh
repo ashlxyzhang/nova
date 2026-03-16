@@ -339,7 +339,7 @@ class DigitalCodedExposure
             SDL_EndGPUComputePass(clear_pass);
 
             // Bail before accumulation if points buffer is unavailable
-            SDL_GPUBuffer *points_buffer = scrubber->get_points_buffer();
+            SDL_GPUBuffer *points_buffer = scrubber.get_points_buffer();
             if (!points_buffer)
             {
                 return;
