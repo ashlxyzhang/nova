@@ -3,88 +3,15 @@
 #define THREADS_HH
 
 #include "DataAcquisition.hh"
+#include "DigitalCodedExposure.hh"
 #include "DataWriter.hh"
 #include "EventData.hh"
 #include "GUI.hh"
-#include "ParameterStore.hh"
+#include "Scrubber.hh"
 
-// Anonymous helper functions
-namespace
-{
-
-/**
- * @brief Sets up the DataWriter object for writing data to a file.
- * @param data_acq DataAcquisition object that will write data to DataWriter.
- * @param data_writer DataWriter object that will write data to file.
- * @param param_store ParameterStore object that contains global data from GUI.
- * @param prog_state State of the program.
- */
-inline void setup_writer(DataAcquisition &data_acq, DataWriter &data_writer, ParameterStore &param_store,
-                         GUI::PROGRAM_STATE prog_state)
-{
-    data_writer.clear();
-    std::string stream_save_file_name{param_store.get<std::string>("stream_save_file_name")};
-
-    if (prog_state == GUI::PROGRAM_STATE::FILE_STREAM)
-    {
-        std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
-
-        if (!stream_save_file_name.ends_with(".aedat4"))
-        {
-            stream_save_file_name.append(".aedat4");
-        }
-
-        if (!stream_file_name.ends_with(".aedat4"))
-        {
-            stream_file_name.append(".aedat4");
-        }
-
-        // Attempting to write to file while reading from it will lead to disaster
-        if (stream_save_file_name == stream_file_name)
-        {
-            size_t aedat_index{stream_save_file_name.find(".aedat4")};
-            stream_save_file_name.insert(aedat_index, "new"); // Append new to ensure different name
-        }
-        param_store.add("stream_save_file_name", stream_save_file_name);
-    }
-    if (param_store.get<bool>("stream_save_events") || param_store.get<bool>("stream_save_frames"))
-    {
-        bool init_data_writer_success{data_writer.init_data_writer(
-            stream_save_file_name, data_acq.get_camera_event_width(), data_acq.get_camera_event_height(),
-            data_acq.get_camera_frame_width(), data_acq.get_camera_frame_height(),
-            param_store.get<bool>("stream_save_events"), param_store.get<bool>("stream_save_frames"), param_store)};
-
-        if (init_data_writer_success)
-        {
-            bool saving_frames{data_writer.get_writing_frame_data()};
-            bool saving_events{data_writer.get_writing_event_data()};
-
-            std::string saving_message{"Currently Saving "};
-            if (saving_events)
-            {
-                saving_message.append("Event Data ");
-            }
-            if (saving_frames)
-            {
-                saving_message.append(saving_events ? "And Frame Data " : "Frame Data ");
-            }
-            saving_message.append("To ");
-            saving_message.append(stream_save_file_name);
-            param_store.add("saving_message", saving_message);
-
-            // Reset saving controls
-            param_store.add("stream_save_file_name", std::string{""});
-            param_store.add("stream_save_events", false);
-            param_store.add("stream_save_frames", false);
-        }
-        else
-        {
-            std::string saving_message{"Nothing Being Saved Currently"};
-            param_store.add("saving_message", saving_message);
-        }
-    }
-}
-} // namespace
+#include <mutex>
+#include <shared_mutex>
+#include <iostream>
 
 // Program threads
 /**
@@ -101,13 +28,13 @@ namespace program_thread
  *
  */
 
-inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer, ParameterStore &param_store)
+inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer)
 {
     // For now let us spin
     while (running)
     {
-        data_writer.write_event_store(param_store);
-        data_writer.write_frame_data(param_store);
+        data_writer.write_event_store();
+        data_writer.write_frame_data();
     }
 }
 
@@ -119,127 +46,101 @@ inline void writer_thread(std::atomic<bool> &running, DataWriter &data_writer, P
  * @param data_writer DataWriter object to store event/frame data into to be saved to persistent storage.
  */
 // Thread for data acquisition, storing into event_data
-inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, ParameterStore &param_store,
-                                    EventData &evt_data, DataWriter &data_writer)
+inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition &data_acq, EventData &evt_data, 
+                                    DataWriter &data_writer, DigitalCodedExposure &dce, Scrubber &scrubber)
 {
     while (running)
     {
-        // These always run
-        // To be responsive when scanning for camera
-        if (param_store.exists("start_camera_scan") && param_store.get<bool>("start_camera_scan"))
+        switch (data_acq.get_state())
         {
-            data_acq.discover_cameras(param_store);
-            param_store.add("start_camera_scan", false);
-        }
+        
+            // FILE STREAMING 
+            // -----------------------------------------------------------------------------------
+            case DataAcquisition::STATE::FILE_STREAM: 
 
-        // DATA ACQUISITION CODE
-        if (param_store.exists("program_state"))
-        {
+                // If stream file changed, reset reader to read from new file and clear previously read event data
+                if (data_acq.has_file_stream_changed())
+                {   
 
-            GUI::PROGRAM_STATE prog_state{param_store.get<GUI::PROGRAM_STATE>("program_state")};
-            switch (prog_state)
-            {
-            case GUI::PROGRAM_STATE::FILE_STREAM: // Case for streaming from file
-                if (param_store.exists("stream_file_name") && param_store.exists("stream_file_changed") &&
-                    param_store.exists("stream_paused") && param_store.exists("stream_save_file_name") &&
-                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames") &&
-                    param_store.exists("event_discard_odds"))
-                {
-                    // If stream file changed, reset reader to read from new file and clear previously read event data
-                    if (param_store.get<bool>("stream_file_changed"))
+                    // Clear DataAcqusition, EventData, and DataWriter
+                    data_acq.clear();
+                    evt_data.clear();
+                    data_writer.clear();
+                    scrubber.clear();
+
+                    // Attempt to initialize a afile reader for the selected file
+                    if (data_acq.init_file_reader())
                     {
-                        data_acq.clear_reader();
-                        std::string stream_file_name{param_store.get<std::string>("stream_file_name")};
-                        evt_data.clear();
-                        bool init_success{data_acq.init_file_reader(stream_file_name, param_store)};
-                        if (init_success)
-                        {
-                            data_acq.get_camera_event_resolution(evt_data);
-                            data_acq.get_camera_frame_resolution(evt_data);
-                            param_store.add("stream_file_changed", false);
-                            param_store.add("resolution_initialized", true); // Need to communicate with DCE
-                        }
-
-                        data_writer.clear();
-                        // Set for nothing saved for now, setup_writer will update it
-                        std::string saving_message{"Nothing Being Saved Currently"};
-                        param_store.add("saving_message", saving_message);
-
-                        // If gui indicates writing needs to be done, then set up writer for writing
-                        if (param_store.get<std::string>("stream_save_file_name") != "")
-                        {
-                            setup_writer(data_acq, data_writer, param_store, prog_state);
-                        }
+                        data_acq.get_camera_event_resolution(evt_data);
+                        data_acq.get_camera_frame_resolution(evt_data);
+                        data_acq.set_file_stream_changed(false);
+                        dce.initialize_textures_next_update(); // DCE needs to reinitialize it's GPU textures for this new input
                     }
+                    
+                    // If the user has set a file to save data to, setup a writer for that file
+                    if (data_writer.get_stream_save_file_name() != "") data_writer.setup(data_acq);
 
-                    // Check if stream is paused
-                    bool stream_paused{param_store.get<bool>("stream_paused")};
-                    if (!stream_paused)
-                    {
-                        // Get event/frame data in batches every frame
-                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer,
-                                                    param_store.get<float>("event_discard_odds"));
-                        data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
-                    }
                 }
+
+                // If not paused, repeatedly order (sternly) DataAcqusition to query cameras/files for events and/or frames
+                if (!data_acq.is_file_stream_paused())
+                {
+                    data_acq.get_batch_evt_data(evt_data, data_writer);
+                    data_acq.get_batch_frame_data(evt_data, data_writer);
+                }
+        
                 break;
 
-            case GUI::PROGRAM_STATE::CAMERA_STREAM: // Case for streaming from camera
-                if (param_store.exists("camera_index") && param_store.exists("camera_changed") &&
-                    param_store.exists("camera_stream_paused") && param_store.exists("stream_save_file_name") &&
-                    param_store.exists("stream_save_events") && param_store.exists("stream_save_frames") &&
-                    param_store.exists("event_discard_odds"))
-                {
 
-                    if (param_store.get<bool>("camera_changed"))
+
+
+            // CAMERA STREAMING 
+            // -----------------------------------------------------------------------------------
+            case DataAcquisition::STATE::CAMERA_STREAM: 
+
+                // If the selected camera has changed we need to reinitialize a bunch of stuff
+                if (data_acq.has_camera_stream_changed())
+                {   
+
+                    // Clear DataAcqusition, EventData, and DataWriter
+                    data_acq.clear();
+                    evt_data.clear();
+                    data_writer.clear();
+                    scrubber.clear();
+                    
+                    // Attempt to initialize a camera reader for the selected camera
+                    if (data_acq.init_camera_reader())
                     {
-                        data_acq.clear_reader();
-                        evt_data.clear();
+                        data_acq.get_camera_event_resolution(evt_data);
+                        data_acq.get_camera_frame_resolution(evt_data);
 
-                        bool init_success{
-                            data_acq.init_camera_reader(param_store.get<int32_t>("camera_index"), param_store)};
-
-                        if (init_success)
-                        {
-                            data_acq.get_camera_event_resolution(evt_data);
-                            data_acq.get_camera_frame_resolution(evt_data);
-                            param_store.add("camera_changed", false);
-                            param_store.add("resolution_initialized", true); // Need to communicate with DCE
-                        }
-
-                        data_writer.clear();
-                        // Set for nothing saved for now
-                        std::string saving_message{"Nothing Being Saved Currently"};
-                        param_store.add("saving_message", saving_message);
-                        // If gui indicates writing needs to be done, then set up writer for writing
-                        if (param_store.get<std::string>("stream_save_file_name") != "")
-                        {
-                            setup_writer(data_acq, data_writer, param_store, prog_state);
-                        }
+                        data_acq.set_camera_stream_changed(false);
+                        dce.initialize_textures_next_update(); // DCE needs to reinitialize it's GPU textures for this new input
                     }
 
-                    // Check if stream is paused
-                    bool camera_stream_paused{param_store.get<bool>("camera_stream_paused")};
-                    if (!camera_stream_paused)
-                    {
-                        // Get event/frame data in batches every frame
-                        data_acq.get_batch_evt_data(evt_data, param_store, data_writer,
-                                                    param_store.get<float>("event_discard_odds"));
-                        data_acq.get_batch_frame_data(evt_data, param_store, data_writer);
-                    }
+                    // If the user has set a file to save data to, setup a writer for that file
+                    if (data_writer.get_stream_save_file_name() != "") data_writer.setup(data_acq);
+                    
                 }
+
+                // Check if stream is paused
+                if (!data_acq.is_camera_stream_paused())
+                {
+                    // Get event/frame data in batches every frame
+                    data_acq.get_batch_evt_data(evt_data, data_writer);
+                    data_acq.get_batch_frame_data(evt_data, data_writer);
+                }
+                
                 break;
 
-            case GUI::PROGRAM_STATE::IDLE:
+            // NOTHING STREAMING
+            // -----------------------------------------------------------------------------------
+            case DataAcquisition::STATE::IDLE:
                 // Nothing being saved
-                std::string saving_message{"Nothing Being Saved Currently"};
-                param_store.add("saving_message", saving_message);
-
-                // Clear data acq
-                data_acq.clear_reader();
+                // data_acq.clear();
                 break;
-            }
         }
+    
     }
 }
 } // namespace program_thread

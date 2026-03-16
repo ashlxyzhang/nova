@@ -8,7 +8,6 @@ vcpkg_from_github(
     HEAD_REF main
     PATCHES
         0001-fix-libusb-macos-frameworks.patch
-        0002-fix-unused-variable-warning.patch
 )
 
 vcpkg_check_features(

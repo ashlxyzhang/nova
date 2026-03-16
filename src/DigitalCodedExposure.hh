@@ -6,15 +6,18 @@
 
 #include "Camera.hh"
 #include "EventData.hh"
-#include "ParameterStore.hh"
 #include "RenderTarget.hh"
 #include "Scrubber.hh"
 #include "UploadBuffer.hh"
+#include "ErrorQueue.hh"
+
 #include "shaders/digital_coded_exposure/clear_comp.h"
 #include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/process_comp.h"
 
 #include <iostream>
+#include <mutex>
+#include <shared_mutex>
 
 /**
  * @brief Flags passed to the compute shaders to determine how DCE is computed.
@@ -30,18 +33,43 @@ struct PassData
         glm::vec4 morletParams; // x: frequency, y: width (h), z: time center
 };
 
+
+
 /**
  * @brief This class is responsible for creating the necessary compute pipelines to create the
  *        digital coded exposure.
  */
 class DigitalCodedExposure
 {
-    private:
-        ParameterStore *parameter_store;
-        std::unordered_map<std::string, RenderTarget> &render_targets;
-        EventData &event_data;
-        Scrubber *scrubber = nullptr;
+    public:
+        struct DCEParameters {
+            float event_contrib_weight = 0.5f;
+            float morlet_frequency = 0.0f;
+            float morlet_width = 0.01f;
 
+            bool shutter_is_morlet = false;
+            bool shutter_is_positive_only = false;
+            bool combine_color = false; 
+
+            int32_t dce_color = 0;              // 0 - High/Low, 1 - Tricolor, 2 - Use same colors as visualizer
+            int32_t activation_function = 0;    // 0 - Linear, 1 - Sigmoid
+
+            glm::vec3 polarity_neg_color = glm::vec3(0.0f, 0.0f, 0.0f);
+            glm::vec3 polarity_pos_color = glm::vec3(1.0f, 1.0f, 1.0f);
+            glm::vec3 polarity_neut_color = glm::vec3(0.5f, 0.5f, 0.5f);
+        };
+
+    private:
+        mutable std::shared_mutex mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
+
+        // Modules
+        EventData &event_data;
+        Scrubber &scrubber;
+        ErrorQueue &error_queue;
+        std::unordered_map<std::string, RenderTarget> &render_targets;
+        // -----
+
+        // GPU 
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
 
@@ -53,8 +81,21 @@ class DigitalCodedExposure
         SDL_GPUTexture *negative_values_texture = nullptr;
 
         unsigned int width{};
-        unsigned int height{};
+        unsigned int height{};  
+        // -----
 
+        // Parameters
+        DCEParameters params;
+        // -----
+
+
+        // Flags
+        bool texture_initialization_required = false; // Set by data acqusition thread after a new file/camera is loaded
+        // -----
+
+
+
+        
         /**
          * @brief Creates intermediate texture to be used in pipeline.
          * @param width width of texture.
@@ -79,24 +120,20 @@ class DigitalCodedExposure
         }
 
     public:
+
         /**
          * @brief Constructor. Initializes compute pipelines.
-         * @param parameter_store ParameterStore object containing data from GUI
-         * @param render_targets Render targets of the program
          * @param event_data EventData object containing event/frame data
+         * @param scrubber Scrubber object with data to compute DCE on
+         * @param render_targets Render targets of the program
          * @param window SDL_Window to draw on
          * @param gpu_device SDL_GPUDevice to create texture on
-         * @param upload_buffer UploadBuffer object for uploading data to GPU
-         * @param scrubber Scrubber object with data to compute DCE on
-         * @param copy_pass SDL_GPUCopyPass unused
+         * @param error_queue ErrorQueue object used for reporting errors to be displayed and/or logged
          */
-        DigitalCodedExposure(ParameterStore *parameter_store,
-                             std::unordered_map<std::string, RenderTarget> &render_targets, EventData &event_data,
-                             SDL_Window *window, SDL_GPUDevice *gpu_device, UploadBuffer *upload_buffer,
-                             Scrubber *scrubber, SDL_GPUCopyPass *copy_pass)
-            : parameter_store(parameter_store), render_targets(render_targets), event_data(event_data),
-              scrubber(scrubber), window(window), gpu_device(gpu_device), width{},
-              height{} // Make sure to zero width and height
+        DigitalCodedExposure(EventData& event_data, Scrubber& scrubber, std::unordered_map<std::string, RenderTarget>& render_targets, 
+                            SDL_Window* window, SDL_GPUDevice* gpu_device, ErrorQueue &error_queue): 
+                            event_data(event_data), scrubber(scrubber), render_targets(render_targets), window(window), 
+                            gpu_device(gpu_device), error_queue(error_queue), width{}, height{}
         {
             // create the color texture, this is the texture that will store the color data
             SDL_GPUTextureCreateInfo color_create_info = {
@@ -210,9 +247,12 @@ class DigitalCodedExposure
             event_data.unlock_data_vectors();
 
             // Only generate textures when a new file has been loaded with new resolution
-            if (parameter_store->exists("resolution_initialized") &&
-                parameter_store->get<bool>("resolution_initialized"))
-            {
+            std::unique_lock dce_read_write_lock(mutex);
+            if (texture_initialization_required)
+            {        
+                // This only needs to happen once when threads.hh loads a new file/camera so set back to false
+                texture_initialization_required = false;
+                dce_read_write_lock.unlock();
 
                 width = event_data.get_camera_event_resolution().x;
                 height = event_data.get_camera_event_resolution().y;
@@ -244,11 +284,13 @@ class DigitalCodedExposure
 
                 positive_values_texture = create_intermediate_texture(width, height);
                 negative_values_texture = create_intermediate_texture(width, height);
-                parameter_store->add("resolution_initialized", false);
             }
         }
 
-        void copy_pass(UploadBuffer *upload_buffer, SDL_GPUCopyPass *copy_pass)
+        /**
+         * @brief Does nothing atm
+         */
+        void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
         }
 
@@ -303,124 +345,31 @@ class DigitalCodedExposure
                 return;
             }
 
-            int point_count = scrubber->get_points_buffer_size();
+            int point_count = scrubber.get_points_buffer_size();
 
-            // Build uniform data
-            if (!parameter_store->exists("dce_color"))
-            {
-                parameter_store->add("dce_color", 0);
-            }
-            int32_t dce_color{parameter_store->get<int32_t>("dce_color")};
+            // Read current time from scrubber 
+            Scrubber::ScrubberState scrubber_state = scrubber.get_state();
+            float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
 
-            if (!parameter_store->exists("activation_function"))
-            {
-                parameter_store->add("activation_function", 0);
-            }
-            int32_t activation_function{parameter_store->get<int32_t>("activation_function")};
+            // Lock dce while reading parameters
+            std::shared_lock dce_read_lock(mutex);
 
-            if (!parameter_store->exists("combine_color"))
-            {
-                parameter_store->add("combine_color", false);
-            }
-            bool combine_color{parameter_store->get<bool>("combine_color")};
+            // Shader parameters
+            glm::vec4 floatFlags = glm::vec4(static_cast<float>(params.dce_color), params.event_contrib_weight, static_cast<float>(params.activation_function), 0.0f);
+            glm::vec4 flags = glm::vec4((params.shutter_is_positive_only ? 1.0f : 0.0f), (params.shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
+            glm::vec4 morletParams = glm::vec4(params.morlet_frequency, params.morlet_width, time_center, 0.0f); 
 
-            glm::vec3 polarity_pos_color;
-            glm::vec3 polarity_neut_color;
-            glm::vec3 polarity_neg_color;
+            // Set colors 
+            glm::vec4 negCol = glm::vec4(params.polarity_neg_color, 1.0f);
+            glm::vec4 neutCol = glm::vec4(params.polarity_neut_color, 1.0f);
+            glm::vec4 posCol = glm::vec4(params.polarity_pos_color, 1.0f);
+            
 
-            if (dce_color < 2)
-            {
-                if (!parameter_store->exists("polarity_neg_color_dce"))
-                {
-                    parameter_store->add("polarity_neg_color_dce", glm::vec3(1.0f, 0.0f, 0.0f));
-                }
-                polarity_neg_color = parameter_store->get<glm::vec3>("polarity_neg_color_dce");
+            // Unlock dce before starting GPU call
+            dce_read_lock.unlock();
 
-                if (!parameter_store->exists("polarity_pos_color_dce"))
-                {
-                    parameter_store->add("polarity_pos_color_dce", glm::vec3(0.0f, 1.0f, 0.0f));
-                }
-                polarity_pos_color = parameter_store->get<glm::vec3>("polarity_pos_color_dce");
 
-                if (!parameter_store->exists("polarity_neut_color_dce"))
-                {
-                    parameter_store->add("polarity_neut_color_dce", glm::vec3(0.0f, 1.0f, 0.0f));
-                }
-                polarity_neut_color = parameter_store->get<glm::vec3>("polarity_neut_color_dce");
-            }
-            else
-            {
-                if (!parameter_store->exists("polarity_neg_color"))
-                {
-                    parameter_store->add("polarity_neg_color", glm::vec3(1.0f, 0.0f, 0.0f));
-                }
-                polarity_neg_color = parameter_store->get<glm::vec3>("polarity_neg_color");
-
-                if (!parameter_store->exists("polarity_pos_color"))
-                {
-                    parameter_store->add("polarity_pos_color", glm::vec3(0.0f, 1.0f, 0.0f));
-                }
-                polarity_pos_color = parameter_store->get<glm::vec3>("polarity_pos_color");
-
-                polarity_neut_color = glm::vec3(0.0f, 0.0f, 0.0f);
-            }
-
-            glm::vec4 negCol = glm::vec4(polarity_neg_color, 1.0f);
-            glm::vec4 neutCol = glm::vec4(polarity_neut_color, 1.0f);
-            glm::vec4 posCol = glm::vec4(polarity_pos_color, 1.0f);
-
-            if (!parameter_store->exists("event_contrib_weight"))
-            {
-                parameter_store->add("event_contrib_weight", 0.5f);
-            }
-            float event_contrib_weight{parameter_store->get<float>("event_contrib_weight")};
-
-            if (!parameter_store->exists("shutter_is_positive_only"))
-            {
-                parameter_store->add("shutter_is_positive_only", false);
-            }
-            bool shutter_is_positive_only = parameter_store->get<bool>("shutter_is_positive_only");
-
-            if (!parameter_store->exists("shutter_is_morlet"))
-            {
-                parameter_store->add("shutter_is_morlet", false);
-            }
-            bool shutter_is_morlet{parameter_store->get<bool>("shutter_is_morlet")};
-
-            if (!parameter_store->exists("scrubber.current_time"))
-            {
-                parameter_store->add("scrubber.current_time", 0.0f);
-            }
-            float current_time{parameter_store->get<float>("scrubber.current_time")};
-
-            if (!parameter_store->exists("scrubber.lower_time"))
-            {
-                parameter_store->add("scrubber.lower_time", 0.0f);
-            }
-            float lower_time{parameter_store->get<float>("scrubber.lower_time")};
-
-            float time_center = (current_time + lower_time) / 2000.0f;
-
-            if (!parameter_store->exists("morlet_frequency"))
-            {
-                parameter_store->add("morlet_frequency", 0.0f);
-            }
-            float morlet_frequency{parameter_store->get<float>("morlet_frequency")};
-
-            if (!parameter_store->exists("morlet_width"))
-            {
-                parameter_store->add("morlet_width", 0.01f);
-            }
-            float morlet_width{parameter_store->get<float>("morlet_width")};
-
-            glm::vec4 floatFlags = glm::vec4(static_cast<float>(dce_color), event_contrib_weight,
-                                             static_cast<float>(activation_function), 0.0f);
-
-            glm::vec4 flags =
-                glm::vec4((shutter_is_positive_only ? 1.0f : 0.0f), (shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
-
-            glm::vec4 morletParams = glm::vec4(morlet_frequency, morlet_width, time_center, 0.0f);
-
+            // GPU shit 
             PassData pass_data;
             pass_data.posCol = posCol;
             pass_data.neutCol = neutCol;
@@ -449,6 +398,21 @@ class DigitalCodedExposure
 
         void render_pass(SDL_GPUCommandBuffer *command_buffer)
         {
+        }
+
+        void initialize_textures_next_update() {
+            std::unique_lock dce_read_write_lock(mutex);
+            texture_initialization_required = true;
+        }
+
+        DCEParameters get_parameters() {
+            std::shared_lock lock(mutex);
+            return params;
+        }
+
+        void set_parameters(const DCEParameters& new_parameters) {
+            std::unique_lock lock(mutex);
+            params = new_parameters;
         }
 };
 
