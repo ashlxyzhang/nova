@@ -2,7 +2,7 @@
 #ifndef DVEVENTREADER_HH
 #define DVEVENTREADER_HH
 
-#include "IEventReader.hh"
+#include "data/IEventReader.hh"
 #include <dv-processing/io/mono_camera_recording.hpp>
 
 /**
@@ -67,10 +67,10 @@ class DVEventReader final : public IEventReader
             result.reserve(events->size());
             for (const auto &e : *events)
             {
-                result.push_back({.x        = static_cast<int32_t>(e.x()),
-                                  .y        = static_cast<int32_t>(e.y()),
+                result.push_back({.x = static_cast<int32_t>(e.x()),
+                                  .y = static_cast<int32_t>(e.y()),
                                   .timestamp = e.timestamp(),
-                                  .polarity  = static_cast<uint8_t>(e.polarity())});
+                                  .polarity = static_cast<uint8_t>(e.polarity())});
             }
             return result;
         }

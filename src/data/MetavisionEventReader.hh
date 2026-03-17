@@ -2,7 +2,7 @@
 #ifndef METAVISIONEVENTREADER_HH
 #define METAVISIONEVENTREADER_HH
 
-#include "IEventReader.hh"
+#include "data/IEventReader.hh"
 #include <atomic>
 #include <metavision/sdk/base/events/event_cd.h>
 #include <metavision/sdk/stream/camera.h>
@@ -40,33 +40,29 @@ class MetavisionEventReader final : public IEventReader
 
             camera_.emplace(Metavision::Camera::from_file(path, hints));
 
-            width_  = camera_->geometry().get_width();
+            width_ = camera_->geometry().get_width();
             height_ = camera_->geometry().get_height();
 
-            camera_->cd().add_callback(
-                [this](const Metavision::EventCD *begin, const Metavision::EventCD *end)
+            camera_->cd().add_callback([this](const Metavision::EventCD *begin, const Metavision::EventCD *end) {
+                std::lock_guard<std::mutex> lock(buffer_mutex_);
+                for (auto it = begin; it != end; ++it)
                 {
-                    std::lock_guard<std::mutex> lock(buffer_mutex_);
-                    for (auto it = begin; it != end; ++it)
-                    {
-                        event_buffer_.push_back({.x         = static_cast<int32_t>(it->x),
-                                                 .y         = static_cast<int32_t>(it->y),
-                                                 .timestamp = static_cast<int64_t>(it->t),
-                                                 .polarity  = static_cast<uint8_t>(it->p)});
-                    }
-                });
+                    event_buffer_.push_back({.x = static_cast<int32_t>(it->x),
+                                             .y = static_cast<int32_t>(it->y),
+                                             .timestamp = static_cast<int64_t>(it->t),
+                                             .polarity = static_cast<uint8_t>(it->p)});
+                }
+            });
 
-            camera_->add_status_change_callback(
-                [this](const Metavision::CameraStatus &status)
+            camera_->add_status_change_callback([this](const Metavision::CameraStatus &status) {
+                if (status == Metavision::CameraStatus::STOPPED)
                 {
-                    if (status == Metavision::CameraStatus::STOPPED)
-                    {
-                        // Hold the lock so this flag becomes visible only after any
-                        // in-flight CD callback has finished writing to event_buffer_.
-                        std::lock_guard<std::mutex> lock(buffer_mutex_);
-                        camera_stopped_ = true;
-                    }
-                });
+                    // Hold the lock so this flag becomes visible only after any
+                    // in-flight CD callback has finished writing to event_buffer_.
+                    std::lock_guard<std::mutex> lock(buffer_mutex_);
+                    camera_stopped_ = true;
+                }
+            });
         }
 
         ~MetavisionEventReader() override

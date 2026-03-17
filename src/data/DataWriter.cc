@@ -1,5 +1,5 @@
-#include "DataWriter.hh"
-#include "DataAcquisition.hh"
+#include "data/DataWriter.hh"
+#include "data/DataAcquisition.hh"
 
 void DataWriter::set_save_frames_toggle(const bool toggle) {
     std::unique_lock lock(mutex);

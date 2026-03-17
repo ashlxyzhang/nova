@@ -1,9 +1,8 @@
 #pragma once
-
 #ifndef UPLOAD_BUFFER_HH
 #define UPLOAD_BUFFER_HH
 
-#include "pch.hh"
+#include "util/pch.hh"
 
 /**
  * @brief Class for uploading data to the GPU.

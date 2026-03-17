@@ -1,27 +1,29 @@
 #pragma once
-#include <SDL3/SDL_gpu.h>
 #ifndef SCRUBBER_HH
 #define SCRUBBER_HH
-#include "pch.hh"
-#include "EventData.hh"
-#include "UploadBuffer.hh"
-#include "ErrorQueue.hh"
-#include <algorithm>
+
+#include "data/EventData.hh"
+#include "render/UploadBuffer.hh"
+#include "util/ErrorQueue.hh"
+#include "util/pch.hh"
 #include <array>
 #include <mutex>
 #include <shared_mutex>
-#include <iostream>
 
 /**
-* @brief Provides functionality for scrubbing through subsets of event data.
-*/
+ * @brief Provides functionality for scrubbing through subsets of event data.
+ */
 class Scrubber
 {
     public:
         /**
          * @brief Two types of data scrubbing, event based or time based.
          */
-        enum class ScrubberType : std::uint8_t { EVENT, TIME };
+        enum class ScrubberType : std::uint8_t
+        {
+            EVENT,
+            TIME
+        };
 
         /**
          * @brief Three modes of data scrubbing.
@@ -29,131 +31,140 @@ class Scrubber
          *        Playing is good for recreating streaming from past data.
          *        Latest is good for seeing data as it is streamed.
          */
-        enum class ScrubberMode : std::uint8_t { PAUSED, PLAYING, LATEST };
+        enum class ScrubberMode : std::uint8_t
+        {
+            PAUSED,
+            PLAYING,
+            LATEST
+        };
 
-        struct ScrubberState {
-            ScrubberType type = ScrubberType::TIME;
-            ScrubberMode mode = ScrubberMode::PLAYING;
-            std::size_t current_index = 0;
-            std::size_t index_window = 50;
-            std::size_t index_step = 0;
-            std::size_t min_index = 0;
-            std::size_t max_index = 0;
-            std::size_t lower_index = 0;
-            float lower_time = 0.0f;
-            float current_time = 0.0f;
-            float time_window = 10000.0f;  // 10ms default (matches Prophesee)
-            float time_step = 33333.0f;    // ~30fps default (matches Prophesee)
-            float min_time = 0.0f;
-            float max_time = 0.0f;
-            bool show_frame_data = false;
+        struct ScrubberState
+        {
+                ScrubberType type = ScrubberType::TIME;
+                ScrubberMode mode = ScrubberMode::PLAYING;
+                std::size_t current_index = 0;
+                std::size_t index_window = 50;
+                std::size_t index_step = 0;
+                std::size_t min_index = 0;
+                std::size_t max_index = 0;
+                std::size_t lower_index = 0;
+                float lower_time = 0.0f;
+                float current_time = 0.0f;
+                float time_window = 10000.0f; // 10ms default (matches Prophesee)
+                float time_step = 33333.0f;   // ~30fps default (matches Prophesee)
+                float min_time = 0.0f;
+                float max_time = 0.0f;
+                bool show_frame_data = false;
 
-            // Resets every value except for TYPE and MODE
-            void clear() {
-                current_index = 0;
-                index_window = 50;
-                index_step = 0;
-                min_index = 0;
-                max_index = 0;
-                lower_index = 0;
-                lower_time = 0.0f;
-                current_time = 0.0f;
-                time_window = 10000.0f;
-                time_step = 33333.0f;
-                min_time = 0.0f;
-                max_time = 0.0f;
-                show_frame_data = false;
-            }
-
-            // Updates based on event_data
-            void update(EventData& event_data) {
-                event_data.lock_data_vectors();
-                const auto &event_vector = event_data.get_evt_vector_ref();
-
-                // If no event data, scrubber has nothing to scrub so clear state
-                if (event_vector.empty())
-                {   
-                    event_data.unlock_data_vectors();
-                    clear();
-                    return;
-                }
-
-                // Get size of event data
-                min_index = 0;
-                max_index = event_vector.size() - 1;
-
-                // Time-based updates
-                if (type == ScrubberType::TIME)
+                // Resets every value except for TYPE and MODE
+                void clear()
                 {
-                    // Get time bounds from event data
+                    current_index = 0;
+                    index_window = 50;
+                    index_step = 0;
+                    min_index = 0;
+                    max_index = 0;
+                    lower_index = 0;
+                    lower_time = 0.0f;
+                    current_time = 0.0f;
+                    time_window = 10000.0f;
+                    time_step = 33333.0f;
                     min_time = 0.0f;
-                    max_time = event_vector.empty() ? 0.0f : event_vector.back().z;
-
-                    // Update based on mode
-                    if (mode == ScrubberMode::PAUSED)
-                    {
-                        current_time = std::clamp(current_time, min_time, max_time);
-                        time_window = std::clamp(time_window, 0.0f, max_time - min_time);
-                        time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                        lower_time = std::max(min_time, current_time - time_window);
-                    }
-                    else if (mode == ScrubberMode::PLAYING)
-                    {
-                        time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                        time_window = std::clamp(time_window, 0.0f, max_time - min_time);
-                        current_time = std::clamp(current_time + time_step, min_time, max_time);
-                        lower_time = std::max(min_time, current_time - time_window);
-                    }
-                    else if (mode == ScrubberMode::LATEST)
-                    {
-                        current_time = max_time;
-                        time_window = std::clamp(time_window, 0.0f, max_time - min_time);
-                        time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                        lower_time = std::max(min_time, current_time - time_window);
-                    }
-
-                    // Convert time values to indices for internal use
-                    lower_index = event_data.get_event_index_from_relative_timestamp(lower_time);
-                    current_index = event_data.get_event_index_from_relative_timestamp(current_time);
-
-                    // Clamp indices
-                    lower_index = std::clamp(lower_index, size_t(0), event_vector.size() - 1);
-                    current_index = std::clamp(current_index, size_t(0), event_vector.size() - 1);
+                    max_time = 0.0f;
+                    show_frame_data = false;
                 }
-                // Event-based Updates
-                else if (type == ScrubberType::EVENT)
-                {   
-                    // Update based on mode
-                    if (mode == ScrubberMode::PAUSED)
+
+                // Updates based on event_data
+                void update(EventData &event_data)
+                {
+                    event_data.lock_data_vectors();
+                    const auto &event_vector = event_data.get_evt_vector_ref();
+
+                    // If no event data, scrubber has nothing to scrub so clear state
+                    if (event_vector.empty())
                     {
+                        event_data.unlock_data_vectors();
+                        clear();
+                        return;
+                    }
+
+                    // Get size of event data
+                    min_index = 0;
+                    max_index = event_vector.size() - 1;
+
+                    // Time-based updates
+                    if (type == ScrubberType::TIME)
+                    {
+                        // Get time bounds from event data
+                        min_time = 0.0f;
+                        max_time = event_vector.empty() ? 0.0f : event_vector.back().z;
+
+                        // Update based on mode
+                        if (mode == ScrubberMode::PAUSED)
+                        {
+                            current_time = std::clamp(current_time, min_time, max_time);
+                            time_window = std::clamp(time_window, 0.0f, max_time - min_time);
+                            time_step = std::clamp(time_step, 0.0f, max_time - min_time);
+                            lower_time = std::max(min_time, current_time - time_window);
+                        }
+                        else if (mode == ScrubberMode::PLAYING)
+                        {
+                            time_step = std::clamp(time_step, 0.0f, max_time - min_time);
+                            time_window = std::clamp(time_window, 0.0f, max_time - min_time);
+                            current_time = std::clamp(current_time + time_step, min_time, max_time);
+                            lower_time = std::max(min_time, current_time - time_window);
+                        }
+                        else if (mode == ScrubberMode::LATEST)
+                        {
+                            current_time = max_time;
+                            time_window = std::clamp(time_window, 0.0f, max_time - min_time);
+                            time_step = std::clamp(time_step, 0.0f, max_time - min_time);
+                            lower_time = std::max(min_time, current_time - time_window);
+                        }
+
+                        // Convert time values to indices for internal use
+                        lower_index = event_data.get_event_index_from_relative_timestamp(lower_time);
+                        current_index = event_data.get_event_index_from_relative_timestamp(current_time);
+
+                        // Clamp indices
+                        lower_index = std::clamp(lower_index, size_t(0), event_vector.size() - 1);
                         current_index = std::clamp(current_index, size_t(0), event_vector.size() - 1);
-                        index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
-                        index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
-                        lower_index = std::max(size_t(0), current_index - index_window);
                     }
-                    else if (mode == ScrubberMode::PLAYING)
+                    // Event-based Updates
+                    else if (type == ScrubberType::EVENT)
                     {
-                        index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
-                        index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
-                        current_index = std::clamp(current_index + index_step, size_t(0), event_vector.size() - 1);
-                        lower_index = std::max(size_t(0), current_index - index_window);
+                        // Update based on mode
+                        if (mode == ScrubberMode::PAUSED)
+                        {
+                            current_index = std::clamp(current_index, size_t(0), event_vector.size() - 1);
+                            index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
+                            index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
+                            lower_index = std::max(size_t(0), current_index - index_window);
+                        }
+                        else if (mode == ScrubberMode::PLAYING)
+                        {
+                            index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
+                            index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
+                            current_index = std::clamp(current_index + index_step, size_t(0), event_vector.size() - 1);
+                            lower_index = std::max(size_t(0), current_index - index_window);
+                        }
+                        else if (mode == ScrubberMode::LATEST)
+                        {
+                            std::size_t event_data_size = event_vector.empty() ? 0 : event_vector.size() - 1;
+                            current_index = event_data_size;
+                            index_window = std::clamp(index_window, size_t(0), event_data_size);
+                            index_step = std::clamp(index_step, size_t(0), event_data_size);
+                            lower_index = std::max(size_t(0), current_index - index_window);
+                        }
                     }
-                    else if (mode == ScrubberMode::LATEST)
-                    {
-                        std::size_t event_data_size = event_vector.empty() ? 0 : event_vector.size() - 1;
-                        current_index = event_data_size;
-                        index_window = std::clamp(index_window, size_t(0), event_data_size);
-                        index_step = std::clamp(index_step, size_t(0), event_data_size);
-                        lower_index = std::max(size_t(0), current_index - index_window);
-                    }
-                }
 
-                event_data.unlock_data_vectors();
-            }
+                    event_data.unlock_data_vectors();
+                }
         };
 
     private:
-        mutable std::shared_mutex mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
+        mutable std::shared_mutex
+            mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
 
         // State
         ScrubberState state;
@@ -165,7 +176,7 @@ class Scrubber
         // -----
 
         // GPU
-        SDL_GPUDevice* gpu_device;
+        SDL_GPUDevice *gpu_device;
         SDL_GPUBuffer *points_buffer = nullptr;
         std::size_t points_buffer_size = 0;
         float lower_depth = 0.0f;
@@ -183,8 +194,8 @@ class Scrubber
          * @param gpu_device SDL_GPUDevice to upload event data points to
          * @param error_queue ErrorQueue object used to report errors to be displayed and/or logged
          */
-        Scrubber(EventData &event_data, SDL_GPUDevice *gpu_device, ErrorQueue &error_queue):
-                event_data(event_data), gpu_device(gpu_device), error_queue(error_queue) 
+        Scrubber(EventData &event_data, SDL_GPUDevice *gpu_device, ErrorQueue &error_queue)
+            : event_data(event_data), gpu_device(gpu_device), error_queue(error_queue)
         {
             // Initialize with Prophesee metavision_viewer defaults:
             //   accumulation time = 10 ms  (time_window = 10 000 us)
@@ -215,7 +226,7 @@ class Scrubber
          * @brief Updates what event data is being captured by scrubber every frame.
          */
         void cpu_update()
-        {     
+        {
             // Make copy of state to prevent changes from being made mid function
             ScrubberState cur_state = get_state();
             // Update this intermediate state based on event-data
@@ -232,7 +243,8 @@ class Scrubber
          */
         void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
-            if (!copy_pass) return;
+            if (!copy_pass)
+                return;
 
             // Lock resources
             event_data.lock_data_vectors();
@@ -458,31 +470,58 @@ class Scrubber
         }
 
         // Thread safe state getter
-        ScrubberState get_state() const {
+        ScrubberState get_state() const
+        {
             std::shared_lock lock(mutex);
             return state;
         }
 
         // Thread safe state setter
-        void set_state(const ScrubberState& new_state) {
+        void set_state(const ScrubberState &new_state)
+        {
             std::unique_lock lock(mutex);
             state = new_state;
         }
 
-        void clear() {
+        void clear()
+        {
             std::unique_lock lock(mutex);
             state.clear();
         }
 
         // Non thread-safe getters
-        SDL_GPUBuffer* get_points_buffer() const { return points_buffer; }
-        SDL_GPUTexture* get_frames_texture() const { return frames; }
-        std::array<float, 2> get_frames_timestamps() const { return frame_timestamps; }
-        std::array<std::size_t, 2> get_frame_dimensions() const { return {frame_width, frame_height}; }
-        std::size_t get_points_buffer_size() const { return points_buffer_size / sizeof(glm::vec4); }
-        float get_lower_depth() const { return lower_depth; }
-        float get_upper_depth() const { return upper_depth; }
-        glm::vec2 get_camera_resolution() const { return camera_resolution; }
+        SDL_GPUBuffer *get_points_buffer() const
+        {
+            return points_buffer;
+        }
+        SDL_GPUTexture *get_frames_texture() const
+        {
+            return frames;
+        }
+        std::array<float, 2> get_frames_timestamps() const
+        {
+            return frame_timestamps;
+        }
+        std::array<std::size_t, 2> get_frame_dimensions() const
+        {
+            return {frame_width, frame_height};
+        }
+        std::size_t get_points_buffer_size() const
+        {
+            return points_buffer_size / sizeof(glm::vec4);
+        }
+        float get_lower_depth() const
+        {
+            return lower_depth;
+        }
+        float get_upper_depth() const
+        {
+            return upper_depth;
+        }
+        glm::vec2 get_camera_resolution() const
+        {
+            return camera_resolution;
+        }
 };
 
 #endif

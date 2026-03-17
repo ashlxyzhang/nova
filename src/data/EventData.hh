@@ -1,5 +1,4 @@
 #pragma once
-
 #ifndef EVENTDATA_HH
 #define EVENTDATA_HH
 

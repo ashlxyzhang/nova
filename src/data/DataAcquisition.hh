@@ -2,19 +2,19 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
-#include "EventData.hh"
-#include "ErrorQueue.hh"
-#include "IEventReader.hh"
-#include "DVEventReader.hh"
-#include "MetavisionEventReader.hh"
+#include "data/DVEventReader.hh"
+#include "data/EventData.hh"
+#include "data/IEventReader.hh"
+#include "data/MetavisionEventReader.hh"
+#include "util/ErrorQueue.hh"
 
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <vector>
 #include <mutex>
 #include <shared_mutex>
+#include <vector>
 
 class DataWriter;
 
@@ -31,8 +31,8 @@ class DataAcquisition
     public:
         enum class STATE : uint8_t
         {
-            IDLE = 0,        
-            FILE_STREAM = 2,  
+            IDLE = 0,
+            FILE_STREAM = 2,
             CAMERA_STREAM = 3
         };
 
@@ -59,16 +59,16 @@ class DataAcquisition
         float event_discard_odds = 1.0f; // 1.0 keeps all, 0.0 keeps none
         // -----
 
-        // Selected camera        
+        // Selected camera
         int32_t camera_index = -1; // -1 if none selected
 
         bool camera_stream_paused = false;
-        bool camera_stream_changed = false; 
+        bool camera_stream_changed = false;
         // -----
         // Selected file
         std::string file_stream_name = "";
-        bool file_stream_paused = false; 
-        bool file_stream_changed = false; 
+        bool file_stream_paused = false;
+        bool file_stream_changed = false;
         // -----
 
         float randFloat()
@@ -76,19 +76,16 @@ class DataAcquisition
             return static_cast<float>(rand()) / RAND_MAX;
         };
 
-
     public:
         /**
          * @param error_queue ErrorQueue object used to report errors to be displayed and/or logged
          */
         DataAcquisition(ErrorQueue &error_queue);
 
-
         /**
          * @brief Clears every member variable
          */
         void clear();
-
 
         /**
          * @brief Scan for available USB cameras load camera names and their pointers into scanned_camera_names and
@@ -162,7 +159,6 @@ class DataAcquisition
          */
         int32_t get_camera_frame_height();
 
-
         // Thread-safe getters
         STATE get_state();
         float get_event_discard_odds();
@@ -174,7 +170,6 @@ class DataAcquisition
         bool has_file_stream_changed();
         std::vector<std::string> get_scanned_camera_names();
 
-
         // Thread-safe setters
         void set_event_discard_odds(float odds);
         void set_camera_index(int32_t index);
@@ -185,7 +180,5 @@ class DataAcquisition
         void set_file_stream_changed(bool changed);
         void set_state(const STATE new_state);
 };
-
-
 
 #endif // DATA_ACQUISITION_HH

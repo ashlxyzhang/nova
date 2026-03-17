@@ -1,13 +1,12 @@
 #pragma once
-
 #ifndef SPINNING_CUBE_HH
 #define SPINNING_CUBE_HH
 
-#include "pch.hh"
+#include "util/pch.hh"
 
-#include "Camera.hh"
-#include "RenderTarget.hh"
-#include "UploadBuffer.hh"
+#include "render/Camera.hh"
+#include "render/RenderTarget.hh"
+#include "render/UploadBuffer.hh"
 
 #include "shaders/spinning_cube/spinning_cube_frag.h"
 #include "shaders/spinning_cube/spinning_cube_vert.h"
@@ -123,16 +122,17 @@ class SpinningCube
 
             // create the graphics pipeline, this is the pipeline that will be used to render the vertex data
 
-            SDL_GPUVertexAttribute vertex_attributes [] = {{0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0},
-            {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3}};
-            SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {{0, sizeof(Vertex), SDL_GPU_VERTEXINPUTRATE_VERTEX, 0}};
-            SDL_GPUVertexInputState vertex_input_state = {
-                        .vertex_buffer_descriptions = vertex_buffer_descriptions,
-                        .num_vertex_buffers = 1,
-                        .vertex_attributes = vertex_attributes,
-                        .num_vertex_attributes = 2};
+            SDL_GPUVertexAttribute vertex_attributes[] = {
+                {0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0},
+                {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3}};
+            SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {
+                {0, sizeof(Vertex), SDL_GPU_VERTEXINPUTRATE_VERTEX, 0}};
+            SDL_GPUVertexInputState vertex_input_state = {.vertex_buffer_descriptions = vertex_buffer_descriptions,
+                                                          .num_vertex_buffers = 1,
+                                                          .vertex_attributes = vertex_attributes,
+                                                          .num_vertex_attributes = 2};
             SDL_GPUColorTargetDescription color_target_descriptions[] = {{SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM}};
-            
+
             SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {
                 .vertex_shader = vs,
                 .fragment_shader = fs,

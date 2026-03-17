@@ -11,7 +11,6 @@ find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED)
 find_package(SDL3_ttf REQUIRED)
 find_package(glm REQUIRED)
-find_package(Eigen3 REQUIRED)
 find_package(dv-processing REQUIRED)
 find_package(Boost COMPONENTS iostreams REQUIRED)
 find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
@@ -69,6 +68,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
+target_include_directories(${PROJECT_NAME} PRIVATE "src/")
 
 if(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
@@ -78,7 +78,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
     glm::glm
-    Eigen3::Eigen
     dv::processing
     Boost::iostreams
     Vulkan::Vulkan

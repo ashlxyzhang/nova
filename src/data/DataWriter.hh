@@ -2,16 +2,15 @@
 #ifndef DATA_WRITER_HH
 #define DATA_WRITER_HH
 
-#include "ErrorQueue.hh"
-#include "EventData.hh"
+#include "data/EventData.hh"
+#include "util/ErrorQueue.hh"
 
 #include <dv-processing/io/mono_camera_recording.hpp>
 #include <dv-processing/io/mono_camera_writer.hpp>
 
-#include <queue>
 #include <mutex>
+#include <queue>
 #include <shared_mutex>
-
 
 class DataAcquisition;
 
@@ -58,12 +57,11 @@ class DataWriter
         bool init_data_writer(DataAcquisition &data_acq);
 
     public:
-
         void set_save_frames_toggle(const bool toggle);
         bool get_save_frames_toggle();
         void set_save_events_toggle(const bool toggle);
         bool get_save_events_toggle();
-        void set_saving_message(const std::string& message);
+        void set_saving_message(const std::string &message);
         std::string get_saving_message();
         void set_stream_save_file_name(const std::string &file_name);
         std::string get_stream_save_file_name();
@@ -79,7 +77,6 @@ class DataWriter
          * @return value of writing_event_data (is the object writing event data or not)
          */
         bool get_writing_event_data();
-
 
         /**
          * @brief Constructor, zero initializes all values

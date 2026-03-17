@@ -2,7 +2,7 @@
 #ifndef IEVENTREADER_HH
 #define IEVENTREADER_HH
 
-#include "EventData.hh"
+#include "data/EventData.hh"
 #include <opencv2/core.hpp>
 #include <optional>
 #include <vector>

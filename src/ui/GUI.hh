@@ -1,31 +1,32 @@
 #pragma once
 #ifndef GUI_HH
 #define GUI_HH
-#include "pch.hh"
-#include "imgui_internal.h"
-#include "RenderTarget.hh"
-#include "Scrubber.hh"
-#include "DataAcquisition.hh"
-#include "DataWriter.hh"
-#include "Visualizer.hh"
-#include "DigitalCodedExposure.hh"
-#include "ErrorQueue.hh"
+
+#include "data/DataAcquisition.hh"
+#include "data/DataWriter.hh"
 #include "fonts/CascadiaCode.ttf.h"
-#include <iostream>
+#include "imgui_internal.h"
+#include "render/DigitalCodedExposure.hh"
+#include "render/RenderTarget.hh"
+#include "render/Visualizer.hh"
+#include "ui/Scrubber.hh"
+#include "util/ErrorQueue.hh"
+#include "util/pch.hh"
 
 // Structure to pass pointers to callbacks (callback functions need pointers to both)
-struct CallbackData {
-    DataAcquisition* data_acquisition;
-    DataWriter* data_writer;
+struct CallbackData
+{
+        DataAcquisition *data_acquisition;
+        DataWriter *data_writer;
 };
 
 // Forward declarations for callbacks
-inline void SDLCALL stream_file_handle_callback(void *user_data, const char* const *data_file_list, int filter_unused);
-inline void SDLCALL save_stream_handle_callback(void *user_data, const char* const *data_file_list, int filter_unused);
+inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
+inline void SDLCALL save_stream_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
 
 /**
-* @brief This class provides functions to draw the GUI.
-*/
+ * @brief This class provides functions to draw the GUI.
+ */
 class GUI
 {
     private:
@@ -49,10 +50,10 @@ class GUI
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
         // Timeline visual constants
-        static constexpr ImU32 kTrackColor      = IM_COL32(60, 60, 60, 255);
+        static constexpr ImU32 kTrackColor = IM_COL32(60, 60, 60, 255);
         static constexpr ImU32 kWindowHighlight = IM_COL32(80, 130, 200, 100);
-        static constexpr ImU32 kPositionMarker  = IM_COL32(255, 200, 50, 255);
-        static constexpr ImU32 kBorderColor     = IM_COL32(120, 120, 120, 255);
+        static constexpr ImU32 kPositionMarker = IM_COL32(255, 200, 50, 255);
+        static constexpr ImU32 kBorderColor = IM_COL32(120, 120, 120, 255);
 
         // Circular fps buffer
         std::vector<float> fps_history_buf;
@@ -122,7 +123,7 @@ class GUI
          * @brief Draws error popup window.
          */
         void draw_error_popup_window()
-        {   
+        {
             std::string error_msg = error_queue.top_error();
             if (!error_msg.empty())
             {
@@ -166,7 +167,8 @@ class GUI
             ImGui::Checkbox("Morlet Shutter", &dce_params.shutter_is_morlet);
             ImGui::Checkbox("Positive Events Only", &dce_params.shutter_is_positive_only);
             ImGui::Separator();
-            ImGui::Combo("Digital Exposure Color", &dce_params.dce_color, "High/Low\0Tricolor\0Use Visualizer Colors\0");
+            ImGui::Combo("Digital Exposure Color", &dce_params.dce_color,
+                         "High/Low\0Tricolor\0Use Visualizer Colors\0");
             if (dce_params.dce_color < 2)
             {
                 ImGui::ColorEdit3("Negative Color", (float *)&dce_params.polarity_neg_color);
@@ -271,7 +273,8 @@ class GUI
                 data_acquisition.set_camera_stream_changed(true);
             }
 
-            if (ImGui::Button(program_state == DataAcquisition::STATE::CAMERA_STREAM ? "Stop Streaming" : "Stream From Camera"))
+            if (ImGui::Button(program_state == DataAcquisition::STATE::CAMERA_STREAM ? "Stop Streaming"
+                                                                                     : "Stream From Camera"))
             {
                 if (program_state != DataAcquisition::STATE::CAMERA_STREAM)
                 {
@@ -406,8 +409,8 @@ class GUI
          * @brief Custom-draw a horizontal timeline bar with window highlight and position marker.
          * @return true if user dragged to a new position (written to out_new_val)
          */
-        bool draw_timeline_bar(float min_val, float max_val, float current_val, float window_val,
-                               float *out_new_val, const char *format, const char *unit_suffix, bool interactive)
+        bool draw_timeline_bar(float min_val, float max_val, float current_val, float window_val, float *out_new_val,
+                               const char *format, const char *unit_suffix, bool interactive)
         {
             bool changed = false;
             ImDrawList *draw_list = ImGui::GetWindowDrawList();
@@ -502,7 +505,8 @@ class GUI
         /**
          * @brief Draw a row of playback control buttons (|<, <<, Play/Pause, >>, >|/LIVE).
          */
-        void draw_playback_controls(Scrubber::ScrubberMode current_mode, Scrubber::ScrubberType scrubber_type, Scrubber::ScrubberState& state)
+        void draw_playback_controls(Scrubber::ScrubberMode current_mode, Scrubber::ScrubberType scrubber_type,
+                                    Scrubber::ScrubberState &state)
         {
             float button_w = ImGui::GetFrameHeight() * 2.0f;
             float button_h = ImGui::GetFrameHeight();
@@ -536,9 +540,9 @@ class GUI
             {
                 if (scrubber_type == Scrubber::ScrubberType::EVENT)
                 {
-                    state.current_index = (state.current_index > state.index_step + state.min_index) 
-                                         ? state.current_index - state.index_step 
-                                         : state.min_index;
+                    state.current_index = (state.current_index > state.index_step + state.min_index)
+                                              ? state.current_index - state.index_step
+                                              : state.min_index;
                 }
                 else
                 {
@@ -694,7 +698,8 @@ class GUI
                     ImGui::Separator();
 
                     // Window slider
-                    size_t max_window = (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
+                    size_t max_window =
+                        (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
                     float max_window_f = static_cast<float>(max_window);
                     float win_slider = win_f;
                     if (ImGui::SliderFloat("Window", &win_slider, 1.0f, max_window_f, "%.0f"))
@@ -871,26 +876,33 @@ class GUI
             {
                 ImGui::BeginChild("QSContent", ImVec2(0, -50), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+                ImGui::TextColored(
+                    ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
                     "You can view this popup again by clicking the 'Quickstart Guide' button in the debug window.");
                 ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-                    "Windows can be moved and resized, you can reset the layout to the default by clicking the 'Reset Layout' button in the debug window.");
+                                   "Windows can be moved and resized, you can reset the layout to the default by "
+                                   "clicking the 'Reset Layout' button in the debug window.");
                 ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-                    "Sliders can be ctrl+clicked to enter a value directly.");
+                                   "Sliders can be ctrl+clicked to enter a value directly.");
 
                 ImGui::Separator();
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Streaming Data");
                 ImGui::Separator();
                 ImGui::TextWrapped(
                     "Users can stream data from the Streaming window (located in the top right by default). "
-                    "To stream from the camera, users can click the 'Scan For Cameras' button to populate the Camera dropdown. "
+                    "To stream from the camera, users can click the 'Scan For Cameras' button to populate the Camera "
+                    "dropdown. "
                     "From the Camera dropdown, users can select the desired, detected camera to stream from. "
                     "Once the camera is selected, users click the 'Stream From Camera' button to start the streaming. "
-                    "To stream from a file, users can click the 'Open File To Stream' button to select an aedat4 file to stream from. "
+                    "To stream from a file, users can click the 'Open File To Stream' button to select an aedat4 file "
+                    "to stream from. "
                     "Streaming from the file will begin as soon as a file is selected. "
-                    "The Event Discard Odds determines the odds that event data is randomly discarded, this setting is useful when streaming from a camera. "
-                    "Users can click the 'Open File To Save Stream To' to select/create an aedat4 file to stream data to. "
-                    "Users can select the 'Save Frames on Next Stream' and/or 'Save Events On Next Stream' checkboxes to save frame and/or event data to the save file. "
+                    "The Event Discard Odds determines the odds that event data is randomly discarded, this setting is "
+                    "useful when streaming from a camera. "
+                    "Users can click the 'Open File To Save Stream To' to select/create an aedat4 file to stream data "
+                    "to. "
+                    "Users can select the 'Save Frames on Next Stream' and/or 'Save Events On Next Stream' checkboxes "
+                    "to save frame and/or event data to the save file. "
                     "Selecting any of the these options will stop streaming. "
                     "To start saving, start streaming from a file or camera with these save options set.");
 
@@ -899,10 +911,13 @@ class GUI
                 ImGui::Separator();
                 ImGui::TextWrapped(
                     "The 3D Visualizer is a point particle plot. Each point in the plot represents event data. "
-                    "The colors used to represent event polarity for each particle as well as particle scales can be changed in the Info window. "
-                    "The axis with text is the time axis. The other bottom axis is the x-pixel dimension of the event data. "
+                    "The colors used to represent event polarity for each particle as well as particle scales can be "
+                    "changed in the Info window. "
+                    "The axis with text is the time axis. The other bottom axis is the x-pixel dimension of the event "
+                    "data. "
                     "The vertical axis is the y-pixel dimension of the event data. "
-                    "Frame data will be shown should the 'Show Frame Data' checkbox be selected in the Scrubber window and should there be frame data received.");
+                    "Frame data will be shown should the 'Show Frame Data' checkbox be selected in the Scrubber window "
+                    "and should there be frame data received.");
 
                 ImGui::Spacing();
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Digital Coded Exposure");
@@ -911,25 +926,36 @@ class GUI
                     "The Digital Coded Exposure attempts to reconstruct frame data out of event data. "
                     "The controls are given in the Digital Coded Exposure Controls window. "
                     "There, the user can select the color scheme, enable Morlet shutter contribution calculations, "
-                    "choose the activation function (how each pixel's color is determined from event contributions), etc. "
-                    "It should be noted that due to limitations in Vulkan shaders (specifically, the inability to atomically add floating point numbers), "
-                    "the Morlet shutter will not work for high Current Index (Time) slider values in the Scrubber window. "
-                    "To see Morlet Shutter output, a smaller data file with with high Morlet Frequency and Morlet Width values is recommended.");
+                    "choose the activation function (how each pixel's color is determined from event contributions), "
+                    "etc. "
+                    "It should be noted that due to limitations in Vulkan shaders (specifically, the inability to "
+                    "atomically add floating point numbers), "
+                    "the Morlet shutter will not work for high Current Index (Time) slider values in the Scrubber "
+                    "window. "
+                    "To see Morlet Shutter output, a smaller data file with with high Morlet Frequency and Morlet "
+                    "Width values is recommended.");
 
                 ImGui::Spacing();
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Scrubbing Data");
                 ImGui::Separator();
                 ImGui::TextWrapped(
-                    "Users can determine what data is shown in the Digital Coded Exposure and 3D Visualizer windows by using the Scrubber window. "
-                    "The 'Scrubber Type' dropdown determines what the controls are based off of (event based or time based). "
-                    "The 'Mode' dropdown provides three ways to view data: 'Paused' allows the user to scrub through past data, "
+                    "Users can determine what data is shown in the Digital Coded Exposure and 3D Visualizer windows by "
+                    "using the Scrubber window. "
+                    "The 'Scrubber Type' dropdown determines what the controls are based off of (event based or time "
+                    "based). "
+                    "The 'Mode' dropdown provides three ways to view data: 'Paused' allows the user to scrub through "
+                    "past data, "
                     "'Playing' allows the user to play through data (controlled by the Index (Time) Step) slider, "
-                    "'Latest' fixes the Current Index (Time) to the latest received data (very useful when streaming from a camera). "
-                    "The 'Scrubber Cap' dropdown puts a cap on the sliders by default to increase the precision of the slider controls. "
+                    "'Latest' fixes the Current Index (Time) to the latest received data (very useful when streaming "
+                    "from a camera). "
+                    "The 'Scrubber Cap' dropdown puts a cap on the sliders by default to increase the precision of the "
+                    "slider controls. "
                     "The Current Index (Time) determines the last event point being shown in the visualizations. "
-                    "The Index (Time) Window determines the number of events before the Current Index (Time) that are shown in the visualizations. "
+                    "The Index (Time) Window determines the number of events before the Current Index (Time) that are "
+                    "shown in the visualizations. "
                     "For the Digital Coded Exposure, the Index (Time) Window is basically the shutter length. "
-                    "The Index (Time) Step determines the increment to the Current Index (Time) for each frame should the Playing Mode be selected.");
+                    "The Index (Time) Step determines the increment to the Current Index (Time) for each frame should "
+                    "the Playing Mode be selected.");
 
                 ImGui::EndChild();
                 ImGui::Separator();
@@ -947,29 +973,13 @@ class GUI
         /**
          * @brief Constructor for GUI.
          */
-        GUI(std::unordered_map<std::string, RenderTarget> &render_targets,
-            DataAcquisition &data_acquisition,
-            DataWriter &data_writer,
-            Scrubber &scrubber,
-            Visualizer &visualizer,
-            DigitalCodedExposure &dce,
-            ErrorQueue &error_queue,
-            SDL_Window *window,
-            SDL_GPUDevice *gpu_device)
-            : render_targets(render_targets),
-              data_acquisition(data_acquisition),
-              data_writer(data_writer),
-              scrubber(scrubber),
-              visualizer(visualizer),
-              dce(dce),
-              error_queue(error_queue),
-              window(window),
-              gpu_device(gpu_device),
-              callback_data{&data_acquisition, &data_writer},
-              fps_history_buf(100, 0.0f),
-              fps_buf_index(0),
-              check_for_layout_file(true),
-              show_quickstart(false)
+        GUI(std::unordered_map<std::string, RenderTarget> &render_targets, DataAcquisition &data_acquisition,
+            DataWriter &data_writer, Scrubber &scrubber, Visualizer &visualizer, DigitalCodedExposure &dce,
+            ErrorQueue &error_queue, SDL_Window *window, SDL_GPUDevice *gpu_device)
+            : render_targets(render_targets), data_acquisition(data_acquisition), data_writer(data_writer),
+              scrubber(scrubber), visualizer(visualizer), dce(dce), error_queue(error_queue), window(window),
+              gpu_device(gpu_device), callback_data{&data_acquisition, &data_writer}, fps_history_buf(100, 0.0f),
+              fps_buf_index(0), check_for_layout_file(true), show_quickstart(false)
         {
             // Setup Dear ImGui context
             IMGUI_CHECKVERSION();
@@ -994,13 +1004,12 @@ class GUI
 
             // Setup Platform/Renderer backends
             ImGui_ImplSDL3_InitForSDLGPU(window);
-            ImGui_ImplSDLGPU3_InitInfo init_info = {
-                .Device = gpu_device,
-                .ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(gpu_device, window),
-                .MSAASamples = SDL_GPU_SAMPLECOUNT_1,
-                .SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-                .PresentMode = SDL_GPU_PRESENTMODE_VSYNC
-            };
+            ImGui_ImplSDLGPU3_InitInfo init_info = {.Device = gpu_device,
+                                                    .ColorTargetFormat =
+                                                        SDL_GetGPUSwapchainTextureFormat(gpu_device, window),
+                                                    .MSAASamples = SDL_GPU_SAMPLECOUNT_1,
+                                                    .SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+                                                    .PresentMode = SDL_GPU_PRESENTMODE_VSYNC};
             ImGui_ImplSDLGPU3_Init(&init_info);
         }
 
@@ -1095,11 +1104,13 @@ class GUI
 
             ImGuiID dock_id_right_top = dock_id_right;
             ImGuiID dock_id_right_bottom;
-            ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.35f, &dock_id_right_bottom, &dock_id_right_top);
+            ImGui::DockBuilderSplitNode(dock_id_right_top, ImGuiDir_Down, 0.35f, &dock_id_right_bottom,
+                                        &dock_id_right_top);
 
             ImGuiID dock_id_right_top_top = dock_id_right_top;
             ImGuiID dock_id_right_top_bottom;
-            ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom, &dock_id_right_top_top);
+            ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom,
+                                        &dock_id_right_top_top);
 
             ImGui::DockBuilderDockWindow("Digital Coded Exposure Controls", dock_id_right_top_bottom);
             ImGui::DockBuilderDockWindow("Info", dock_id_right_top_bottom);
@@ -1114,9 +1125,9 @@ class GUI
 };
 
 // Callback functions
-inline void SDLCALL stream_file_handle_callback(void *user_data, const char* const *data_file_list, int filter_unused)
+inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused)
 {
-    CallbackData* data = static_cast<CallbackData*>(user_data);
+    CallbackData *data = static_cast<CallbackData *>(user_data);
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};
@@ -1131,9 +1142,9 @@ inline void SDLCALL stream_file_handle_callback(void *user_data, const char* con
     }
 }
 
-inline void SDLCALL save_stream_handle_callback(void *user_data, const char* const *data_file_list, int filter_unused)
+inline void SDLCALL save_stream_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused)
 {
-    CallbackData* data = static_cast<CallbackData*>(user_data);
+    CallbackData *data = static_cast<CallbackData *>(user_data);
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};
