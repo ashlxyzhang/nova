@@ -1,9 +1,8 @@
 #pragma once
-
 #ifndef CAMERA_HH
 #define CAMERA_HH
 
-#include "pch.hh"
+#include "util/pch.hh"
 
 /**
  * @brief A simplified orbital camera class using GLM

@@ -1,9 +1,8 @@
 #pragma once
-
 #ifndef RENDER_TARGET_HH
 #define RENDER_TARGET_HH
 
-#include "pch.hh"
+#include "util/pch.hh"
 
 /**
  * @brief Target to render on screen.

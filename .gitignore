@@ -5,3 +5,5 @@ build/
 compile_commands.json
 vcpkg_installed/
 imgui.ini
+resources/shaders/**/*.h
+vcpkg/

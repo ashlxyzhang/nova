@@ -1,7 +1,5 @@
-cmake_minimum_required(VERSION 3.22...3.28)
+cmake_minimum_required(VERSION 3.26)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(NOVA LANGUAGES C CXX)
@@ -9,54 +7,44 @@ project(NOVA LANGUAGES C CXX)
 file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.hh")
 
-# Use FetchContent on Linux, and find_package (vcpkg) on Windows/Other
-include(FetchContent)
+find_package(Vulkan REQUIRED)
+find_package(SDL3 REQUIRED)
+find_package(SDL3_ttf REQUIRED)
+find_package(glm REQUIRED)
+find_package(dv-processing REQUIRED)
+find_package(Boost COMPONENTS iostreams REQUIRED)
+find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
+find_package(MetavisionHAL REQUIRED)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    FetchContent_Declare(
-        SDL3
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-3.2.26
+# --- Shader compilation ---
+find_program(GLSLANG glslang REQUIRED)
+
+set(SHADER_DIR "${CMAKE_SOURCE_DIR}/resources/shaders")
+set(COMPILED_SHADER_HEADERS "")
+
+function(compile_shader SRC VAR)
+    get_filename_component(DIR "${SRC}" DIRECTORY)
+    set(HDR "${DIR}/${VAR}.h")
+    add_custom_command(
+        OUTPUT  "${HDR}"
+        COMMAND "${GLSLANG}" --target-env vulkan1.0 --vn "${VAR}" -o "${HDR}" "${SRC}"
+        DEPENDS "${SRC}"
+        COMMENT "Compiling ${SRC}"
+        VERBATIM
     )
-    FetchContent_MakeAvailable(SDL3)
+    set(COMPILED_SHADER_HEADERS "${COMPILED_SHADER_HEADERS};${HDR}" PARENT_SCOPE)
+endfunction()
 
-    FetchContent_Declare(
-        SDL3_ttf
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
-        GIT_TAG release-3.2.2
-    )
-    FetchContent_MakeAvailable(SDL3_ttf)
+file(GLOB_RECURSE SHADER_SOURCES "${SHADER_DIR}/*.comp" "${SHADER_DIR}/*.vert" "${SHADER_DIR}/*.frag")
+foreach(SRC ${SHADER_SOURCES})
+    get_filename_component(NAME_WE "${SRC}" NAME_WE)
+    get_filename_component(EXT "${SRC}" LAST_EXT)
+    string(SUBSTRING "${EXT}" 1 -1 EXT_CLEAN)
+    compile_shader("${SRC}" "${NAME_WE}_${EXT_CLEAN}")
+endforeach()
 
-    FetchContent_Declare(
-        glm
-        GIT_REPOSITORY https://github.com/g-truc/glm.git
-        GIT_TAG 1.0.2
-    )
-    FetchContent_MakeAvailable(glm)
-
-    FetchContent_Declare(
-        eigen
-        GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-        GIT_TAG 3.4.0
-    )
-    FetchContent_MakeAvailable(eigen)
-
-    FetchContent_Declare(
-        dv-processing
-        GIT_REPOSITORY https://gitlab.com/inivation/dv/dv-processing.git
-        GIT_TAG 2.0.2
-    )
-    FetchContent_MakeAvailable(dv-processing)
-
-else()
-    find_package(SDL3 REQUIRED)
-    find_package(SDL3_ttf REQUIRED)
-    find_package(glm REQUIRED)
-    find_package(Eigen3 REQUIRED)
-    find_package(dv-processing REQUIRED)
-    find_package(Boost COMPONENTS iostreams REQUIRED)
-
-endif()
+add_custom_target(shaders DEPENDS ${COMPILED_SHADER_HEADERS})
+# ---
 
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 file(GLOB IMGUI_CORE_SOURCES
@@ -72,39 +60,28 @@ file(GLOB IMGUI_BACKENDS
 )
 list(APPEND SOURCES ${IMGUI_CORE_SOURCES} ${IMGUI_BACKENDS})
 
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${COMPILED_SHADER_HEADERS})
+add_dependencies(${CMAKE_PROJECT_NAME} shaders)
+
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
+target_include_directories(${PROJECT_NAME} PRIVATE "src/")
+
+if(APPLE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
     glm::glm
-    Eigen3::Eigen
     dv::processing
     Boost::iostreams
+    Vulkan::Vulkan
+    MetavisionSDK::core
+    MetavisionSDK::stream
+    Metavision::HAL
 )
-
-# For CTEST functionality with GTEST
-set(GTEST_DIR "${CMAKE_SOURCE_DIR}/external/googletest")
-add_subdirectory(${GTEST_DIR}) 
-
-enable_testing()
-
-file(GLOB_RECURSE TEST_SOURCES "testing/*.cc")
-add_executable(tester ${TEST_SOURCES} ${HEADERS})
-target_include_directories(tester PRIVATE "resources/")
-target_link_libraries(tester PRIVATE
-    GTest::gtest_main
-    SDL3::SDL3
-    SDL3_ttf::SDL3_ttf
-    glm::glm
-    Eigen3::Eigen
-    dv::processing
-    Boost::iostreams 
-)
-
-include(GoogleTest)
-gtest_discover_tests(tester)  
-  

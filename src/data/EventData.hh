@@ -1,5 +1,4 @@
 #pragma once
-
 #ifndef EVENTDATA_HH
 #define EVENTDATA_HH
 
@@ -19,6 +18,7 @@
 #include <system_error>
 #include <thread>
 #include <vector>
+#include <iostream>
 
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <set>
@@ -448,7 +448,7 @@ class EventData
          *        critical section for thread-safety.
          */
         void lock_data_vectors()
-        {
+        {   
             evt_lock.lock();
         }
 
