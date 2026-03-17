@@ -16,6 +16,9 @@ vcpkg_check_features(
         hdf5 HDF5_DISABLED
 )
 
+# openeb sets -Werror=unused-but-set-variable in release builds but its own code triggers it
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt" "-Werror=unused-but-set-variable" "")
+
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
