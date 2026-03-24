@@ -12,8 +12,6 @@ void DataAcquisition::clear()
     std::unique_lock da_read_write_lock(mutex);
 
     data_reader_ptr.reset();
-    scanned_cameras.clear();
-    scanned_camera_names.clear();
 
     camera_event_width = 0;
     camera_event_height = 0;

@@ -278,6 +278,7 @@ class GUI
             {
                 if (program_state != DataAcquisition::STATE::CAMERA_STREAM)
                 {
+                    data_acquisition.set_camera_stream_changed(true);
                     data_acquisition.set_state(DataAcquisition::STATE::CAMERA_STREAM);
                 }
                 else
