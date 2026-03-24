@@ -1,7 +1,6 @@
 #include "util/pch.hh"
 
 #include "data/DataAcquisition.hh"
-#include "data/DataWriter.hh"
 #include "render/DigitalCodedExposure.hh"
 #include "render/RenderTarget.hh"
 #include "render/SpinningCube.hh"
@@ -17,7 +16,6 @@ struct Application
         // Graphics
         SDL_GPUDevice *gpu_device = nullptr;
         SDL_Window *window = nullptr;
-        std::unordered_map<std::string, RenderTarget> render_targets;
         float last_frame_render_time = 0.0f;
 
         // Modules
@@ -102,7 +100,7 @@ static void render_gui(void *appstate) {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
-{   
+{  
     // Initialize application and save to appstate so that it can be accessed in other functions
     auto *app = new Application();
     *appstate = app;
@@ -113,14 +111,16 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     // Initialize modules
     app->error_queue = std::make_unique<ErrorQueue>();
-    app->data_acq = std::make_unique<DataAcquisition>(*app->error_queue);
-    app->visualizer = std::make_unique<Visualizer>(app->window, app->gpu_device, *app->error_queue);
+    app->data_acq = std::make_unique<DataAcquisition>(app->gpu_device);
+    app->visualizer = std::make_unique<Visualizer>(app->gpu_device, *app->error_queue);
     app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device, *app->error_queue);
-    app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, *app->digital_coded_exposure, *app->error_queue, app->window, app->gpu_device);
+    app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, 
+                                     *app->digital_coded_exposure, *app->error_queue, 
+                                     app->window, app->gpu_device);
 
-    // Spawn separate thread to manage the DataAcqusition
-    app->data_acquisition_thread = std::thread(program_thread::data_acquisition_thread, 
-                                                std::ref(app->data_acquisition_running), 
+    // Spawn separate thread to manage the DataAcquisition
+    app->data_acquisition_thread = std::thread(program_thread::data_acquisition_thread,
+                                                std::ref(app->data_acquisition_running),
                                                 std::ref(*app->data_acq));
 
     return SDL_APP_CONTINUE;
@@ -147,15 +147,26 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
-    // Update and render all data sources
+    // Update synced scrubber state from sources (gets updated min/max bounds)
+    app->gui->update_synced_scrubber_state_from_sources();
+
+    // Apply synced scrubber state to all sources if in synced mode
+    app->gui->apply_synced_scrubber_state();
+
+    // Update all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();
-    for (const auto& data_source: data_sources)
+    for (const auto& data_source : data_sources)
     {
-        data_source->update(); 
-        app->digital_coded_exposure->render(data_source); 
+        data_source->update();
+    }
+
+    // Render all data sources
+    for (const auto& data_source : data_sources)
+    {
+        app->digital_coded_exposure->render(data_source);
         app->visualizer->render(data_source);
     }
-    
+
     // Render the GUI
     render_gui(appstate);
 
@@ -167,10 +178,17 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     auto *app = static_cast<Application *>(appstate);
 
     // Stop worker threads
-    app->writer_running = false;
-    app->writer_thread.join();
-    app->data_acquisition_running = false;
-    app->data_acquisition_thread.join();
+    if (app->writer_thread.joinable())
+    {
+        app->writer_running = false;
+        app->writer_thread.join();
+    }
+    
+    if (app->data_acquisition_thread.joinable())
+    {
+        app->data_acquisition_running = false;
+        app->data_acquisition_thread.join();
+    }
 
     // Free modules before GPU shutdown
     SDL_GPUDevice *gpu_device = app->gpu_device;

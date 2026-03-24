@@ -13,28 +13,30 @@
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
 
-// Structure to pass pointers to callbacks (callback functions need pointers to both)
+// Structure to pass pointers to callbacks
 struct CallbackData
 {
-        DataAcquisition *data_acquisition;
-        DataWriter *data_writer;
+    DataAcquisition *data_acquisition;
 };
 
 // Forward declarations for callbacks
 inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
-inline void SDLCALL save_stream_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
 
 /**
  * @brief This class provides functions to draw the GUI.
  */
 class GUI
 {
+    public:
+        enum class ViewMode
+        {
+            SINGLE,  // View and scrub a single selected data source
+            SYNCED   // View all data sources synced to a single scrubber state
+        };
+
     private:
         // Modules
-        std::unordered_map<std::string, RenderTarget> &render_targets;
         DataAcquisition &data_acquisition;
-        DataWriter &data_writer;
-        Scrubber &scrubber;
         Visualizer &visualizer;
         DigitalCodedExposure &dce;
         ErrorQueue &error_queue;
@@ -46,6 +48,18 @@ class GUI
 
         // Callback data for file dialogs
         CallbackData callback_data;
+
+        // View mode and selection
+        ViewMode view_mode = ViewMode::SINGLE;
+        int selected_source_index = -1;
+
+        // Synced scrubber state (used when view_mode == SYNCED)
+        // This state is applied to all data sources' scrubbers
+        Scrubber::ScrubberState synced_scrubber_state;
+
+        // Camera control state
+        bool is_mouse_dragging = false;
+        bool cursor_captured = false;
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -217,191 +231,115 @@ class GUI
         }
 
         /**
-         * @brief Draw Streaming window. Contains controls for streaming data in.
+         * @brief Draw Data Sources management window.
          */
-        void draw_stream_window()
+        void draw_data_sources_window()
         {
-            ImGui::Begin("Streaming");
-            DataAcquisition::STATE program_state = data_acquisition.get_state();
+            ImGui::Begin("Data Sources");
 
-            // Display program state
-            ImGui::Text("Program State:");
-            switch (program_state)
+            // View mode selection
+            ImGui::Text("View Mode:");
+            int mode_int = static_cast<int>(view_mode);
+            if (ImGui::RadioButton("Single Source", mode_int == 0))
             {
-            case DataAcquisition::STATE::IDLE:
-                ImGui::Text("Program Is Currently Doing Nothing.");
-                break;
-            case DataAcquisition::STATE::FILE_STREAM:
-                ImGui::Text("Program Is Currently Streaming From FILE.");
-                break;
-            case DataAcquisition::STATE::CAMERA_STREAM:
-                ImGui::Text("Program Is Currently Streaming From CAMERA.");
-                break;
+                view_mode = ViewMode::SINGLE;
             }
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Synced", mode_int == 1))
+            {
+                view_mode = ViewMode::SYNCED;
+            }
+
             ImGui::Separator();
 
-            float event_discard_odds = data_acquisition.get_event_discard_odds();
-            ImGui::Text("Event Discard Odds");
-            ImGui::SliderFloat("##Frequency Of Discarded Events", &event_discard_odds, 1.0f, 1500.0f, "%f");
-            data_acquisition.set_event_discard_odds(event_discard_odds);
+            // Add new sources
+            ImGui::Text("Add New Source:");
+            
+            if (ImGui::Button("Add File Source"))
+            {
+                SDL_ShowOpenFileDialog(stream_file_handle_callback, &callback_data, window, nullptr, 0, nullptr, 0);
+            }
 
-            ImGui::Separator();
-
-            // Stream from camera
-            ImGui::Text("Stream From Camera:");
-            if (ImGui::Button("Scan For Cameras"))
+            ImGui::SameLine();
+            if (ImGui::Button("Discover Cameras"))
             {
                 data_acquisition.discover_cameras();
             }
 
-            int32_t camera_index = data_acquisition.get_camera_index();
-            int32_t camera_index_copy = camera_index;
-
-            // Get camera names
-            std::vector<const char *> discovered_cameras_char;
-            std::vector<std::string> discovered_cameras = data_acquisition.get_scanned_camera_names();
-            for (const auto &name : discovered_cameras)
+            // Camera selection for adding
+            std::vector<std::string> camera_names = data_acquisition.get_scanned_camera_names();
+            if (!camera_names.empty())
             {
-                discovered_cameras_char.push_back(name.c_str());
-            }
-
-            ImGui::Combo("Camera", &camera_index, discovered_cameras_char.data(), discovered_cameras_char.size());
-            if (camera_index_copy != camera_index)
-            {
-                data_acquisition.set_camera_index(camera_index);
-                data_acquisition.set_camera_stream_paused(true);
-                data_acquisition.set_camera_stream_changed(true);
-            }
-
-            if (ImGui::Button(program_state == DataAcquisition::STATE::CAMERA_STREAM ? "Stop Streaming"
-                                                                                     : "Stream From Camera"))
-            {
-                if (program_state != DataAcquisition::STATE::CAMERA_STREAM)
+                static int camera_selection = 0;
+                std::vector<const char*> camera_names_cstr;
+                for (const auto &name : camera_names)
                 {
-                    data_acquisition.set_state(DataAcquisition::STATE::CAMERA_STREAM);
+                    camera_names_cstr.push_back(name.c_str());
                 }
-                else
+                
+                ImGui::Combo("Available Cameras", &camera_selection, camera_names_cstr.data(), camera_names_cstr.size());
+                
+                if (ImGui::Button("Add Selected Camera"))
                 {
-                    data_acquisition.set_state(DataAcquisition::STATE::IDLE);
+                    data_acquisition.add_camera_source(camera_selection);
                 }
-            }
-
-            bool camera_stream_paused = data_acquisition.is_camera_stream_paused();
-            if (ImGui::Button(camera_stream_paused ? "Camera Resume" : "Camera Pause"))
-            {
-                data_acquisition.set_camera_stream_paused(!camera_stream_paused);
             }
 
             ImGui::Separator();
 
-            // Stream from file
-            ImGui::Text("Stream From File:");
-            if (ImGui::Button("Open File To Stream"))
+            // List existing sources
+            ImGui::Text("Existing Sources:");
+            auto sources = data_acquisition.get_data_sources();
+            
+            for (size_t i = 0; i < sources.size(); ++i)
             {
-                SDL_ShowOpenFileDialog(stream_file_handle_callback, &callback_data, nullptr, nullptr, 0, nullptr, 0);
-            }
-
-            bool file_stream_paused = data_acquisition.is_file_stream_paused();
-            if (ImGui::Button(file_stream_paused ? "Resume" : "Pause"))
-            {
-                data_acquisition.set_file_stream_paused(!file_stream_paused);
-            }
-
-            ImGui::Separator();
-
-            // Stream save options
-            ImGui::Text("Stream Save Options:");
-            std::string saving_message = data_writer.get_saving_message();
-            ImGui::Text("%s", saving_message.c_str());
-
-            bool stream_save_frames = data_writer.get_save_frames_toggle();
-            bool stream_save_frames_copy = stream_save_frames;
-            ImGui::Checkbox("Save Frames On Next Stream (Will Stop Streaming)", &stream_save_frames);
-            if (stream_save_frames != stream_save_frames_copy)
-            {
-                data_acquisition.set_state(DataAcquisition::STATE::IDLE);
-                data_writer.set_save_frames_toggle(stream_save_frames);
-            }
-
-            bool stream_save_events = data_writer.get_save_events_toggle();
-            bool stream_save_events_copy = stream_save_events;
-            ImGui::Checkbox("Save Events On Next Stream (Will Stop Streaming)", &stream_save_events);
-            if (stream_save_events_copy != stream_save_events)
-            {
-                data_acquisition.set_state(DataAcquisition::STATE::IDLE);
-                data_writer.set_save_events_toggle(stream_save_events);
-            }
-
-            std::string stream_save_file_name = data_writer.get_stream_save_file_name();
-            if ((stream_save_frames || stream_save_events) && !stream_save_file_name.empty())
-            {
-                std::string will_save_message = "Will Save Streamed ";
-                if (stream_save_events)
+                ImGui::PushID(i);
+                
+                bool is_selected = (static_cast<int>(i) == selected_source_index);
+                
+                if (view_mode == ViewMode::SINGLE)
                 {
-                    will_save_message.append("Event Data ");
-                }
-                if (stream_save_frames)
-                {
-                    will_save_message.append(stream_save_events ? "And Frame Data " : "Frame Data ");
-                }
-                will_save_message.append("To \n");
-                will_save_message.append(stream_save_file_name);
-                will_save_message.append(" On Next Stream");
-                ImGui::Text("%s", will_save_message.c_str());
-            }
-            else
-            {
-                ImGui::Text("Nothing Being Saved On Next Stream");
-            }
-
-            if (ImGui::Button("Open File To Save Stream To (Will Stop Streaming)"))
-            {
-                SDL_ShowSaveFileDialog(save_stream_handle_callback, &callback_data, nullptr, nullptr, 0, nullptr);
-            }
-
-            ImGui::End();
-        }
-
-        /**
-         * @brief Draws 3D Visualizer window into IMGUI.
-         */
-        void draw_visualizer()
-        {
-            ImGui::Begin("3D Visualizer");
-            if (render_targets.count("VisualizerColor"))
-            {
-                SDL_GPUTexture *texture = render_targets.at("VisualizerColor").texture;
-                if (texture)
-                {
-                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                    float tex_aspect = (float)render_targets.at("VisualizerColor").width /
-                                       (float)render_targets.at("VisualizerColor").height;
-                    ImVec2 display_size = pane_size;
-                    float pane_aspect = pane_size.x / pane_size.y;
-                    if (tex_aspect > pane_aspect)
+                    if (ImGui::Selectable(sources[i]->name.c_str(), is_selected))
                     {
-                        display_size.y = pane_size.x / tex_aspect;
+                        selected_source_index = static_cast<int>(i);
                     }
-                    else
-                    {
-                        display_size.x = pane_size.y * tex_aspect;
-                    }
-                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                    ImGui::Image((ImTextureID)texture, display_size);
-                    render_targets.at("VisualizerColor").is_focused = ImGui::IsItemHovered();
                 }
                 else
                 {
-                    ImGui::Text("Texture for 'VisualizerColor' is null.");
+                    ImGui::Text("%s", sources[i]->name.c_str());
                 }
+                
+                ImGui::SameLine();
+                
+                // State control buttons
+                if (sources[i]->state == DataSource::State::ACTIVE)
+                {
+                    if (ImGui::SmallButton("Pause"))
+                    {
+                        sources[i]->state = DataSource::State::PAUSED;
+                    }
+                }
+                else
+                {
+                    if (ImGui::SmallButton("Resume"))
+                    {
+                        sources[i]->state = DataSource::State::ACTIVE;
+                    }
+                }
+                
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Delete"))
+                {
+                    data_acquisition.remove_data_source(i);
+                    if (selected_source_index >= static_cast<int>(sources.size() - 1))
+                    {
+                        selected_source_index = (std::max)(0, static_cast<int>(sources.size()) - 2);
+                    }
+                }
+                
+                ImGui::PopID();
             }
-            else
-            {
-                ImGui::Text("Render target 'VisualizerColor' not found.");
-            }
+
             ImGui::End();
         }
 
@@ -444,7 +382,7 @@ class GUI
             float range = max_val - min_val;
             if (range > 0.0f)
             {
-                // Window highlight (from current - window to current)
+                // Window highlight
                 float win_start = (std::max)(current_val - window_val, min_val);
                 float win_end = (std::min)(current_val, max_val);
                 float win_start_frac = (win_start - min_val) / range;
@@ -453,7 +391,7 @@ class GUI
                 ImVec2 win_br = ImVec2(track_tl.x + win_end_frac * track_w, track_br.y);
                 draw_list->AddRectFilled(win_tl, win_br, kWindowHighlight);
 
-                // Position marker (vertical line + triangle)
+                // Position marker
                 float pos_frac = (current_val - min_val) / range;
                 float pos_x = track_tl.x + pos_frac * track_w;
                 draw_list->AddLine(ImVec2(pos_x, track_tl.y), ImVec2(pos_x, track_br.y), kPositionMarker, 2.0f);
@@ -503,7 +441,7 @@ class GUI
         }
 
         /**
-         * @brief Draw a row of playback control buttons (|<, <<, Play/Pause, >>, >|/LIVE).
+         * @brief Draw a row of playback control buttons.
          */
         void draw_playback_controls(Scrubber::ScrubberMode current_mode, Scrubber::ScrubberType scrubber_type,
                                     Scrubber::ScrubberState &state)
@@ -511,7 +449,7 @@ class GUI
             float button_w = ImGui::GetFrameHeight() * 2.0f;
             float button_h = ImGui::GetFrameHeight();
 
-            // |< Jump to start
+            // Jump to start
             if (ImGui::Button("|<", ImVec2(button_w, button_h)))
             {
                 if (scrubber_type == Scrubber::ScrubberType::EVENT)
@@ -527,7 +465,7 @@ class GUI
             ImGui::SetItemTooltip("Jump to start");
             ImGui::SameLine();
 
-            // << Step backward
+            // Step backward
             bool step_zero = false;
             if (scrubber_type == Scrubber::ScrubberType::EVENT)
                 step_zero = state.index_step == 0;
@@ -576,7 +514,7 @@ class GUI
             }
             ImGui::SameLine();
 
-            // >> Step forward
+            // Step forward
             if (step_zero)
                 ImGui::BeginDisabled();
             if (ImGui::Button(">>", ImVec2(button_w, button_h)))
@@ -596,7 +534,7 @@ class GUI
                 ImGui::EndDisabled();
             ImGui::SameLine();
 
-            // >| or LIVE
+            // Jump to end / LIVE
             if (current_mode == Scrubber::ScrubberMode::LATEST)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.8f, 0.1f, 1.0f));
@@ -631,9 +569,45 @@ class GUI
         {
             ImGui::Begin("Scrubber");
 
-            Scrubber::ScrubberState state = scrubber.get_state();
+            auto sources = data_acquisition.get_data_sources();
+            
+            // Get the appropriate scrubber state to display and edit
+            Scrubber::ScrubberState *active_state = nullptr;
+            
+            if (view_mode == ViewMode::SYNCED)
+            {
+                active_state = &synced_scrubber_state;
+                ImGui::Text("Mode: Synced (All Sources)");
+            }
+            else // SINGLE
+            {
+                if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+                {
+                    // Get state from the selected source's scrubber
+                    Scrubber::ScrubberState temp_state = sources[selected_source_index]->scrubber.get_state();
+                    synced_scrubber_state = temp_state; // Use synced_scrubber_state as temporary storage
+                    active_state = &synced_scrubber_state;
+                    ImGui::Text("Mode: Single Source - %s", sources[selected_source_index]->name.c_str());
+                }
+                else
+                {
+                    ImGui::TextDisabled("No source selected");
+                    ImGui::End();
+                    return;
+                }
+            }
 
-            // Section 1 — Type selection via tab bar
+            if (!active_state)
+            {
+                ImGui::End();
+                return;
+            }
+
+            Scrubber::ScrubberState &state = *active_state;
+
+            ImGui::Separator();
+
+            // Type selection via tab bar
             Scrubber::ScrubberType prev_type = state.type;
             if (ImGui::BeginTabBar("##ScrubberTypeTabs"))
             {
@@ -656,7 +630,7 @@ class GUI
 
             ImGui::Separator();
 
-            // Cap mode (for div factor calculations)
+            // Cap mode
             static int cap_mode_int = 0;
             const char *cap_mode_names[] = {"Capped", "Uncapped"};
             ImGui::Combo("Scrubber Cap", &cap_mode_int, cap_mode_names, 2);
@@ -666,7 +640,7 @@ class GUI
             // Get visualizer parameters for time unit conversion
             auto vis_params = visualizer.get_parameters();
 
-            // Section 2-4 — Timeline, playback, settings
+            // Timeline, playback, settings
             if (state.type == Scrubber::ScrubberType::EVENT)
             {
                 float min_f = static_cast<float>(state.min_index);
@@ -809,58 +783,190 @@ class GUI
             // Show Frame Data checkbox
             ImGui::Checkbox("Show Frame Data", &state.show_frame_data);
 
-            // Update scrubber state
-            scrubber.set_state(state);
+            // Write state back to appropriate scrubber(s)
+            if (view_mode == ViewMode::SINGLE && selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+            {
+                sources[selected_source_index]->scrubber.set_state(state);
+            }
+            // In synced mode, state will be applied to all scrubbers in apply_synced_scrubber_state()
 
             ImGui::End();
         }
 
         /**
-         * @brief Draws Digital Coded Exposure window.
+         * @brief Draws 3D Visualizer windows for visible data sources.
          */
-        void draw_digital_coded_exposure()
+        void draw_visualizers()
         {
-            ImGui::Begin("Frame");
-            ImGui::Text("Digital Coded Exposure");
-            if (render_targets.count("DigitalCodedExposure"))
+            auto sources = data_acquisition.get_data_sources();
+
+            if (view_mode == ViewMode::SYNCED)
             {
-                SDL_GPUTexture *texture = render_targets.at("DigitalCodedExposure").texture;
-                if (texture)
+                // Show all sources in synced mode
+                for (size_t i = 0; i < sources.size(); ++i)
                 {
-                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                    float tex_aspect = (float)render_targets.at("DigitalCodedExposure").width /
-                                       (float)render_targets.at("DigitalCodedExposure").height;
-                    ImVec2 display_size = pane_size;
-                    float pane_aspect = pane_size.x / pane_size.y;
-                    if (tex_aspect > pane_aspect)
+                    std::string window_name = "3D Visualizer - " + sources[i]->name;
+                    ImGui::Begin(window_name.c_str());
+
+                    SDL_GPUTexture *texture = sources[i]->render_targets.visualizer_color.texture;
+                    if (texture)
                     {
-                        display_size.y = pane_size.x / tex_aspect;
+                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                        float tex_aspect = (float)sources[i]->render_targets.visualizer_color.width /
+                                           (float)sources[i]->render_targets.visualizer_color.height;
+                        ImVec2 display_size = pane_size;
+                        float pane_aspect = pane_size.x / pane_size.y;
+                        if (tex_aspect > pane_aspect)
+                        {
+                            display_size.y = pane_size.x / tex_aspect;
+                        }
+                        else
+                        {
+                            display_size.x = pane_size.y * tex_aspect;
+                        }
+                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                        ImGui::Image((ImTextureID)texture, display_size);
+                        sources[i]->render_targets.visualizer_color.is_focused = ImGui::IsItemHovered();
                     }
                     else
                     {
-                        display_size.x = pane_size.y * tex_aspect;
+                        ImGui::Text("No texture available");
                     }
-                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                    ImGui::Image((ImTextureID)texture, display_size);
-                    render_targets.at("DigitalCodedExposure").is_focused = ImGui::IsItemHovered();
-                }
-                else
-                {
-                    ImGui::Text("No Event Data.");
+
+                    ImGui::End();
                 }
             }
-            else
+            else // SINGLE
             {
-                ImGui::Text("Render target 'DigitalCodedExposure' not found.");
+                if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+                {
+                    ImGui::Begin("3D Visualizer");
+
+                    SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.visualizer_color.texture;
+                    if (texture)
+                    {
+                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                        float tex_aspect = (float)sources[selected_source_index]->render_targets.visualizer_color.width /
+                                           (float)sources[selected_source_index]->render_targets.visualizer_color.height;
+                        ImVec2 display_size = pane_size;
+                        float pane_aspect = pane_size.x / pane_size.y;
+                        if (tex_aspect > pane_aspect)
+                        {
+                            display_size.y = pane_size.x / tex_aspect;
+                        }
+                        else
+                        {
+                            display_size.x = pane_size.y * tex_aspect;
+                        }
+                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                        ImGui::Image((ImTextureID)texture, display_size);
+                        sources[selected_source_index]->render_targets.visualizer_color.is_focused = ImGui::IsItemHovered();
+                    }
+                    else
+                    {
+                        ImGui::Text("No texture available");
+                    }
+
+                    ImGui::End();
+                }
             }
-            ImGui::End();
         }
 
         /**
-         * @brief Markdown render of quickstart guide for users to reference.
+         * @brief Draws Digital Coded Exposure windows for visible data sources.
+         */
+        void draw_digital_coded_exposure()
+        {
+            auto sources = data_acquisition.get_data_sources();
+
+            if (view_mode == ViewMode::SYNCED)
+            {
+                // Show all sources in synced mode
+                for (size_t i = 0; i < sources.size(); ++i)
+                {
+                    std::string window_name = "Frame - " + sources[i]->name;
+                    ImGui::Begin(window_name.c_str());
+                    ImGui::Text("Digital Coded Exposure");
+
+                    SDL_GPUTexture *texture = sources[i]->render_targets.dce.texture;
+                    if (texture)
+                    {
+                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                        float tex_aspect = (float)sources[i]->render_targets.dce.width /
+                                           (float)sources[i]->render_targets.dce.height;
+                        ImVec2 display_size = pane_size;
+                        float pane_aspect = pane_size.x / pane_size.y;
+                        if (tex_aspect > pane_aspect)
+                        {
+                            display_size.y = pane_size.x / tex_aspect;
+                        }
+                        else
+                        {
+                            display_size.x = pane_size.y * tex_aspect;
+                        }
+                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                        ImGui::Image((ImTextureID)texture, display_size);
+                        sources[i]->render_targets.dce.is_focused = ImGui::IsItemHovered();
+                    }
+                    else
+                    {
+                        ImGui::Text("No Event Data.");
+                    }
+
+                    ImGui::End();
+                }
+            }
+            else // SINGLE
+            {
+                if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+                {
+                    ImGui::Begin("Frame");
+                    ImGui::Text("Digital Coded Exposure");
+
+                    SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.dce.texture;
+                    if (texture)
+                    {
+                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                        float tex_aspect = (float)sources[selected_source_index]->render_targets.dce.width /
+                                           (float)sources[selected_source_index]->render_targets.dce.height;
+                        ImVec2 display_size = pane_size;
+                        float pane_aspect = pane_size.x / pane_size.y;
+                        if (tex_aspect > pane_aspect)
+                        {
+                            display_size.y = pane_size.x / tex_aspect;
+                        }
+                        else
+                        {
+                            display_size.x = pane_size.y * tex_aspect;
+                        }
+                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                        ImGui::Image((ImTextureID)texture, display_size);
+                        sources[selected_source_index]->render_targets.dce.is_focused = ImGui::IsItemHovered();
+                    }
+                    else
+                    {
+                        ImGui::Text("No Event Data.");
+                    }
+
+                    ImGui::End();
+                }
+            }
+        }
+
+        /**
+         * @brief Markdown render of quickstart guide.
          */
         void draw_quickstart_window()
         {
@@ -876,86 +982,21 @@ class GUI
             {
                 ImGui::BeginChild("QSContent", ImVec2(0, -50), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-                ImGui::TextColored(
-                    ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-                    "You can view this popup again by clicking the 'Quickstart Guide' button in the debug window.");
                 ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                   "Windows can be moved and resized, you can reset the layout to the default by "
-                                   "clicking the 'Reset Layout' button in the debug window.");
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                   "Sliders can be ctrl+clicked to enter a value directly.");
+                                   "You can view this popup again by clicking the 'Quickstart Guide' button in the debug window.");
 
                 ImGui::Separator();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Streaming Data");
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Data Sources");
                 ImGui::Separator();
                 ImGui::TextWrapped(
-                    "Users can stream data from the Streaming window (located in the top right by default). "
-                    "To stream from the camera, users can click the 'Scan For Cameras' button to populate the Camera "
-                    "dropdown. "
-                    "From the Camera dropdown, users can select the desired, detected camera to stream from. "
-                    "Once the camera is selected, users click the 'Stream From Camera' button to start the streaming. "
-                    "To stream from a file, users can click the 'Open File To Stream' button to select an aedat4 file "
-                    "to stream from. "
-                    "Streaming from the file will begin as soon as a file is selected. "
-                    "The Event Discard Odds determines the odds that event data is randomly discarded, this setting is "
-                    "useful when streaming from a camera. "
-                    "Users can click the 'Open File To Save Stream To' to select/create an aedat4 file to stream data "
-                    "to. "
-                    "Users can select the 'Save Frames on Next Stream' and/or 'Save Events On Next Stream' checkboxes "
-                    "to save frame and/or event data to the save file. "
-                    "Selecting any of the these options will stop streaming. "
-                    "To start saving, start streaming from a file or camera with these save options set.");
+                    "The application now supports multiple data sources. Use the Data Sources window to add files or cameras. "
+                    "You can switch between Single Source mode (view one at a time) or Synced mode (view all sources with a shared scrubber).");
 
                 ImGui::Spacing();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "3D Visualizer");
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Camera Controls");
                 ImGui::Separator();
                 ImGui::TextWrapped(
-                    "The 3D Visualizer is a point particle plot. Each point in the plot represents event data. "
-                    "The colors used to represent event polarity for each particle as well as particle scales can be "
-                    "changed in the Info window. "
-                    "The axis with text is the time axis. The other bottom axis is the x-pixel dimension of the event "
-                    "data. "
-                    "The vertical axis is the y-pixel dimension of the event data. "
-                    "Frame data will be shown should the 'Show Frame Data' checkbox be selected in the Scrubber window "
-                    "and should there be frame data received.");
-
-                ImGui::Spacing();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Digital Coded Exposure");
-                ImGui::Separator();
-                ImGui::TextWrapped(
-                    "The Digital Coded Exposure attempts to reconstruct frame data out of event data. "
-                    "The controls are given in the Digital Coded Exposure Controls window. "
-                    "There, the user can select the color scheme, enable Morlet shutter contribution calculations, "
-                    "choose the activation function (how each pixel's color is determined from event contributions), "
-                    "etc. "
-                    "It should be noted that due to limitations in Vulkan shaders (specifically, the inability to "
-                    "atomically add floating point numbers), "
-                    "the Morlet shutter will not work for high Current Index (Time) slider values in the Scrubber "
-                    "window. "
-                    "To see Morlet Shutter output, a smaller data file with with high Morlet Frequency and Morlet "
-                    "Width values is recommended.");
-
-                ImGui::Spacing();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Scrubbing Data");
-                ImGui::Separator();
-                ImGui::TextWrapped(
-                    "Users can determine what data is shown in the Digital Coded Exposure and 3D Visualizer windows by "
-                    "using the Scrubber window. "
-                    "The 'Scrubber Type' dropdown determines what the controls are based off of (event based or time "
-                    "based). "
-                    "The 'Mode' dropdown provides three ways to view data: 'Paused' allows the user to scrub through "
-                    "past data, "
-                    "'Playing' allows the user to play through data (controlled by the Index (Time) Step) slider, "
-                    "'Latest' fixes the Current Index (Time) to the latest received data (very useful when streaming "
-                    "from a camera). "
-                    "The 'Scrubber Cap' dropdown puts a cap on the sliders by default to increase the precision of the "
-                    "slider controls. "
-                    "The Current Index (Time) determines the last event point being shown in the visualizations. "
-                    "The Index (Time) Window determines the number of events before the Current Index (Time) that are "
-                    "shown in the visualizations. "
-                    "For the Digital Coded Exposure, the Index (Time) Window is basically the shutter length. "
-                    "The Index (Time) Step determines the increment to the Current Index (Time) for each frame should "
-                    "the Playing Mode be selected.");
+                    "Click and drag in the 3D Visualizer to rotate the camera. Use mouse wheel to zoom.");
 
                 ImGui::EndChild();
                 ImGui::Separator();
@@ -973,14 +1014,19 @@ class GUI
         /**
          * @brief Constructor for GUI.
          */
-        GUI(std::unordered_map<std::string, RenderTarget> &render_targets, DataAcquisition &data_acquisition,
-            DataWriter &data_writer, Scrubber &scrubber, Visualizer &visualizer, DigitalCodedExposure &dce,
-            ErrorQueue &error_queue, SDL_Window *window, SDL_GPUDevice *gpu_device)
-            : render_targets(render_targets), data_acquisition(data_acquisition), data_writer(data_writer),
-              scrubber(scrubber), visualizer(visualizer), dce(dce), error_queue(error_queue), window(window),
-              gpu_device(gpu_device), callback_data{&data_acquisition, &data_writer}, fps_history_buf(100, 0.0f),
-              fps_buf_index(0), check_for_layout_file(true), show_quickstart(false)
+        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer,
+            DigitalCodedExposure &dce, ErrorQueue &error_queue, SDL_Window *window, SDL_GPUDevice *gpu_device)
+            : data_acquisition(data_acquisition), visualizer(visualizer), dce(dce),
+              error_queue(error_queue), window(window), gpu_device(gpu_device),
+              callback_data{&data_acquisition}, fps_history_buf(100, 0.0f), fps_buf_index(0),
+              check_for_layout_file(true), show_quickstart(false)
         {
+            // Initialize synced scrubber state with defaults
+            synced_scrubber_state.type = Scrubber::ScrubberType::TIME;
+            synced_scrubber_state.mode = Scrubber::ScrubberMode::PLAYING;
+            synced_scrubber_state.time_window = 10000.0f;
+            synced_scrubber_state.time_step = 33333.0f;
+
             // Setup Dear ImGui context
             IMGUI_CHECKVERSION();
             ImGui::CreateContext();
@@ -1024,12 +1070,145 @@ class GUI
         }
 
         /**
-         * @brief IMGUI event handler.
+         * @brief IMGUI and camera control event handler.
          * @param event SDL event to process.
          */
         void event_handler(SDL_Event *event)
         {
             ImGui_ImplSDL3_ProcessEvent(event);
+
+            // Handle camera controls for visualizer
+            auto sources = data_acquisition.get_data_sources();
+            bool any_focused = false;
+
+            // Check if any visualizer window is focused
+            for (const auto &source : sources)
+            {
+                if (source->render_targets.visualizer_color.is_focused)
+                {
+                    any_focused = true;
+                    break;
+                }
+            }
+
+            if (any_focused)
+            {
+                switch (event->type)
+                {
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    if (event->button.button == SDL_BUTTON_LEFT)
+                    {
+                        is_mouse_dragging = true;
+                        SDL_HideCursor();
+                        SDL_SetWindowRelativeMouseMode(window, true);
+                        cursor_captured = true;
+                    }
+                    break;
+
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    if (event->button.button == SDL_BUTTON_LEFT)
+                    {
+                        is_mouse_dragging = false;
+                        if (cursor_captured)
+                        {
+                            SDL_SetWindowRelativeMouseMode(window, false);
+                            SDL_ShowCursor();
+                            cursor_captured = false;
+                        }
+                    }
+                    break;
+
+                case SDL_EVENT_MOUSE_MOTION:
+                    if (is_mouse_dragging && cursor_captured)
+                    {
+                        float x_offset = -event->motion.xrel;
+                        float y_offset = event->motion.yrel;
+                        visualizer.rotate_camera(x_offset, y_offset);
+                    }
+                    break;
+
+                case SDL_EVENT_MOUSE_WHEEL:
+                {
+                    float scroll_delta = event->wheel.y;
+                    if (event->wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+                        scroll_delta = -scroll_delta;
+
+                    if (scroll_delta != 0.0f)
+                        visualizer.zoom_camera(scroll_delta * 0.1f);
+                    break;
+                }
+
+                case SDL_EVENT_WINDOW_FOCUS_LOST:
+                    if (cursor_captured)
+                    {
+                        SDL_SetWindowRelativeMouseMode(window, false);
+                        SDL_ShowCursor();
+                        cursor_captured = false;
+                        is_mouse_dragging = false;
+                    }
+                    break;
+                }
+
+                // Clear focus flags
+                for (auto &source : sources)
+                {
+                    source->render_targets.visualizer_color.is_focused = false;
+                }
+            }
+        }
+
+        /**
+         * @brief Apply synced scrubber state to all data sources.
+         * Call this before rendering in synced mode.
+         */
+        void apply_synced_scrubber_state()
+        {
+            if (view_mode != ViewMode::SYNCED)
+                return;
+
+            auto sources = data_acquisition.get_data_sources();
+            for (auto &source : sources)
+            {
+                // Get current state from source's scrubber (has updated min/max from event data)
+                Scrubber::ScrubberState current_state = source->scrubber.get_state();
+                
+                // Apply the synced control parameters (type, mode, position, window, step)
+                // but keep the source-specific min/max values
+                current_state.type = synced_scrubber_state.type;
+                current_state.mode = synced_scrubber_state.mode;
+                current_state.current_index = synced_scrubber_state.current_index;
+                current_state.current_time = synced_scrubber_state.current_time;
+                current_state.index_window = synced_scrubber_state.index_window;
+                current_state.time_window = synced_scrubber_state.time_window;
+                current_state.index_step = synced_scrubber_state.index_step;
+                current_state.time_step = synced_scrubber_state.time_step;
+                current_state.show_frame_data = synced_scrubber_state.show_frame_data;
+                
+                source->scrubber.set_state(current_state);
+            }
+        }
+
+        /**
+         * @brief Update synced scrubber state from data sources.
+         * Call this after all sources have updated their scrubbers.
+         */
+        void update_synced_scrubber_state_from_sources()
+        {
+            if (view_mode != ViewMode::SYNCED)
+                return;
+
+            auto sources = data_acquisition.get_data_sources();
+            if (sources.empty())
+                return;
+
+            // Use first source to get updated min/max bounds
+            Scrubber::ScrubberState first_state = sources[0]->scrubber.get_state();
+            
+            // Update synced state's min/max from first source
+            synced_scrubber_state.min_index = first_state.min_index;
+            synced_scrubber_state.max_index = first_state.max_index;
+            synced_scrubber_state.min_time = first_state.min_time;
+            synced_scrubber_state.max_time = first_state.max_time;
         }
 
         /**
@@ -1059,10 +1238,10 @@ class GUI
             draw_error_popup_window();
             draw_info_window();
             draw_debug_window(fps);
-            draw_digital_coded_exposure();
-            draw_stream_window();
+            draw_data_sources_window();
             draw_scrubber_window();
-            draw_visualizer();
+            draw_digital_coded_exposure();
+            draw_visualizers();
             draw_quickstart_window();
 
             ImGui::Render();
@@ -1115,13 +1294,15 @@ class GUI
             ImGui::DockBuilderDockWindow("Digital Coded Exposure Controls", dock_id_right_top_bottom);
             ImGui::DockBuilderDockWindow("Info", dock_id_right_top_bottom);
             ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
-            ImGui::DockBuilderDockWindow("Streaming", dock_id_right_top_top);
+            ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
             ImGui::DockBuilderDockWindow("Frame", dock_id_main);
             ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_right_bottom);
             ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
 
             ImGui::DockBuilderFinish(dockspace_id);
         }
+
+        ViewMode get_view_mode() const { return view_mode; }
 };
 
 // Callback functions
@@ -1131,25 +1312,7 @@ inline void SDLCALL stream_file_handle_callback(void *user_data, const char *con
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};
-        data->data_acquisition->set_file_stream_name(file_name);
-        data->data_acquisition->set_file_stream_paused(true);
-        data->data_acquisition->set_file_stream_changed(true);
-        data->data_acquisition->set_state(DataAcquisition::STATE::FILE_STREAM);
-    }
-    else
-    {
-        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
-    }
-}
-
-inline void SDLCALL save_stream_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused)
-{
-    CallbackData *data = static_cast<CallbackData *>(user_data);
-    if (data_file_list && *data_file_list)
-    {
-        std::string file_name{*data_file_list};
-        data->data_writer->set_stream_save_file_name(file_name);
-        data->data_acquisition->set_state(DataAcquisition::STATE::IDLE);
+        data->data_acquisition->add_file_source(file_name);
     }
     else
     {

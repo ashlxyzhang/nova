@@ -48,4 +48,4 @@ struct DataSource {
 };
 
 
-#endif // DATA_ACQUISITION_HH
+#endif // DATA_SOURCE_HH

@@ -39,11 +39,12 @@ class DataAcquisition
         DataAcquisition(SDL_GPUDevice* gpu_device);
 
         void discover_cameras();
-        void add_camera_source(const dv::io::camera::USBDevice::DeviceDescriptor& camera);
+        void add_camera_source(int camera_index);
         void add_file_source(const std::string& file_path);
         void remove_data_source(size_t index);
 
         std::vector<std::string> get_scanned_camera_names();        
+        std::vector<dv::io::camera::USBDevice::DeviceDescriptor> get_scanned_cameras();
         std::vector<std::shared_ptr<DataSource>> get_data_sources(); 
 };
 
