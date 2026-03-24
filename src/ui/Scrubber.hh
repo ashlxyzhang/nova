@@ -105,21 +105,21 @@ class Scrubber
                             current_time = std::clamp(current_time, min_time, max_time);
                             time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                            lower_time = std::max(min_time, current_time - time_window);
+                            lower_time = (std::max)(min_time, current_time - time_window);
                         }
                         else if (mode == ScrubberMode::PLAYING)
                         {
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                             time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                             current_time = std::clamp(current_time + time_step, min_time, max_time);
-                            lower_time = std::max(min_time, current_time - time_window);
+                            lower_time = (std::max)(min_time, current_time - time_window);
                         }
                         else if (mode == ScrubberMode::LATEST)
                         {
                             current_time = max_time;
                             time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
-                            lower_time = std::max(min_time, current_time - time_window);
+                            lower_time = (std::max)(min_time, current_time - time_window);
                         }
 
                         // Convert time values to indices for internal use
@@ -139,14 +139,14 @@ class Scrubber
                             current_index = std::clamp(current_index, size_t(0), event_vector.size() - 1);
                             index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
                             index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
-                            lower_index = std::max(size_t(0), current_index - index_window);
+                            lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
                         else if (mode == ScrubberMode::PLAYING)
                         {
                             index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
                             index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
                             current_index = std::clamp(current_index + index_step, size_t(0), event_vector.size() - 1);
-                            lower_index = std::max(size_t(0), current_index - index_window);
+                            lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
                         else if (mode == ScrubberMode::LATEST)
                         {
@@ -154,7 +154,7 @@ class Scrubber
                             current_index = event_data_size;
                             index_window = std::clamp(index_window, size_t(0), event_data_size);
                             index_step = std::clamp(index_step, size_t(0), event_data_size);
-                            lower_index = std::max(size_t(0), current_index - index_window);
+                            lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
                     }
 
@@ -163,17 +163,8 @@ class Scrubber
         };
 
     private:
-        mutable std::shared_mutex
-            mutex; // Used by getters, setters, and internal methods performing bulk atomic operations
-
-        // State
+        mutable std::shared_mutex mutex; 
         ScrubberState state;
-        // -----
-
-        // Modules
-        EventData &event_data;
-        ErrorQueue &error_queue;
-        // -----
 
         // GPU
         SDL_GPUDevice *gpu_device;
@@ -190,12 +181,9 @@ class Scrubber
     public:
         /**
          * @brief Constructor. Initializes scrubber with default values.
-         * @param event_data EventData object containing event/frame data
          * @param gpu_device SDL_GPUDevice to upload event data points to
-         * @param error_queue ErrorQueue object used to report errors to be displayed and/or logged
          */
-        Scrubber(EventData &event_data, SDL_GPUDevice *gpu_device, ErrorQueue &error_queue)
-            : event_data(event_data), gpu_device(gpu_device), error_queue(error_queue)
+        Scrubber(SDL_GPUDevice *gpu_device): gpu_device(gpu_device)
         {
             // Initialize with Prophesee metavision_viewer defaults:
             //   accumulation time = 10 ms  (time_window = 10 000 us)
@@ -225,7 +213,7 @@ class Scrubber
         /**
          * @brief Updates what event data is being captured by scrubber every frame.
          */
-        void cpu_update()
+        void cpu_update(EventData &event_data)
         {
             // Make copy of state to prevent changes from being made mid function
             ScrubberState cur_state = get_state();
@@ -241,7 +229,7 @@ class Scrubber
          * @param upload_buffer UploadBuffer object for uploading data to gpu
          * @param copy_pass SDL_GPUCopyPass for copying data to GPU
          */
-        void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+        void copy_pass(EventData &event_data, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
         {
             if (!copy_pass)
                 return;

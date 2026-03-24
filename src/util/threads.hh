@@ -50,93 +50,21 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 {
     while (running)
     {
-        switch (data_acq.get_state())
+
+        // Get copy of all DataSource's
+        std::vector<std::shared_ptr<DataSource>> data_sources = data_acq.get_data_sources();
+        for (const auto& data_source: data_sources)
         {
+            
+            // Lock data source for reading
+            std::shared_lock data_source_lock(data_source->mutex);
 
-        // FILE STREAMING
-        // -----------------------------------------------------------------------------------
-        case DataAcquisition::STATE::FILE_STREAM:
 
-            // If stream file changed, reset reader to read from new file and clear previously read event data
-            if (data_acq.has_file_stream_changed())
+            if (data_source->state == DataSource::State::ACTIVE)
             {
-
-                // Clear DataAcqusition, EventData, and DataWriter
-                data_acq.clear();
-                evt_data.clear();
-                data_writer.clear();
-                scrubber.clear();
-
-                // Attempt to initialize a afile reader for the selected file
-                if (data_acq.init_file_reader())
-                {
-                    data_acq.get_camera_event_resolution(evt_data);
-                    data_acq.get_camera_frame_resolution(evt_data);
-                    data_acq.set_file_stream_changed(false);
-                    dce.initialize_textures_next_update(); // DCE needs to reinitialize it's GPU textures for this new
-                                                           // input
-                }
-
-                // If the user has set a file to save data to, setup a writer for that file
-                if (data_writer.get_stream_save_file_name() != "")
-                    data_writer.setup(data_acq);
+                data_source->get_batch_event_data();
+                data_source->get_batch_frame_data();
             }
-
-            // If not paused, repeatedly order (sternly) DataAcqusition to query cameras/files for events and/or frames
-            if (!data_acq.is_file_stream_paused())
-            {
-                data_acq.get_batch_evt_data(evt_data, data_writer);
-                data_acq.get_batch_frame_data(evt_data, data_writer);
-            }
-
-            break;
-
-        // CAMERA STREAMING
-        // -----------------------------------------------------------------------------------
-        case DataAcquisition::STATE::CAMERA_STREAM:
-
-            // If the selected camera has changed we need to reinitialize a bunch of stuff
-            if (data_acq.has_camera_stream_changed())
-            {
-
-                // Clear DataAcqusition, EventData, and DataWriter
-                data_acq.clear();
-                evt_data.clear();
-                data_writer.clear();
-                scrubber.clear();
-
-                // Attempt to initialize a camera reader for the selected camera
-                if (data_acq.init_camera_reader())
-                {
-                    data_acq.get_camera_event_resolution(evt_data);
-                    data_acq.get_camera_frame_resolution(evt_data);
-
-                    data_acq.set_camera_stream_changed(false);
-                    dce.initialize_textures_next_update(); // DCE needs to reinitialize it's GPU textures for this new
-                                                           // input
-                }
-
-                // If the user has set a file to save data to, setup a writer for that file
-                if (data_writer.get_stream_save_file_name() != "")
-                    data_writer.setup(data_acq);
-            }
-
-            // Check if stream is paused
-            if (!data_acq.is_camera_stream_paused())
-            {
-                // Get event/frame data in batches every frame
-                data_acq.get_batch_evt_data(evt_data, data_writer);
-                data_acq.get_batch_frame_data(evt_data, data_writer);
-            }
-
-            break;
-
-        // NOTHING STREAMING
-        // -----------------------------------------------------------------------------------
-        case DataAcquisition::STATE::IDLE:
-            // Nothing being saved
-            // data_acq.clear();
-            break;
         }
     }
 }

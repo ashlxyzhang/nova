@@ -2,7 +2,6 @@
 #ifndef DVEVENTREADER_HH
 #define DVEVENTREADER_HH
 
-#include "data/IEventReader.hh"
 #include <dv-processing/io/mono_camera_recording.hpp>
 
 /**
