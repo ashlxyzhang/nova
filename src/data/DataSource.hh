@@ -44,8 +44,7 @@ struct DataSource {
 
 	void get_batch_event_data();
 	void get_batch_frame_data();
-	void cpu_update();
-	void copy_pass();
+	void update();
 };
 
 

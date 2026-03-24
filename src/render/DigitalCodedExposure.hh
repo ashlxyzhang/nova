@@ -63,9 +63,7 @@ class DigitalCodedExposure
 
         // Parameters
         DCEParameters params;
-
         ErrorQueue &error_queue;
-        DataAcquisition &data_acq;
 
         // GPU
         SDL_GPUDevice *gpu_device = nullptr;
@@ -81,8 +79,8 @@ class DigitalCodedExposure
          * @param gpu_device SDL_GPUDevice to create texture on
          * @param error_queue ErrorQueue object used for reporting errors to be displayed and/or logged
          */
-        DigitalCodedExposure(SDL_GPUDevice *gpu_device, DataAcquisition &data_acq, ErrorQueue &error_queue)
-            : gpu_device(gpu_device), data_acq(data_acq), error_queue(error_queue)
+        DigitalCodedExposure(SDL_GPUDevice *gpu_device, ErrorQueue &error_queue)
+            : gpu_device(gpu_device), error_queue(error_queue)
         {
 
             SDL_GPUComputePipelineCreateInfo clear_compute_pipeline_info = {0};
@@ -159,20 +157,12 @@ class DigitalCodedExposure
          * @brief Called to update Digital Coded Exposure every frame.
          *        Recreates texture should file change.
          */
-        void cpu_update()
-        {
-    
-        }
-
-        void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
-        {
-        }
-
-        /**
+        
+         /**
          * @brief Compute pass. Dispatches compute shaders to calculate Digital Coded Exposure output.
          * @param command_buffer GPU command buffer.
          */
-        void compute_pass(SDL_GPUCommandBuffer *command_buffer)
+        void render(std::shared_ptr<DataSource> data_source)
         {
 
             // Read DCE parameters & construct uniform data once for all data sources
@@ -188,76 +178,69 @@ class DigitalCodedExposure
 
             dce_read_lock.unlock();
 
-
-            // For each DataSource
-            std::vector<std::shared_ptr<DataSource>> data_sources = data_acq.get_data_sources();
-            for (const auto& data_source: data_sources) {
-
-                // Read resolution
-                int width = data_source->resolution.width;
-                int height = data_source->resolution.height;
-
-                // Set up texture bindings
-                SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
-
-                texture_buffer_bindings[0].texture = data_source->render_targets.dce.texture;
-                texture_buffer_bindings[0].mip_level = 0;
-                texture_buffer_bindings[0].layer = 0;
-                texture_buffer_bindings[0].cycle = false;
-
-                texture_buffer_bindings[1].texture = data_source->render_targets.positive_values_texture.texture;
-                texture_buffer_bindings[1].mip_level = 0;
-                texture_buffer_bindings[1].layer = 0;
-                texture_buffer_bindings[1].cycle = false;
-
-                texture_buffer_bindings[2].texture = data_source->render_targets.negative_values_texture.texture;
-                texture_buffer_bindings[2].mip_level = 0;
-                texture_buffer_bindings[2].layer = 0;
-                texture_buffer_bindings[2].cycle = false;
-
-                // --- Pass A: Clear all textures ---
-                SDL_GPUComputePass *clear_pass =
-                    SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-                SDL_BindGPUComputePipeline(clear_pass, clear_compute_pipeline);
-                SDL_DispatchGPUCompute(clear_pass, width, height, 1);
-                SDL_EndGPUComputePass(clear_pass);
-
-
-                // Get points buffer, stop early if unavailable or empty
-                SDL_GPUBuffer *points_buffer = data_source->scrubber.get_points_buffer();
-                int point_count = data_source->scrubber.get_points_buffer_size();
-                if (!points_buffer || point_count == 0) return;
-
-
-                // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage in shader)
-                Scrubber::ScrubberState scrubber_state = data_source->scrubber.get_state();
-                float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
-                pass_data.morletParams.z = time_center;
-               
-                
-                // --- Pass B: Accumulate events into intermediate textures ---
-                SDL_GPUComputePass *dce_pass =
-                    SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-                SDL_BindGPUComputePipeline(dce_pass, compute_pipeline);
-                SDL_BindGPUComputeStorageBuffers(dce_pass, 0, &points_buffer, 1);
-                SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-                SDL_DispatchGPUCompute(dce_pass, point_count, 1, 1);
-                SDL_EndGPUComputePass(dce_pass);
-
-                // --- Pass C: Process intermediate textures into final output ---
-                SDL_GPUComputePass *process_pass =
-                    SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-                SDL_BindGPUComputePipeline(process_pass, process_compute_pipeline);
-                SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-                SDL_DispatchGPUCompute(process_pass, width, height, 1);
-                SDL_EndGPUComputePass(process_pass);
-            }
-
             
-        }
+            SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
 
-        void render_pass(SDL_GPUCommandBuffer *command_buffer)
-        {
+            // Read resolution
+            int width = data_source->resolution.width;
+            int height = data_source->resolution.height;
+
+            // Set up texture bindings
+            SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
+
+            texture_buffer_bindings[0].texture = data_source->render_targets.dce.texture;
+            texture_buffer_bindings[0].mip_level = 0;
+            texture_buffer_bindings[0].layer = 0;
+            texture_buffer_bindings[0].cycle = false;
+
+            texture_buffer_bindings[1].texture = data_source->render_targets.positive_values_texture.texture;
+            texture_buffer_bindings[1].mip_level = 0;
+            texture_buffer_bindings[1].layer = 0;
+            texture_buffer_bindings[1].cycle = false;
+
+            texture_buffer_bindings[2].texture = data_source->render_targets.negative_values_texture.texture;
+            texture_buffer_bindings[2].mip_level = 0;
+            texture_buffer_bindings[2].layer = 0;
+            texture_buffer_bindings[2].cycle = false;
+
+            // --- Pass A: Clear all textures ---
+            SDL_GPUComputePass *clear_pass =
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_BindGPUComputePipeline(clear_pass, clear_compute_pipeline);
+            SDL_DispatchGPUCompute(clear_pass, width, height, 1);
+            SDL_EndGPUComputePass(clear_pass);
+
+
+            // Get points buffer, stop early if unavailable or empty
+            SDL_GPUBuffer *points_buffer = data_source->scrubber.get_points_buffer();
+            int point_count = data_source->scrubber.get_points_buffer_size();
+            if (!points_buffer || point_count == 0) return;
+
+
+            // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage in shader)
+            Scrubber::ScrubberState scrubber_state = data_source->scrubber.get_state();
+            float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
+            pass_data.morletParams.z = time_center;
+            
+            
+            // --- Pass B: Accumulate events into intermediate textures ---
+            SDL_GPUComputePass *dce_pass =
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_BindGPUComputePipeline(dce_pass, compute_pipeline);
+            SDL_BindGPUComputeStorageBuffers(dce_pass, 0, &points_buffer, 1);
+            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_DispatchGPUCompute(dce_pass, point_count, 1, 1);
+            SDL_EndGPUComputePass(dce_pass);
+
+            // --- Pass C: Process intermediate textures into final output ---
+            SDL_GPUComputePass *process_pass =
+                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_BindGPUComputePipeline(process_pass, process_compute_pipeline);
+            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+            SDL_DispatchGPUCompute(process_pass, width, height, 1);
+            SDL_EndGPUComputePass(process_pass);
+            
+            SDL_SubmitGPUCommandBuffer(command_buffer);
         }
 
         DCEParameters get_parameters()

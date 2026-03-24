@@ -165,9 +165,12 @@ class Scrubber
     private:
         mutable std::shared_mutex mutex; 
         ScrubberState state;
+        
+        
 
         // GPU
         SDL_GPUDevice *gpu_device;
+        UploadBuffer upload_buffer;
         SDL_GPUBuffer *points_buffer = nullptr;
         std::size_t points_buffer_size = 0;
         float lower_depth = 0.0f;
@@ -183,7 +186,7 @@ class Scrubber
          * @brief Constructor. Initializes scrubber with default values.
          * @param gpu_device SDL_GPUDevice to upload event data points to
          */
-        Scrubber(SDL_GPUDevice *gpu_device): gpu_device(gpu_device)
+        Scrubber(SDL_GPUDevice *gpu_device): gpu_device(gpu_device), upload_buffer(gpu_device)
         {
             // Initialize with Prophesee metavision_viewer defaults:
             //   accumulation time = 10 ms  (time_window = 10 000 us)
@@ -226,14 +229,11 @@ class Scrubber
         /**
          * @brief Copies relevant event data and frame data into buffer on GPU
          *        to be drawn and processed by DCE.
-         * @param upload_buffer UploadBuffer object for uploading data to gpu
-         * @param copy_pass SDL_GPUCopyPass for copying data to GPU
          */
-        void copy_pass(EventData &event_data, UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+        void copy_pass(EventData &event_data)
         {
-            if (!copy_pass)
-                return;
 
+            
             // Lock resources
             event_data.lock_data_vectors();
 
@@ -307,23 +307,15 @@ class Scrubber
             points_buffer = SDL_CreateGPUBuffer(gpu_device, &buffer_create_info);
 
             // Upload data to the new buffer
+            SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
+            SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
             upload_buffer.upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
 
             // Below is frame texture generation code, skip if user does not want frames
             const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data.get_frame_vector_ref();
             glm::vec2 current_frame_dimensions = event_data.get_camera_frame_resolution();
-
-            // Also sanity check the dimensions of the frame
-            if (!scrubber_state.show_frame_data || frame_vector.empty() ||
-                (current_frame_dimensions.x < 1.0f || current_frame_dimensions.y < 1.0f))
-            {
-                event_data.unlock_data_vectors();
-                // To prevent drawing of frames
-                frame_timestamps[0] = -1.0f;
-                frame_timestamps[1] = -1.0f;
-                return;
-            }
 
             // recreate frame if necessary
             if (frame_width != current_frame_dimensions.x || frame_height != current_frame_dimensions.y)
@@ -455,6 +447,8 @@ class Scrubber
             }
 
             event_data.unlock_data_vectors();
+            SDL_EndGPUCopyPass(copy_pass);
+            SDL_SubmitGPUCommandBuffer(command_buffer);
         }
 
         // Thread safe state getter
@@ -475,6 +469,12 @@ class Scrubber
         {
             std::unique_lock lock(mutex);
             state.clear();
+        }
+
+        void update(EventData &event_data)
+        {
+            cpu_update(event_data);
+            copy_pass(event_data);
         }
 
         // Non thread-safe getters

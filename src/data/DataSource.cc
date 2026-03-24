@@ -40,6 +40,8 @@ void DataSource::init_render_targets()
 	};
 
 	render_targets.dce = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
+    render_targets.positive_values_texture = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
+    render_targets.negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
 	render_targets.visualizer_color = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
 	render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
 }
@@ -50,6 +52,13 @@ DataSource::~DataSource()
 	SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_color.texture);
 	SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
 }
+
+void DataSource::update()
+{
+    scrubber.update(event_data);
+}
+
+
 
 
 /*
