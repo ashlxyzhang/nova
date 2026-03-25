@@ -3,7 +3,6 @@
 #define GUI_HH
 
 #include "data/DataAcquisition.hh"
-#include "data/DataWriter.hh"
 #include "fonts/CascadiaCode.ttf.h"
 #include "imgui_internal.h"
 #include "render/DigitalCodedExposure.hh"
@@ -53,8 +52,7 @@ class GUI
         ViewMode view_mode = ViewMode::SINGLE;
         int selected_source_index = -1;
 
-        // Synced scrubber state (used when view_mode == SYNCED)
-        // This state is applied to all data sources' scrubbers
+        // Synced scrubber state applied to all data sources when in SYNCED view mode
         Scrubber::ScrubberState synced_scrubber_state;
 
         // Camera control state

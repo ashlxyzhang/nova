@@ -17,6 +17,13 @@
 #include <shared_mutex>
 #include <vector>
 
+// Forward Declarations
+namespace dv::io::camera {
+    struct USBDevice {
+        struct DeviceDescriptor;
+    };
+}
+
 class DataWriter;
 
 /**

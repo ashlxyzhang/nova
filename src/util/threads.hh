@@ -3,7 +3,6 @@
 #define THREADS_HH
 
 #include "data/DataAcquisition.hh"
-#include "data/DataWriter.hh"
 #include "data/EventData.hh"
 #include "render/DigitalCodedExposure.hh"
 #include "ui/GUI.hh"
