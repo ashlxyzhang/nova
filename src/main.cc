@@ -157,7 +157,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     {
         data_source->update();
         app->digital_coded_exposure->render(data_source);
-        // app->visualizer->render(data_source);
+        app->visualizer->render(data_source);
     }
 
     // Render the GUI
@@ -171,18 +171,12 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     auto *app = static_cast<Application *>(appstate);
 
     // Stop worker threads
-    if (app->writer_thread.joinable())
-    {
-        app->writer_running = false;
-        app->writer_thread.join();
-    }
+    app->writer_running = false;
+    app->writer_thread.join();
     
-    if (app->data_acquisition_thread.joinable())
-    {
-        app->data_acquisition_running = false;
-        app->data_acquisition_thread.join();
-    }
-
+    app->data_acquisition_running = false;
+    app->data_acquisition_thread.join();
+    
     // Free modules before GPU shutdown
     SDL_GPUDevice *gpu_device = app->gpu_device;
     SDL_Window *window = app->window;

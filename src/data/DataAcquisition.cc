@@ -50,8 +50,8 @@ void DataAcquisition::add_file_source(const std::string& file_path)
 
     if (new_source->is_open()) 
     {
-        data_sources.push_back(std::make_shared<DataSource>(gpu_device, file_path));   
-    }
+        data_sources.push_back(new_source);   
+    }   
     else 
     {
         std::cerr << "Failed to open file source: " << file_path << std::endl;

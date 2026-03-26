@@ -148,28 +148,28 @@ void DataSource::init_render_targets()
     render_targets.negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
     
 
-    // SDL_GPUTextureCreateInfo vis_color_create_info = {
-    //     .type = SDL_GPU_TEXTURETYPE_2D,
-    //     .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
-    //     .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
-    //     .width = 1920,
-    //     .height = 1200,
-    //     .layer_count_or_depth = 1,
-    //     .num_levels = 1,
-    //     .sample_count = SDL_GPU_SAMPLECOUNT_1,
-    // };
-	// render_targets.visualizer_color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
+    SDL_GPUTextureCreateInfo vis_color_create_info = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
+        .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        .width = 1920,
+        .height = 1200,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+    };
+	render_targets.visualizer_color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
 	
-    // SDL_GPUTextureCreateInfo vis_depth_create_info = {
-    //     .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-    //     .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-    //     .width = 1920,
-    //     .height = 1200,
-    //     .layer_count_or_depth = 1,
-    //     .num_levels = 1,
-    //     .sample_count = SDL_GPU_SAMPLECOUNT_1,
-    // };
-    // render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
+    SDL_GPUTextureCreateInfo vis_depth_create_info = {
+        .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+        .width = 1920,
+        .height = 1200,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+    };
+    render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
 }
 
 DataSource::~DataSource()
@@ -177,8 +177,8 @@ DataSource::~DataSource()
 	SDL_ReleaseGPUTexture(gpu_device, render_targets.dce.texture);
 	SDL_ReleaseGPUTexture(gpu_device, render_targets.positive_values_texture.texture);
 	SDL_ReleaseGPUTexture(gpu_device, render_targets.negative_values_texture.texture);
-    // SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
-    // SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
+    SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_color.texture);
+    SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
     event_data.clear();
 }
 
