@@ -7,15 +7,9 @@
 #include "ui/Scrubber.hh"
 #include "data/IEventReader.hh"
 
-#include <dv-processing/io/camera/discovery.hpp>
 #include <string>
-
-// Forward declarations (necessary to compile)
-namespace dv::io::camera { 
-    struct USBDevice { 
-        struct DeviceDescriptor; 
-    }; 
-}
+#include <dv-processing/io/camera/discovery.hpp>
+#include <dv-processing/io/camera/usb_device.hpp>
 
 struct DataSource {
 	mutable std::shared_mutex mutex;
@@ -23,7 +17,7 @@ struct DataSource {
     std::string name; 
 
     enum Type { CAMERA, FILE } type;
-    enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state; 
+    enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state = State::PAUSED; 
 
 	std::unique_ptr<IEventReader> reader;
     EventData event_data;
@@ -48,7 +42,6 @@ struct DataSource {
 	~DataSource();
 
 	void init_render_targets();
-
 	void get_batch_event_data();
 	void get_batch_frame_data();
 	void update();

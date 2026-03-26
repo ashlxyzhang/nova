@@ -4,29 +4,19 @@
 #include "data/DVEventReader.hh"
 #include "data/MetavisionEventReader.hh"
 
-#include <dv-processing/io/camera/discovery.hpp>
-#include <dv-processing/io/camera/usb_device.hpp>
-
 #include <memory>
 #include <optional>
+#include <filesystem>
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
-	: gpu_device(gpu_device), name(file_path), type(Type::FILE), state(State::PAUSED), scrubber(gpu_device)
+	: gpu_device(gpu_device), type(Type::FILE), state(State::PAUSED), scrubber(gpu_device)
 {
-    
 	std::unique_lock da_read_write_lock(mutex);
-
-    // Check for file extension
-    size_t extension_pos = file_path.find_last_of('.');
-    if (extension_pos == std::string::npos)
-    {
-        std::cerr << "File has no extension!" << std::endl;
-        state = State::FAILED_TO_OPEN;
-        return;
-    }
+    std::filesystem::path path(file_path);
+    name = path.filename().string(); 
 
     // Load file based on extension
-    std::string ext = file_path.substr(extension_pos);
+    std::string ext = path.extension().string();
     if (ext == ".aedat4")
     {
         try
@@ -131,7 +121,7 @@ void DataSource::init_render_targets()
 		resolution = cv::Size(1920, 1080);
 	}
 
-	SDL_GPUTextureCreateInfo color_create_info = {
+	SDL_GPUTextureCreateInfo dce_create_info = {
 		.type = SDL_GPU_TEXTURETYPE_2D,
 		.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
 		.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
@@ -141,19 +131,55 @@ void DataSource::init_render_targets()
 		.num_levels = 1,
 		.sample_count = SDL_GPU_SAMPLECOUNT_1,
 	};
+    render_targets.dce = {SDL_CreateGPUTexture(gpu_device, &dce_create_info), dce_create_info.width, dce_create_info.height};
 
-	render_targets.dce = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
-    render_targets.positive_values_texture = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
-    render_targets.negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
-	render_targets.visualizer_color = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
-	render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &color_create_info), color_create_info.width, color_create_info.height};
+    SDL_GPUTextureCreateInfo dce_intermediate_create_info = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
+        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE |
+                    SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+        .width = (Uint32) resolution.width,
+        .height = (Uint32) resolution.height,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+    };
+    render_targets.positive_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
+    render_targets.negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
+    
+
+    // SDL_GPUTextureCreateInfo vis_color_create_info = {
+    //     .type = SDL_GPU_TEXTURETYPE_2D,
+    //     .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
+    //     .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
+    //     .width = 1920,
+    //     .height = 1200,
+    //     .layer_count_or_depth = 1,
+    //     .num_levels = 1,
+    //     .sample_count = SDL_GPU_SAMPLECOUNT_1,
+    // };
+	// render_targets.visualizer_color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
+	
+    // SDL_GPUTextureCreateInfo vis_depth_create_info = {
+    //     .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+    //     .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+    //     .width = 1920,
+    //     .height = 1200,
+    //     .layer_count_or_depth = 1,
+    //     .num_levels = 1,
+    //     .sample_count = SDL_GPU_SAMPLECOUNT_1,
+    // };
+    // render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
 }
 
 DataSource::~DataSource()
 {
 	SDL_ReleaseGPUTexture(gpu_device, render_targets.dce.texture);
-	SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_color.texture);
-	SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
+	SDL_ReleaseGPUTexture(gpu_device, render_targets.positive_values_texture.texture);
+	SDL_ReleaseGPUTexture(gpu_device, render_targets.negative_values_texture.texture);
+    // SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
+    // SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
+    event_data.clear();
 }
 
 void DataSource::update()

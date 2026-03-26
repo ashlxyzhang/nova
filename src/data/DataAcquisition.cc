@@ -1,6 +1,4 @@
 #include "data/DataAcquisition.hh"
-#include <dv-processing/io/camera/discovery.hpp>
-#include <dv-processing/io/camera/usb_device.hpp>
 
 DataAcquisition::DataAcquisition(SDL_GPUDevice* gpu_device): gpu_device(gpu_device) {}
 
@@ -67,5 +65,11 @@ void DataAcquisition::remove_data_source(size_t index)
     {
         data_sources.erase(data_sources.begin() + index);
     }
+}
+
+std::vector<std::shared_ptr<DataSource>> DataAcquisition::get_data_sources()
+{
+    std::shared_lock da_read_lock(mutex);
+    return data_sources;
 }
 

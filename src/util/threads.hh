@@ -28,20 +28,13 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
 {
     while (running)
     {
-
         // Get copy of all DataSource's
         std::vector<std::shared_ptr<DataSource>> data_sources = data_acq.get_data_sources();
         for (const auto& data_source: data_sources)
         {
-            
             // Lock data source for reading
-            std::shared_lock data_source_lock(data_source->mutex);
-
-            if (data_source->state == DataSource::State::ACTIVE)
-            {
-                data_source->get_batch_event_data();
-                data_source->get_batch_frame_data();
-            }
+            data_source->get_batch_event_data();
+            data_source->get_batch_frame_data();
         }
     }
 }

@@ -2,29 +2,20 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
+#include "data/DataSource.hh"
 #include "data/DVEventReader.hh"
 #include "data/EventData.hh"
 #include "data/IEventReader.hh"
 #include "data/MetavisionEventReader.hh"
-#include "data/DataSource.hh"
 #include "util/ErrorQueue.hh"
 
-#include <dv-processing/io/camera/discovery.hpp>
-#include <dv-processing/io/camera/usb_device.hpp>
 #include <opencv2/imgproc.hpp>
-
 #include <mutex>
 #include <shared_mutex>
 #include <vector>
 
-// Forward Declarations
-namespace dv::io::camera {
-    struct USBDevice {
-        struct DeviceDescriptor;
-    };
-}
-
-class DataWriter;
+#include <dv-processing/io/camera/discovery.hpp>
+#include <dv-processing/io/camera/usb_device.hpp>
 
 /**
  * @brief This class provides a nice wrapper for managing and creating multiple DataSource's in a thread-safe way
@@ -51,7 +42,6 @@ class DataAcquisition
         void remove_data_source(size_t index);
 
         std::vector<std::string> get_scanned_camera_names();        
-        std::vector<dv::io::camera::USBDevice::DeviceDescriptor> get_scanned_cameras();
         std::vector<std::shared_ptr<DataSource>> get_data_sources(); 
 };
 

@@ -1,5 +1,9 @@
 #include "util/pch.hh"
 
+// DO NOT MOVE THIS TO PCH.HH, IT WILL NOT COMPILE 😊
+#define SDL_MAIN_USE_CALLBACKS 1
+#include <SDL3/SDL_main.h>
+
 #include "data/DataAcquisition.hh"
 #include "render/DigitalCodedExposure.hh"
 #include "render/RenderTarget.hh"
@@ -147,24 +151,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
-    // Update synced scrubber state from sources (gets updated min/max bounds)
-    app->gui->update_synced_scrubber_state_from_sources();
-
-    // Apply synced scrubber state to all sources if in synced mode
-    app->gui->apply_synced_scrubber_state();
-
-    // Update all data sources
+    // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();
     for (const auto& data_source : data_sources)
     {
         data_source->update();
-    }
-
-    // Render all data sources
-    for (const auto& data_source : data_sources)
-    {
         app->digital_coded_exposure->render(data_source);
-        app->visualizer->render(data_source);
+        // app->visualizer->render(data_source);
     }
 
     // Render the GUI

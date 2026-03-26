@@ -287,45 +287,18 @@ class GUI
 
             // List existing sources
             ImGui::Text("Existing Sources:");
-            auto sources = data_acquisition.get_data_sources();
+            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
             
             for (size_t i = 0; i < sources.size(); ++i)
             {
                 ImGui::PushID(i);
                 
                 bool is_selected = (static_cast<int>(i) == selected_source_index);
-                
-                if (view_mode == ViewMode::SINGLE)
+                if (ImGui::Selectable(sources[i]->name.c_str(), is_selected))
                 {
-                    if (ImGui::Selectable(sources[i]->name.c_str(), is_selected))
-                    {
-                        selected_source_index = static_cast<int>(i);
-                    }
-                }
-                else
-                {
-                    ImGui::Text("%s", sources[i]->name.c_str());
+                    selected_source_index = static_cast<int>(i);
                 }
                 
-                ImGui::SameLine();
-                
-                // State control buttons
-                if (sources[i]->state == DataSource::State::ACTIVE)
-                {
-                    if (ImGui::SmallButton("Pause"))
-                    {
-                        sources[i]->state = DataSource::State::PAUSED;
-                    }
-                }
-                else
-                {
-                    if (ImGui::SmallButton("Resume"))
-                    {
-                        sources[i]->state = DataSource::State::ACTIVE;
-                    }
-                }
-                
-                ImGui::SameLine();
                 if (ImGui::SmallButton("Delete"))
                 {
                     data_acquisition.remove_data_source(i);
@@ -567,34 +540,26 @@ class GUI
         {
             ImGui::Begin("Scrubber");
 
-            auto sources = data_acquisition.get_data_sources();
+            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
             
             // Get the appropriate scrubber state to display and edit
             Scrubber::ScrubberState *active_state = nullptr;
             
-            if (view_mode == ViewMode::SYNCED)
+            if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
             {
+                // Get state from the selected source's scrubber
+                Scrubber::ScrubberState temp_state = sources[selected_source_index]->scrubber.get_state();
+                synced_scrubber_state = temp_state; // Use synced_scrubber_state as temporary storage
                 active_state = &synced_scrubber_state;
-                ImGui::Text("Mode: Synced (All Sources)");
+                ImGui::Text("Mode: Single Source - %s", sources[selected_source_index]->name.c_str());
             }
-            else // SINGLE
+            else
             {
-                if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
-                {
-                    // Get state from the selected source's scrubber
-                    Scrubber::ScrubberState temp_state = sources[selected_source_index]->scrubber.get_state();
-                    synced_scrubber_state = temp_state; // Use synced_scrubber_state as temporary storage
-                    active_state = &synced_scrubber_state;
-                    ImGui::Text("Mode: Single Source - %s", sources[selected_source_index]->name.c_str());
-                }
-                else
-                {
-                    ImGui::TextDisabled("No source selected");
-                    ImGui::End();
-                    return;
-                }
+                ImGui::TextDisabled("No source selected");
+                ImGui::End();
+                return;
             }
-
+    
             if (!active_state)
             {
                 ImGui::End();
@@ -782,7 +747,7 @@ class GUI
             ImGui::Checkbox("Show Frame Data", &state.show_frame_data);
 
             // Write state back to appropriate scrubber(s)
-            if (view_mode == ViewMode::SINGLE && selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+            if (selected_source_index >= 0 && selected_source_index <static_cast<int>(sources.size()))
             {
                 sources[selected_source_index]->scrubber.set_state(state);
             }
@@ -796,84 +761,43 @@ class GUI
          */
         void draw_visualizers()
         {
-            auto sources = data_acquisition.get_data_sources();
+            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
 
-            if (view_mode == ViewMode::SYNCED)
+            if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
             {
-                // Show all sources in synced mode
-                for (size_t i = 0; i < sources.size(); ++i)
-                {
-                    std::string window_name = "3D Visualizer - " + sources[i]->name;
-                    ImGui::Begin(window_name.c_str());
+                ImGui::Begin("3D Visualizer");
 
-                    SDL_GPUTexture *texture = sources[i]->render_targets.visualizer_color.texture;
-                    if (texture)
+                SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.visualizer_color.texture;
+                if (texture)
+                {
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                    float tex_aspect = (float)sources[selected_source_index]->render_targets.visualizer_color.width /
+                                        (float)sources[selected_source_index]->render_targets.visualizer_color.height;
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+                    if (tex_aspect > pane_aspect)
                     {
-                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                        float tex_aspect = (float)sources[i]->render_targets.visualizer_color.width /
-                                           (float)sources[i]->render_targets.visualizer_color.height;
-                        ImVec2 display_size = pane_size;
-                        float pane_aspect = pane_size.x / pane_size.y;
-                        if (tex_aspect > pane_aspect)
-                        {
-                            display_size.y = pane_size.x / tex_aspect;
-                        }
-                        else
-                        {
-                            display_size.x = pane_size.y * tex_aspect;
-                        }
-                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                        ImGui::Image((ImTextureID)texture, display_size);
-                        sources[i]->render_targets.visualizer_color.is_focused = ImGui::IsItemHovered();
+                        display_size.y = pane_size.x / tex_aspect;
                     }
                     else
                     {
-                        ImGui::Text("No texture available");
+                        display_size.x = pane_size.y * tex_aspect;
                     }
-
-                    ImGui::End();
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                    ImGui::Image((ImTextureID)texture, display_size);
+                    sources[selected_source_index]->render_targets.visualizer_color.is_focused = ImGui::IsItemHovered();
                 }
-            }
-            else // SINGLE
-            {
-                if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+                else
                 {
-                    ImGui::Begin("3D Visualizer");
-
-                    SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.visualizer_color.texture;
-                    if (texture)
-                    {
-                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                        float tex_aspect = (float)sources[selected_source_index]->render_targets.visualizer_color.width /
-                                           (float)sources[selected_source_index]->render_targets.visualizer_color.height;
-                        ImVec2 display_size = pane_size;
-                        float pane_aspect = pane_size.x / pane_size.y;
-                        if (tex_aspect > pane_aspect)
-                        {
-                            display_size.y = pane_size.x / tex_aspect;
-                        }
-                        else
-                        {
-                            display_size.x = pane_size.y * tex_aspect;
-                        }
-                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                        ImGui::Image((ImTextureID)texture, display_size);
-                        sources[selected_source_index]->render_targets.visualizer_color.is_focused = ImGui::IsItemHovered();
-                    }
-                    else
-                    {
-                        ImGui::Text("No texture available");
-                    }
-
-                    ImGui::End();
+                    ImGui::Text("No texture available");
                 }
+
+                ImGui::End();
             }
+            
         }
 
         /**
@@ -881,86 +805,44 @@ class GUI
          */
         void draw_digital_coded_exposure()
         {
-            auto sources = data_acquisition.get_data_sources();
+            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
 
-            if (view_mode == ViewMode::SYNCED)
+            if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
             {
-                // Show all sources in synced mode
-                for (size_t i = 0; i < sources.size(); ++i)
-                {
-                    std::string window_name = "Frame - " + sources[i]->name;
-                    ImGui::Begin(window_name.c_str());
-                    ImGui::Text("Digital Coded Exposure");
+                ImGui::Begin("Frame");
+                ImGui::Text("Digital Coded Exposure");
 
-                    SDL_GPUTexture *texture = sources[i]->render_targets.dce.texture;
-                    if (texture)
+                SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.dce.texture;
+                if (texture)
+                {
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                    float tex_aspect = (float)sources[selected_source_index]->render_targets.dce.width /
+                                        (float)sources[selected_source_index]->render_targets.dce.height;
+                    ImVec2 display_size = pane_size;
+                    float pane_aspect = pane_size.x / pane_size.y;
+                    if (tex_aspect > pane_aspect)
                     {
-                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                        float tex_aspect = (float)sources[i]->render_targets.dce.width /
-                                           (float)sources[i]->render_targets.dce.height;
-                        ImVec2 display_size = pane_size;
-                        float pane_aspect = pane_size.x / pane_size.y;
-                        if (tex_aspect > pane_aspect)
-                        {
-                            display_size.y = pane_size.x / tex_aspect;
-                        }
-                        else
-                        {
-                            display_size.x = pane_size.y * tex_aspect;
-                        }
-                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                        ImGui::Image((ImTextureID)texture, display_size);
-                        sources[i]->render_targets.dce.is_focused = ImGui::IsItemHovered();
+                        display_size.y = pane_size.x / tex_aspect;
                     }
                     else
                     {
-                        ImGui::Text("No Event Data.");
+                        display_size.x = pane_size.y * tex_aspect;
                     }
-
-                    ImGui::End();
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                    ImGui::Image((ImTextureID)texture, display_size);
+                    sources[selected_source_index]->render_targets.dce.is_focused = ImGui::IsItemHovered();
                 }
-            }
-            else // SINGLE
-            {
-                if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+                else
                 {
-                    ImGui::Begin("Frame");
-                    ImGui::Text("Digital Coded Exposure");
-
-                    SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.dce.texture;
-                    if (texture)
-                    {
-                        ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                        float tex_aspect = (float)sources[selected_source_index]->render_targets.dce.width /
-                                           (float)sources[selected_source_index]->render_targets.dce.height;
-                        ImVec2 display_size = pane_size;
-                        float pane_aspect = pane_size.x / pane_size.y;
-                        if (tex_aspect > pane_aspect)
-                        {
-                            display_size.y = pane_size.x / tex_aspect;
-                        }
-                        else
-                        {
-                            display_size.x = pane_size.y * tex_aspect;
-                        }
-                        float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                        float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                        ImGui::Image((ImTextureID)texture, display_size);
-                        sources[selected_source_index]->render_targets.dce.is_focused = ImGui::IsItemHovered();
-                    }
-                    else
-                    {
-                        ImGui::Text("No Event Data.");
-                    }
-
-                    ImGui::End();
+                    ImGui::Text("No Event Data.");
                 }
+
+                ImGui::End();
             }
+            
         }
 
         /**
@@ -1076,7 +958,7 @@ class GUI
             ImGui_ImplSDL3_ProcessEvent(event);
 
             // Handle camera controls for visualizer
-            auto sources = data_acquisition.get_data_sources();
+            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
             bool any_focused = false;
 
             // Check if any visualizer window is focused
@@ -1153,60 +1035,6 @@ class GUI
                     source->render_targets.visualizer_color.is_focused = false;
                 }
             }
-        }
-
-        /**
-         * @brief Apply synced scrubber state to all data sources.
-         * Call this before rendering in synced mode.
-         */
-        void apply_synced_scrubber_state()
-        {
-            if (view_mode != ViewMode::SYNCED)
-                return;
-
-            auto sources = data_acquisition.get_data_sources();
-            for (auto &source : sources)
-            {
-                // Get current state from source's scrubber (has updated min/max from event data)
-                Scrubber::ScrubberState current_state = source->scrubber.get_state();
-                
-                // Apply the synced control parameters (type, mode, position, window, step)
-                // but keep the source-specific min/max values
-                current_state.type = synced_scrubber_state.type;
-                current_state.mode = synced_scrubber_state.mode;
-                current_state.current_index = synced_scrubber_state.current_index;
-                current_state.current_time = synced_scrubber_state.current_time;
-                current_state.index_window = synced_scrubber_state.index_window;
-                current_state.time_window = synced_scrubber_state.time_window;
-                current_state.index_step = synced_scrubber_state.index_step;
-                current_state.time_step = synced_scrubber_state.time_step;
-                current_state.show_frame_data = synced_scrubber_state.show_frame_data;
-                
-                source->scrubber.set_state(current_state);
-            }
-        }
-
-        /**
-         * @brief Update synced scrubber state from data sources.
-         * Call this after all sources have updated their scrubbers.
-         */
-        void update_synced_scrubber_state_from_sources()
-        {
-            if (view_mode != ViewMode::SYNCED)
-                return;
-
-            auto sources = data_acquisition.get_data_sources();
-            if (sources.empty())
-                return;
-
-            // Use first source to get updated min/max bounds
-            Scrubber::ScrubberState first_state = sources[0]->scrubber.get_state();
-            
-            // Update synced state's min/max from first source
-            synced_scrubber_state.min_index = first_state.min_index;
-            synced_scrubber_state.max_index = first_state.max_index;
-            synced_scrubber_state.min_time = first_state.min_time;
-            synced_scrubber_state.max_time = first_state.max_time;
         }
 
         /**
