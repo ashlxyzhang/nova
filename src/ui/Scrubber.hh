@@ -475,6 +475,7 @@ class Scrubber
         {
             cpu_update(event_data);
             copy_pass(event_data);
+            SDL_WaitForGPUIdle(gpu_device);
         }
 
         // Non thread-safe getters

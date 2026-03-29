@@ -213,6 +213,7 @@ class DigitalCodedExposure
 
             // Get points buffer, stop early if unavailable or empty
             SDL_GPUBuffer *points_buffer = data_source->scrubber.get_points_buffer();
+
             int point_count = data_source->scrubber.get_points_buffer_size();
             if (!points_buffer || point_count == 0) return;
 
@@ -241,6 +242,7 @@ class DigitalCodedExposure
             SDL_EndGPUComputePass(process_pass);
             
             SDL_SubmitGPUCommandBuffer(command_buffer);
+            SDL_WaitForGPUIdle(gpu_device);
         }
 
         DCEParameters get_parameters()

@@ -30,8 +30,6 @@ struct Application
         std::unique_ptr<GUI> gui;
 
         // Worker threads
-        std::atomic<bool> writer_running = true;
-        std::thread writer_thread;
         std::atomic<bool> data_acquisition_running = true;
         std::thread data_acquisition_thread;
 };
@@ -170,10 +168,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     auto *app = static_cast<Application *>(appstate);
 
-    // Stop worker threads
-    app->writer_running = false;
-    app->writer_thread.join();
-    
+    // Stop worker threads    
     app->data_acquisition_running = false;
     app->data_acquisition_thread.join();
     

@@ -352,12 +352,15 @@ class Visualizer
                                  const VisualizerParameters &params)
                 {
                     if (data_source->scrubber.get_points_buffer_size() == 0)
-                        return;
+                        return; 
 
                     SDL_BindGPUGraphicsPipeline(render_pass, points_pipeline);
 
-                    SDL_GPUBufferBinding vertex_buffer_binding[] = {data_source->scrubber.get_points_buffer(), 0};
-                    SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_binding, 1);
+                    SDL_GPUBuffer* points_buffer = data_source->scrubber.get_points_buffer();
+                    SDL_GPUBufferBinding vertex_buffer_binding;
+                    vertex_buffer_binding.buffer = points_buffer;
+                    vertex_buffer_binding.offset = 0;
+                    SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_buffer_binding, 1);
 
                     struct PointsUniforms
                     {
@@ -999,6 +1002,7 @@ class Visualizer
 
             // Submit the command buffer
             SDL_SubmitGPUCommandBuffer(command_buffer);
+            SDL_WaitForGPUIdle(gpu_device);
         }
 };
 
