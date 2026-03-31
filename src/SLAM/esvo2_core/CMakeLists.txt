@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.26)
 project(esvo2_core)
 # explicitly set std=c++14 to remove errors from pcl library
 
