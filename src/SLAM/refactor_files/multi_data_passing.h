@@ -77,35 +77,36 @@ struct NullType {};
 
 template<typename M0, typename M1, typename M2 = NullType, typename M3 = NullType, typename M4 = NullType,
          typename M5 = NullType, typename M6 = NullType, typename M7 = NullType, typename M8 = NullType>
-struct MultiDataPassing
+class MultiDataPassing
 {
-  typedef std::tuple<M0, M1, M2, M3, M4, M5, M6, M7, M8> Messages;
+
+  // typedef std::tuple<M0, M1, M2, M3, M4, M5, M6, M7, M8> Messages;
   // typedef Signal9<M0, M1, M2, M3, M4, M5, M6, M7, M8> Signal;
   typedef std::chrono::time_point<std::chrono::steady_clock> timePoint; 
   typedef 
   std::tuple<
-  std::pair<std::shared_ptr<M0 const>, timePoint>, 
-  std::pair<std::shared_ptr<M1 const>, timePoint>, 
-  std::pair<std::shared_ptr<M2 const>, timePoint>, 
-  std::pair<std::shared_ptr<M3 const>, timePoint>,
-  std::pair<std::shared_ptr<M4 const>, timePoint>, 
-  std::pair<std::shared_ptr<M5 const>, timePoint>, 
-  std::pair<std::shared_ptr<M6 const>, timePoint>, 
-  std::pair<std::shared_ptr<M7 const>, timePoint>,
-  std::pair<std::shared_ptr<M8 const>, timePoint> > Events;
+  std::pair<std::shared_ptr<M0>, timePoint>, 
+  std::pair<std::shared_ptr<M1>, timePoint>, 
+  std::pair<std::shared_ptr<M2>, timePoint>, 
+  std::pair<std::shared_ptr<M3>, timePoint>,
+  std::pair<std::shared_ptr<M4>, timePoint>, 
+  std::pair<std::shared_ptr<M5>, timePoint>, 
+  std::pair<std::shared_ptr<M6>, timePoint>, 
+  std::pair<std::shared_ptr<M7>, timePoint>,
+  std::pair<std::shared_ptr<M8>, timePoint> > Events;
   
   // typedef duration;
 
   // typedef typename mpl::fold<Messages, mpl::int_<0>, mpl::if_<mpl::not_<boost::is_same<mpl::_2, NullType> >, mpl::next<mpl::_1>, mpl::_1> >::type RealTypeCount;
-  typedef typename std::pair<std::shared_ptr<M0 const>, timePoint> M0Event;
-  typedef typename std::pair<std::shared_ptr<M1 const>, timePoint> M1Event;
-  typedef typename std::pair<std::shared_ptr<M2 const>, timePoint> M2Event;
-  typedef typename std::pair<std::shared_ptr<M3 const>, timePoint> M3Event;
-  typedef typename std::pair<std::shared_ptr<M4 const>, timePoint> M4Event;
-  typedef typename std::pair<std::shared_ptr<M5 const>, timePoint> M5Event;
-  typedef typename std::pair<std::shared_ptr<M6 const>, timePoint> M6Event;
-  typedef typename std::pair<std::shared_ptr<M7 const>, timePoint> M7Event;
-  typedef typename std::pair<std::shared_ptr<M8 const>, timePoint> M8Event;
+  typedef typename std::pair<std::shared_ptr<M0>, timePoint> M0Event;
+  typedef typename std::pair<std::shared_ptr<M1>, timePoint> M1Event;
+  typedef typename std::pair<std::shared_ptr<M2>, timePoint> M2Event;
+  typedef typename std::pair<std::shared_ptr<M3>, timePoint> M3Event;
+  typedef typename std::pair<std::shared_ptr<M4>, timePoint> M4Event;
+  typedef typename std::pair<std::shared_ptr<M5>, timePoint> M5Event;
+  typedef typename std::pair<std::shared_ptr<M6>, timePoint> M6Event;
+  typedef typename std::pair<std::shared_ptr<M7>, timePoint> M7Event;
+  typedef typename std::pair<std::shared_ptr<M8>, timePoint> M8Event;
 
   // typedef Synchronizer<ApproximateTime> Sync;
   // typedef PolicyBase<M0, M1, M2, M3, M4, M5, M6, M7, M8> Super;
@@ -122,31 +123,34 @@ struct MultiDataPassing
   // typedef typename Super::M6Event M6Event;
   // typedef typename Super::M7Event M7Event;
   // typedef typename Super::M8Event M8Event;
-  typedef std::deque<std::pair<M0,timePoint>> M0Deque;
-  typedef std::deque<std::pair<M1,timePoint>> M1Deque;
-  typedef std::deque<std::pair<M2,timePoint>> M2Deque;
-  typedef std::deque<std::pair<M3,timePoint>> M3Deque;
-  typedef std::deque<std::pair<M4,timePoint>> M4Deque;
-  typedef std::deque<std::pair<M5,timePoint>> M5Deque;
-  typedef std::deque<std::pair<M6,timePoint>> M6Deque;
-  typedef std::deque<std::pair<M7,timePoint>> M7Deque;
-  typedef std::deque<std::pair<M8,timePoint>> M8Deque;
-  typedef std::vector<std::pair<M0, timePoint>> M0Vector;
-  typedef std::vector<std::pair<M1, timePoint>> M1Vector;
-  typedef std::vector<std::pair<M2, timePoint>> M2Vector;
-  typedef std::vector<std::pair<M3, timePoint>> M3Vector;
-  typedef std::vector<std::pair<M4, timePoint>> M4Vector;
-  typedef std::vector<std::pair<M5, timePoint>> M5Vector;
-  typedef std::vector<std::pair<M6, timePoint>> M6Vector;
-  typedef std::vector<std::pair<M7, timePoint>> M7Vector;
-  typedef std::vector<std::pair<M8, timePoint>> M8Vector;
-  typedef std::tuple<std::pair<M0, timePoint>, std::pair<M1, timePoint>, std::pair<M2, timePoint>, std::pair<M3, timePoint>, std::pair<M4, timePoint>, std::pair<M5, timePoint>, std::pair<M6, timePoint>, std::pair<M7, timePoint>, std::pair<M8, timePoint>> Tuple;
+  typedef std::deque<M0Event> M0Deque;
+  typedef std::deque<M1Event> M1Deque;
+  typedef std::deque<M2Event> M2Deque;
+  typedef std::deque<M3Event> M3Deque;
+  typedef std::deque<M4Event> M4Deque;
+  typedef std::deque<M5Event> M5Deque;
+  typedef std::deque<M6Event> M6Deque;
+  typedef std::deque<M7Event> M7Deque;
+  typedef std::deque<M8Event> M8Deque;
+  typedef std::vector<M0Event> M0Vector;
+  typedef std::vector<M1Event> M1Vector;
+  typedef std::vector<M2Event> M2Vector;
+  typedef std::vector<M3Event> M3Vector;
+  typedef std::vector<M4Event> M4Vector;
+  typedef std::vector<M5Event> M5Vector;
+  typedef std::vector<M6Event> M6Vector;
+  typedef std::vector<M7Event> M7Vector;
+  typedef std::vector<M8Event> M8Vector;
+  typedef std::tuple<M0Event, M1Event, M2Event, M3Event, M4Event, M5Event, M6Event, M7Event, M8Event> Tuple;
   typedef std::tuple<M0Deque, M1Deque, M2Deque, M3Deque, M4Deque, M5Deque, M6Deque, M7Deque, M8Deque> DequeTuple;
   typedef std::tuple<M0Vector, M1Vector, M2Vector, M3Vector, M4Vector, M5Vector, M6Vector, M7Vector, M8Vector> VectorTuple;
 
-  MultiDataPassing(uint32_t queue_size, int numTypes)
+public:
+  MultiDataPassing(uint32_t queue_size, uint32_t output_queue_size, int numTypes, std::condition_variable* cv)
   : //parent_(0), 
     queue_size_(queue_size)
+  , output_queue_size(output_queue_size)
+  , cv(cv)
   , enable_reset_(false)
   , num_reset_deques_(0)
   , num_non_empty_deques_(0)
@@ -167,13 +171,14 @@ struct MultiDataPassing
     last_stamps_.resize(9, timePoint::min());
   }
 
+private:
   template<int i>
   bool checkInterMessageBound()
   {
     // namespace mt = ros::message_traits;
 
-    std::deque<typename std::tuple_element<i, DequeTuple>::type>& deque = std::get<i>(deques_);
-    std::vector<typename std::tuple_element<i, VectorTuple>::type>& v = std::get<i>(past_);
+    typename std::tuple_element<i, DequeTuple>::type& deque = std::get<i>(deques_);
+    typename std::tuple_element<i, VectorTuple>::type& v = std::get<i>(past_);
     // assert(!deque.empty());
     assert(!deque.empty());
     // const typename std::tuple_element<i, Messages>::type &msg = *(deque.back()).getMessage();
@@ -218,6 +223,7 @@ struct MultiDataPassing
   }
 
 
+public:
   template<int i>
   void add(const typename std::tuple_element<i, Events>::type& evt)
   {
@@ -242,7 +248,7 @@ struct MultiDataPassing
       }
     }
     last_stamps_[i] = now;
-
+    //std::cout<<"here1"<<std::endl;
     std::deque<typename std::tuple_element<i, Events>::type>& deque = std::get<i>(deques_);
     deque.push_back(evt);
     if (deque.size() == (size_t)1) {
@@ -250,12 +256,14 @@ struct MultiDataPassing
       ++num_non_empty_deques_;
       if (num_non_empty_deques_ == (uint32_t)realTypeCount)
       {
+        //std::cout<<"here2"<<std::endl;
         // All deques have messages
         process();
       }
     }
     else
     {
+      //std::cout<<"here3"<<std::endl;
       if (!checkInterMessageBound<i>())
         if (enable_reset_)
         {
@@ -265,8 +273,10 @@ struct MultiDataPassing
     // Check whether we have more messages than allowed in the queue.
     // Note that during the above call to process(), queue i may contain queue_size_+1 messages.
     std::vector<typename std::tuple_element<i, Events>::type>& past = std::get<i>(past_);
+    //std::cout<<"here4"<<std::endl;
     if (deque.size() + past.size() > queue_size_)
     {
+      //std::cout<<"here5"<<std::endl;
       // Cancel ongoing candidate search, if any:
       num_non_empty_deques_ = 0; // We will recompute it from scratch
       recover<0>();
@@ -282,16 +292,20 @@ struct MultiDataPassing
       assert(!deque.empty());
       deque.pop_front();
       has_dropped_messages_[i] = true;
+      //std::cout<<"here6"<<std::endl;
       if (pivot_ != NO_PIVOT)
       {
-	// The candidate is no longer valid. Destroy it.
-	candidate_ = Tuple();
-	pivot_ = NO_PIVOT;
-	// There might still be enough messages to create a new candidate:
-	process();
+        //std::cout<<"here7"<<std::endl;
+        // The candidate is no longer valid. Destroy it.
+        candidate_ = Tuple();
+        pivot_ = NO_PIVOT;
+        // There might still be enough messages to create a new candidate:
+        process();
       }
     }
   }
+
+private:
 
   void setAgePenalty(double age_penalty)
   {
@@ -572,15 +586,23 @@ private:
   // Assumes: all deques are non empty, i.e. num_non_empty_deques_ == realTypeCount
   void publishCandidate()
   {
+    //std::cout<<"here29, in publihs candidate"<<std::endl;
     //printf("Publishing candidate\n");
     // Publish
-    outputQueue.push_back(std::get<0>(candidate_), std::get<1>(candidate_), std::get<2>(candidate_), std::get<3>(candidate_),
-                    std::get<4>(candidate_), std::get<5>(candidate_), std::get<6>(candidate_), std::get<7>(candidate_),
-                    std::get<8>(candidate_));
+    while(outputQueue.size() > output_queue_size)
+    {
+      outputQueue.pop_front();
+      //std::cout<<"here 29.5 are popping"<<std::endl;
+    }
+    outputQueue.push_back(candidate_);
+    //std::cout<<"------------------------------------here 30, just pushed back output queue"<<std::endl;
+    cv->notify_one();
+    //std::cout<<"here 31, notified"<<std::endl;
     // Delete this candidate
     candidate_ = Tuple();
     pivot_ = NO_PIVOT;
 
+    //std::cout<<"here32, pre recover and delete"<<std::endl;
     // Recover hidden messages, and delete the ones corresponding to the candidate
     num_non_empty_deques_ = 0; // We will recompute it from scratch
     recoverAndDelete<0>();
@@ -592,6 +614,7 @@ private:
     recoverAndDelete<6>();
     recoverAndDelete<7>();
     recoverAndDelete<8>();
+    //std::cout<<"here33, post recover and delete"<<std::endl;
   }
 
   // Assumes: all deques are non empty, i.e. num_non_empty_deques_ == realTypeCount
@@ -781,9 +804,11 @@ private:
   // assumes data_mutex_ is already locked
   void process()
   {
+    //std::cout<<"here8, in process start"<<std::endl;
     // While no deque is empty
     while (num_non_empty_deques_ == (uint32_t)realTypeCount)
     {
+      //std::cout<<"here9, while looping"<<std::endl;
       // Find the start and end of the current interval
       //printf("Entering while loop in this state [\n");
       //show_internal_state();
@@ -792,17 +817,20 @@ private:
       uint32_t end_index, start_index;
       getCandidateEnd(end_index, end_time);
       getCandidateStart(start_index, start_time);
+      //std::cout<<"here10 got candidates"<<std::endl;
       for (uint32_t i = 0; i < (uint32_t)realTypeCount; i++)
       {
-	if (i != end_index)
-	{
-	  // No dropped message could have been better to use than the ones we have,
-	  // so it becomes ok to use this topic as pivot in the future
-	  has_dropped_messages_[i] = false;
-	}
+        if (i != end_index)
+        {
+          // No dropped message could have been better to use than the ones we have,
+          // so it becomes ok to use this topic as pivot in the future
+          has_dropped_messages_[i] = false;
+        }
       }
+      //std::cout<<"here11, end of for"<<std::endl;
       if (pivot_ == NO_PIVOT)
       {
+        //std::cout<<"here 12no pivot"<<std::endl;
         // We do not have a candidate
         // INVARIANT: the past_ vectors are empty
         // INVARIANT: (candidate_ has no filled members)
@@ -812,50 +840,60 @@ private:
           dequeDeleteFront(start_index);
           continue;
         }
-	if (has_dropped_messages_[end_index])
-	{
-	  // The topic that would become pivot has dropped messages, so it is not a good pivot
-	  dequeDeleteFront(start_index);
-	  continue;
-	}
-	// This is a valid candidate, and we don't have any, so take it
-	makeCandidate();
-	candidate_start_ = start_time;
-	candidate_end_ = end_time;
-	pivot_ = end_index;
-	pivot_time_ = end_time;
-	dequeMoveFrontToPast(start_index);
+        if (has_dropped_messages_[end_index])
+        {
+          // The topic that would become pivot has dropped messages, so it is not a good pivot
+          dequeDeleteFront(start_index);
+          continue;
+        }
+        //std::cout<<"here13"<<std::endl;
+        // This is a valid candidate, and we don't have any, so take it
+        makeCandidate();
+        candidate_start_ = start_time;
+        candidate_end_ = end_time;
+        pivot_ = end_index;
+        pivot_time_ = end_time;
+        dequeMoveFrontToPast(start_index);
+        //std::cout<<"here14"<<std::endl;
       }
       else
       {
+        //std::cout<<"here15"<<std::endl;
         // We already have a candidate
         // Is this one better than the current candidate?
         // INVARIANT: has_dropped_messages_ is all false
         if ((end_time - candidate_end_) * (1 + age_penalty_) >= (start_time - candidate_start_))
         {
           // This is not a better candidate, move to the next
+          //std::cout<<"here16"<<std::endl;
           dequeMoveFrontToPast(start_index);
+          //std::cout<<"here17"<<std::endl;
         }
         else
         {
+          //std::cout<<"here18"<<std::endl;
           // This is a better candidate
           makeCandidate();
           candidate_start_ = start_time;
           candidate_end_ = end_time;
           dequeMoveFrontToPast(start_index);
+          //std::cout<<"here19"<<std::endl;
           // Keep the same pivot (and pivot time)
         }
       }
       // INVARIANT: we have a candidate and pivot
       assert(pivot_ != NO_PIVOT);
+      //std::cout<<"here20"<<std::endl;
       //printf("start_index == %d, pivot_ == %d\n", start_index, pivot_);
       if (start_index == pivot_)  // TODO: replace with start_time == pivot_time_
       {
+        //std::cout<<"here21, publishing"<<std::endl;
         // We have exhausted all possible candidates for this pivot, we now can output the best one
         publishCandidate();
       }
       else if ((end_time - candidate_end_) * (1 + age_penalty_) >= (pivot_time_ - candidate_start_))
       {
+        //std::cout<<"here22, publishing 2"<<std::endl;
         // We have not exhausted all candidates, but this candidate is already provably optimal
         // Indeed, any future candidate must contain the interval [pivot_time_ end_time], which
         // is already too big.
@@ -865,18 +903,22 @@ private:
       }
       else if (num_non_empty_deques_ < (uint32_t)realTypeCount)
       {
+        //std::cout<<"here23, oakdwakd"<<std::endl;
         uint32_t num_non_empty_deques_before_virtual_search = num_non_empty_deques_;
 
         // Before giving up, use the rate bounds, if provided, to further try to prove optimality
         std::vector<int> num_virtual_moves(9,0);
         while (1)
         {
+          //std::cout<<"here24"<<std::endl;
           timePoint end_time, start_time;
           uint32_t end_index, start_index;
           getVirtualCandidateEnd(end_index, end_time);
           getVirtualCandidateStart(start_index, start_time);
+          //std::cout<<"here25"<<std::endl;
           if ((end_time - candidate_end_) * (1 + age_penalty_) >= (pivot_time_ - candidate_start_))
           {
+            //std::cout<<"here26, publishing"<<std::endl;
             // We have proved optimality
             // As above, any future candidate must contain the interval [pivot_time_ end_time], which
             // is already too big.
@@ -885,29 +927,31 @@ private:
           }
           if ((end_time - candidate_end_) * (1 + age_penalty_) < (start_time - candidate_start_))
           {
+            //std::cout<<"here27, cna't prove"<<std::endl;
             // We cannot prove optimality
             // Indeed, we have a virtual (i.e. optimistic) candidate that is better than the current
             // candidate
             // Cleanup the virtual search:
             num_non_empty_deques_ = 0; // We will recompute it from scratch
-	    recover<0>(num_virtual_moves[0]);
-	    recover<1>(num_virtual_moves[1]);
-	    recover<2>(num_virtual_moves[2]);
-	    recover<3>(num_virtual_moves[3]);
-	    recover<4>(num_virtual_moves[4]);
-	    recover<5>(num_virtual_moves[5]);
-	    recover<6>(num_virtual_moves[6]);
-	    recover<7>(num_virtual_moves[7]);
-	    recover<8>(num_virtual_moves[8]);
+            recover<0>(num_virtual_moves[0]);
+            recover<1>(num_virtual_moves[1]);
+            recover<2>(num_virtual_moves[2]);
+            recover<3>(num_virtual_moves[3]);
+            recover<4>(num_virtual_moves[4]);
+            recover<5>(num_virtual_moves[5]);
+            recover<6>(num_virtual_moves[6]);
+            recover<7>(num_virtual_moves[7]);
+            recover<8>(num_virtual_moves[8]);
             (void)num_non_empty_deques_before_virtual_search; // unused variable warning stopper
             assert(num_non_empty_deques_before_virtual_search == num_non_empty_deques_);
             break;
           }
+          //std::cout<<"here28"<<std::endl;
           // Note: we cannot reach this point with start_index == pivot_ since in that case we would
           //       have start_time == pivot_time, in which case the two tests above are the negation
           //       of each other, so that one must be true. Therefore the while loop always terminates.
-	  assert(start_index != pivot_);
-	  assert(start_time < pivot_time_);
+          assert(start_index != pivot_);
+          assert(start_time < pivot_time_);
           dequeMoveFrontToPast(start_index);
           num_virtual_moves[start_index]++;
         } // while(1)
@@ -915,23 +959,71 @@ private:
     } // while(num_non_empty_deques_ == (uint32_t)realTypeCount)
   }
 
-  Tuple& getValues()
+
+  // --------------NEW FUNCTIONS----------------
+public:
+  MultiDataPassing(){}
+
+  MultiDataPassing &operator=(const MultiDataPassing &other)
   {
-    // TODO lock
-    return outputQueue.front();
-    outputQueue.pop_front();
-    // TODO unlock
+    this->queue_size_ = other.queue_size_;
+    this->output_queue_size = other.output_queue_size;
+    this->cv = other.cv;
+    this->enable_reset_ = false;
+    this->num_reset_deques_ = 0;
+    this->num_non_empty_deques_ = 0;
+    this->pivot_ = NO_PIVOT;
+    this->max_interval_duration_ = std::chrono::steady_clock::duration::max();
+    this->age_penalty_ = 0.1;
+    this->realTypeCount = other.realTypeCount;
+    assert(this->queue_size_ > 0);  // The synchronizer will tend to drop many messages with a queue size of 1. At least 2 is recommended.
+    inter_message_lower_bounds_.resize(9, std::chrono::steady_clock::duration::zero());
+    warned_about_incorrect_bound_.resize(9, false);
+    has_dropped_messages_.resize(9, false);
+    last_stamps_.resize(9, timePoint::min());
+    return *this;
   }
 
+  // Assumes mutex has been locked
+  bool queueEmpty()
+  {
+    return outputQueue.empty();
+  }
+
+  // Assumes mutex has been locked
+  Tuple getValues()
+  {
+    Tuple front = outputQueue.front();
+    outputQueue.pop_front();
+    return front;
+  }
+
+  int getTypeCount()
+  {
+    return realTypeCount;
+  }
+
+  void lock()
+  {
+    data_mutex_.lock();
+  }
+
+  void unlock()
+  {
+    data_mutex_.unlock();
+  }
+private:
 
   // Sync* parent_;
   int realTypeCount;
   uint32_t queue_size_;
+  uint32_t output_queue_size;
+  std::condition_variable* cv;
+
   bool enable_reset_;
   uint32_t num_reset_deques_;
 
   static const uint32_t NO_PIVOT = 9;  // Special value for the pivot indicating that no pivot has been selected
-
   DequeTuple deques_;
   uint32_t num_non_empty_deques_;
   VectorTuple past_;

@@ -5,30 +5,65 @@
 #include <mutex>
 #include <chrono>
 #include <condition_variable>
-// #include <shared_ptr>
-
-// struct 
-
 
 template<typename T>
 class DataPassingDeque {
     using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
     public:
-        DataPassingDeque(int max_queue_size, std::condition_variable& cv);
-        void add(std::shared_ptr<T> thingToAdd, timePoint timestamp);
-        void lock();
-        void unlock();
-        // Assumes mutex is locked
-        bool hasChanged();
-        // Assumes mutex is locked
-        std::pair<std::shared_ptr<T>, timePoint> getValue();
+        DataPassingDeque(){}
+        DataPassingDeque(int max_queue_size, std::condition_variable* cv)
+        {
+            this->max_queue_size = max_queue_size;
+            this->cv = cv;
+        }
 
-        private:
+        DataPassingDeque &operator=(const DataPassingDeque &other)
+        {
+            this->max_queue_size = other.max_queue_size;
+            this->cv = other.cv;
+            return *this;
+        }
+
+        // Adds a thing to the queue
+        void add(std::shared_ptr<T> thingToAdd, timePoint timestamp)
+        {
+            lock();
+            while(dq.size() >= max_queue_size)
+                dq.pop_front();
+            dq.push_back({thingToAdd, timestamp});
+            unlock();
+            cv->notify_one();
+        }
+        
+        void lock()
+        {
+            data_mutex.lock();
+        }
+
+        void unlock()
+        {
+            data_mutex.unlock();
+        }
+        
+        // Has anything been added to the queue? Assumes mutex is locked
+        bool queueEmpty()
+        {
+            return dq.empty();
+        }
+
+        // Gets the first value in the queue. Assumes mutex is locked
+        std::pair<std::shared_ptr<T>, timePoint> getValue()
+        {
+            std::pair<std::shared_ptr<T>, timePoint> value = dq.front();
+            dq.pop_front();
+            return value;
+        }
+
+    private:
         std::mutex data_mutex;
         std::deque<std::pair<std::shared_ptr<T>, timePoint>> dq;
         int max_queue_size;
-        std::condition_variable& cv;
-        bool changed;
+        std::condition_variable* cv;
 };
 
 #endif
