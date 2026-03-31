@@ -170,6 +170,7 @@ void DataSource::init_render_targets()
         .sample_count = SDL_GPU_SAMPLECOUNT_1,
     };
     render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
+    event_data.set_camera_event_resolution(resolution.width, resolution.height);
 }
 
 DataSource::~DataSource()
