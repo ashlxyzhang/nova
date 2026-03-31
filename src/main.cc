@@ -168,16 +168,15 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     auto *app = static_cast<Application *>(appstate);
 
-    // Stop worker threads    
+    // Stop worker threads
     app->data_acquisition_running = false;
     app->data_acquisition_thread.join();
-    
-    // Free modules before GPU shutdown
+
     SDL_GPUDevice *gpu_device = app->gpu_device;
     SDL_Window *window = app->window;
+    SDL_WaitForGPUIdle(gpu_device);
     delete app;
 
-    SDL_WaitForGPUIdle(gpu_device);
     SDL_ReleaseWindowFromGPUDevice(gpu_device, window);
     SDL_DestroyGPUDevice(gpu_device);
     SDL_DestroyWindow(window);

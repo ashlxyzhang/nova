@@ -4,8 +4,8 @@
 
 #include "util/pch.hh"
 
-#include "data/EventData.hh"
 #include "data/DataAcquisition.hh"
+#include "data/EventData.hh"
 #include "render/Camera.hh"
 #include "render/RenderTarget.hh"
 #include "render/UploadBuffer.hh"
@@ -59,7 +59,7 @@ class DigitalCodedExposure
         };
 
     private:
-        mutable std::shared_mutex mutex; 
+        mutable std::shared_mutex mutex;
 
         // Parameters
         DCEParameters params;
@@ -157,8 +157,8 @@ class DigitalCodedExposure
          * @brief Called to update Digital Coded Exposure every frame.
          *        Recreates texture should file change.
          */
-        
-         /**
+
+        /**
          * @brief Compute pass. Dispatches compute shaders to calculate Digital Coded Exposure output.
          * @param command_buffer GPU command buffer.
          */
@@ -172,13 +172,14 @@ class DigitalCodedExposure
             pass_data.posCol = glm::vec4(params.polarity_pos_color, 1.0f);
             pass_data.neutCol = glm::vec4(params.polarity_neut_color, 1.0f);
             pass_data.negCol = glm::vec4(params.polarity_neg_color, 1.0f);
-            pass_data.floatFlags = glm::vec4(static_cast<float>(params.dce_color), params.event_contrib_weight, static_cast<float>(params.activation_function), 0.0f);
-            pass_data.flags = glm::vec4((params.shutter_is_positive_only ? 1.0f : 0.0f), (params.shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
+            pass_data.floatFlags = glm::vec4(static_cast<float>(params.dce_color), params.event_contrib_weight,
+                                             static_cast<float>(params.activation_function), 0.0f);
+            pass_data.flags = glm::vec4((params.shutter_is_positive_only ? 1.0f : 0.0f),
+                                        (params.shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
             pass_data.morletParams = glm::vec4(params.morlet_frequency, params.morlet_width, 0.0f, 0.0f);
 
             dce_read_lock.unlock();
 
-            
             SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
 
             // Read resolution
@@ -210,37 +211,36 @@ class DigitalCodedExposure
             SDL_DispatchGPUCompute(clear_pass, width, height, 1);
             SDL_EndGPUComputePass(clear_pass);
 
-
-            // Get points buffer, stop early if unavailable or empty
+            // Get points buffer; run passes B and C only if there are points to process
             SDL_GPUBuffer *points_buffer = data_source->scrubber.get_points_buffer();
-
             int point_count = data_source->scrubber.get_points_buffer_size();
-            if (!points_buffer || point_count == 0) return;
 
+            if (points_buffer && point_count > 0)
+            {
+                // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage
+                // in shader)
+                Scrubber::ScrubberState scrubber_state = data_source->scrubber.get_state();
+                float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
+                pass_data.morletParams.z = time_center;
 
-            // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage in shader)
-            Scrubber::ScrubberState scrubber_state = data_source->scrubber.get_state();
-            float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
-            pass_data.morletParams.z = time_center;
-            
-            
-            // --- Pass B: Accumulate events into intermediate textures ---
-            SDL_GPUComputePass *dce_pass =
-                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-            SDL_BindGPUComputePipeline(dce_pass, compute_pipeline);
-            SDL_BindGPUComputeStorageBuffers(dce_pass, 0, &points_buffer, 1);
-            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-            SDL_DispatchGPUCompute(dce_pass, point_count, 1, 1);
-            SDL_EndGPUComputePass(dce_pass);
+                // --- Pass B: Accumulate events into intermediate textures ---
+                SDL_GPUComputePass *dce_pass =
+                    SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+                SDL_BindGPUComputePipeline(dce_pass, compute_pipeline);
+                SDL_BindGPUComputeStorageBuffers(dce_pass, 0, &points_buffer, 1);
+                SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+                SDL_DispatchGPUCompute(dce_pass, point_count, 1, 1);
+                SDL_EndGPUComputePass(dce_pass);
 
-            // --- Pass C: Process intermediate textures into final output ---
-            SDL_GPUComputePass *process_pass =
-                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
-            SDL_BindGPUComputePipeline(process_pass, process_compute_pipeline);
-            SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-            SDL_DispatchGPUCompute(process_pass, width, height, 1);
-            SDL_EndGPUComputePass(process_pass);
-            
+                // --- Pass C: Process intermediate textures into final output ---
+                SDL_GPUComputePass *process_pass =
+                    SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+                SDL_BindGPUComputePipeline(process_pass, process_compute_pipeline);
+                SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
+                SDL_DispatchGPUCompute(process_pass, width, height, 1);
+                SDL_EndGPUComputePass(process_pass);
+            }
+
             SDL_SubmitGPUCommandBuffer(command_buffer);
             SDL_WaitForGPUIdle(gpu_device);
         }
