@@ -5,7 +5,6 @@
 #include "util/pch.hh"
 
 #include "data/EventData.hh"
-#include "render/Camera.hh"
 #include "render/RenderTarget.hh"
 #include "render/UploadBuffer.hh"
 #include "ui/Scrubber.hh"
