@@ -7,3 +7,4 @@ vcpkg_installed/
 imgui.ini
 resources/shaders/**/*.h
 vcpkg/
+.DS_Store
