@@ -212,11 +212,13 @@ namespace esvo2_core
                               std::move(mapping_thread_promise_), std::move(reset_future_));
     MappingThread.detach();
 
-    // Dynamic reconfigure
-    dynamic_reconfigure_callback_ = boost::bind(&esvo2_Mapping::onlineParameterChangeCallback, this, _1, _2);
+    // **The onlineParameterChangeCallback is empty, so I am pretty sure this does nothing. 
+    // **I also commented out the onlineParameterChangeCallback function.
+    // Dynamic reconfigure.
+    // dynamic_reconfigure_callback_ = boost::bind(&esvo2_Mapping::onlineParameterChangeCallback, this, _1, _2);
 
-    server_.reset(new dynamic_reconfigure::Server<DVS_MappingStereoConfig>(nh_private));
-    server_->setCallback(dynamic_reconfigure_callback_);
+    // server_.reset(new dynamic_reconfigure::Server<DVS_MappingStereoConfig>(nh_private));
+    // server_->setCallback(dynamic_reconfigure_callback_);
   }
 
   esvo2_Mapping::~esvo2_Mapping()
@@ -1083,9 +1085,9 @@ namespace esvo2_core
     MappingThread.detach();
   }
 
-  void esvo2_Mapping::onlineParameterChangeCallback(DVS_MappingStereoConfig &config, uint32_t level)
-  {
-  }
+  // void esvo2_Mapping::onlineParameterChangeCallback(DVS_MappingStereoConfig &config, uint32_t level)
+  // {
+  // }
 
   void esvo2_Mapping::publishMappingResults(
       DepthMap::Ptr depthMapPtr,

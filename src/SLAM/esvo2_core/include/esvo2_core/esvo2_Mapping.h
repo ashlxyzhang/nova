@@ -70,7 +70,7 @@ namespace esvo2_core
         const sensor_msgs::ImageConstPtr &time_surface_negative,
         const sensor_msgs::ImageConstPtr &time_surface_dx,
         const sensor_msgs::ImageConstPtr &time_surface_dy);
-    void onlineParameterChangeCallback(DVS_MappingStereoConfig &config, uint32_t level);
+    // void onlineParameterChangeCallback(DVS_MappingStereoConfig &config, uint32_t level);
     void AACallback(
         const sensor_msgs::ImageConstPtr &AA_left);
     // EventQueue& EQ);
@@ -149,9 +149,10 @@ namespace esvo2_core
     message_filters::Synchronizer<ApproxSyncPolicy> TS_sync_;
     message_filters::Synchronizer<ApproxSyncPolicy2> TS_AA_sync_;
 
-    // dynamic configuration (modify parameters online)
-    boost::shared_ptr<dynamic_reconfigure::Server<DVS_MappingStereoConfig>> server_;
-    dynamic_reconfigure::Server<DVS_MappingStereoConfig>::CallbackType dynamic_reconfigure_callback_;
+    //  **In esvo2_Mapping.cpp, the below stuff never actually happens. Also commented out the onlineParameterChangeCallback function.
+    // dynamic configuration (modify parameters online).
+    // boost::shared_ptr<dynamic_reconfigure::Server<DVS_MappingStereoConfig>> server_;
+    // dynamic_reconfigure::Server<DVS_MappingStereoConfig>::CallbackType dynamic_reconfigure_callback_;
 
     // offline data
     std::string dvs_frame_id_;
