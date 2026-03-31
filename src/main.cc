@@ -6,6 +6,7 @@
 
 #include "data/DataAcquisition.hh"
 #include "render/DigitalCodedExposure.hh"
+#include "render/GPUDevice.hh"
 #include "render/RenderTarget.hh"
 #include "render/SpinningCube.hh"
 #include "render/UploadBuffer.hh"
@@ -18,7 +19,7 @@
 struct Application
 {
         // Graphics
-        SDL_GPUDevice *gpu_device = nullptr;
+        GPUDevice gpu_device_wrapper;
         SDL_Window *window = nullptr;
         float last_frame_render_time = 0.0f;
 
@@ -50,20 +51,12 @@ static SDL_AppResult init_graphics(Application &app)
         return SDL_APP_FAILURE;
     }
 
-    app.gpu_device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, true, "vulkan");
-    if (app.gpu_device == nullptr)
+    app.gpu_device_wrapper = std::move(GPUDevice(app.window));
+    if (app.gpu_device_wrapper.get_device() == nullptr)
     {
         SDL_Log("Couldn't create GPU device: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-
-    if (!SDL_ClaimWindowForGPUDevice(app.gpu_device, app.window))
-    {
-        SDL_Log("Couldn't claim window for GPU device: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
-    }
-    SDL_SetGPUSwapchainParameters(app.gpu_device, app.window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-                                  SDL_GPU_PRESENTMODE_VSYNC);
 
     return SDL_APP_CONTINUE;
 }
@@ -72,7 +65,7 @@ static void render_gui(void *appstate) {
     auto *app = static_cast<Application *>(appstate);
 
     // Render GUI
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu_device);
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu_device_wrapper.get_device());
     SDL_GPUTexture *swapchain_texture;
     SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, app->window, &swapchain_texture, nullptr, nullptr);
 
@@ -113,12 +106,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     // Initialize modules
     app->error_queue = std::make_unique<ErrorQueue>();
-    app->data_acq = std::make_unique<DataAcquisition>(app->gpu_device);
-    app->visualizer = std::make_unique<Visualizer>(app->gpu_device, *app->error_queue);
-    app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device, *app->error_queue);
+    app->data_acq = std::make_unique<DataAcquisition>(app->gpu_device_wrapper.get_device());
+    app->visualizer = std::make_unique<Visualizer>(app->gpu_device_wrapper.get_device(), *app->error_queue);
+    app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device_wrapper.get_device(), *app->error_queue);
     app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, 
                                      *app->digital_coded_exposure, *app->error_queue, 
-                                     app->window, app->gpu_device);
+                                     app->window, app->gpu_device_wrapper.get_device());
 
     // Spawn separate thread to manage the DataAcquisition
     app->data_acquisition_thread = std::thread(program_thread::data_acquisition_thread,
@@ -172,14 +165,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     app->data_acquisition_running = false;
     app->data_acquisition_thread.join();
 
-    SDL_GPUDevice *gpu_device = app->gpu_device;
-    SDL_Window *window = app->window;
-    SDL_WaitForGPUIdle(gpu_device);
+    SDL_DestroyWindow(app->window);
+
     delete app;
-
-    SDL_ReleaseWindowFromGPUDevice(gpu_device, window);
-    SDL_DestroyGPUDevice(gpu_device);
-    SDL_DestroyWindow(window);
-
+    
     SDL_Quit();
 }
