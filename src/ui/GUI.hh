@@ -800,48 +800,81 @@ class GUI
             
         }
 
+        void draw_single_dce(std::shared_ptr<DataSource> data_source) {
+            SDL_GPUTexture *texture = data_source->render_targets.dce.texture;
+            if (texture)
+            {
+                // Calculate image size
+                float available_width = ImGui::GetContentRegionAvail().x;
+                float aspect_ratio = data_source->render_targets.dce.width / (float) data_source->render_targets.dce.height;
+                ImVec2 display_size = {available_width, available_width / aspect_ratio};
+                
+                // Draw image
+                ImGui::Image((ImTextureID) texture, display_size);
+                data_source->render_targets.dce.is_focused = ImGui::IsItemHovered();
+            }
+            else
+            {
+                ImGui::Text("No Event Data.");
+            }
+        }
+
         /**
          * @brief Draws Digital Coded Exposure windows for visible data sources.
          */
         void draw_digital_coded_exposure()
         {
+            // Get all data sources
             std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
+            int num_sources = (int) sources.size();
 
-            if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+            // Setup ImGui frame
+            ImGuiStyle& style = ImGui::GetStyle();
+            ImGui::Begin("Frame");
+            ImGui::Text("Digital Coded Exposure");
+
+            // Single view fills entire window
+            if (view_mode == ViewMode::SINGLE) 
             {
-                ImGui::Begin("Frame");
-                ImGui::Text("Digital Coded Exposure");
-
-                SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.dce.texture;
-                if (texture)
-                {
-                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                    float tex_aspect = (float)sources[selected_source_index]->render_targets.dce.width /
-                                        (float)sources[selected_source_index]->render_targets.dce.height;
-                    ImVec2 display_size = pane_size;
-                    float pane_aspect = pane_size.x / pane_size.y;
-                    if (tex_aspect > pane_aspect)
-                    {
-                        display_size.y = pane_size.x / tex_aspect;
-                    }
-                    else
-                    {
-                        display_size.x = pane_size.y * tex_aspect;
-                    }
-                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
-                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                    ImGui::Image((ImTextureID)texture, display_size);
-                    sources[selected_source_index]->render_targets.dce.is_focused = ImGui::IsItemHovered();
-                }
-                else
-                {
-                    ImGui::Text("No Event Data.");
-                }
-
-                ImGui::End();
+                if (selected_source_index >= 0 && selected_source_index < num_sources) {
+                    draw_single_dce(sources[selected_source_index]);
+                }   
             }
+
+            // Shared view drawn in 2xN grid
+            else if (view_mode == ViewMode::SYNCED)
+            {       
+                // Set table size
+                int num_cols = 2;
+                int num_rows = std::ceil(num_sources / (double) num_cols);
+
+                // Make table fill horizontally and scroll vertically
+                ImGuiTableFlags flags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
+                ImGui::BeginTable("", num_cols, flags);
+                
+                // Calculate width of columns
+                float col_width = (ImGui::GetContentRegionAvail().x - style.ScrollbarSize) / num_cols;
+                ImGui::TableSetupColumn("col0", ImGuiTableColumnFlags_WidthFixed, col_width);
+                ImGui::TableSetupColumn("col1", ImGuiTableColumnFlags_WidthFixed, col_width);
+
+                // Draw individual DCE textures
+                for (int row=0; row < num_rows; row++) {
+                    ImGui::TableNextRow();
+                    for (int col=0; col<num_cols; col++) {
+                        ImGui::TableSetColumnIndex(col);
+                        
+                        int source_index = row*num_cols + col;
+                        if (source_index < num_sources)
+                        {
+                            draw_single_dce(sources[source_index]);
+                        }
+                    }
+                }
+
+                ImGui::EndTable();
+            }
+
+            ImGui::End();
             
         }
 
