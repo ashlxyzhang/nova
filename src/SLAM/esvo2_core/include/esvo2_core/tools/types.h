@@ -1,18 +1,20 @@
 #pragma once
-#ifndef ESVO2_CORE_ROS_FREE_TYPES_H
-#define ESVO2_CORE_ROS_FREE_TYPES_H
+#ifndef ESVO2_CORE_TYPES_H
+#define ESVO2_CORE_TYPES_H
 
 #include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include <esvo2_core/tools/SystemStatus.h>
+
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 namespace esvo2_core
 {
 
-// Replaces dvs_msgs::Event
+// Replaces Event
 struct Event
 {
         uint16_t x;
@@ -21,7 +23,7 @@ struct Event
         bool polarity;
 };
 
-// Replaces dvs_msgs::EventArray
+// Replaces EventArray
 struct EventArray
 {
         std::vector<Event> events;
@@ -66,4 +68,4 @@ struct VBaBg
 
 } // namespace esvo2_core
 
-#endif // ESVO2_CORE_ROS_FREE_TYPES_H
+#endif // ESVO2_CORE_types_H

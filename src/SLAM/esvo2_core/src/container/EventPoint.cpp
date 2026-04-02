@@ -6,67 +6,62 @@ namespace container
 {
 EventPoint::EventPoint()
 {
-  row_ = 0;
-  col_ = 0;
-  ts_ = ros::Time();
-  polarity_ = 0;
+    row_ = 0;
+    col_ = 0;
+    ts_ = timePoint();
+    polarity_ = 0;
 }
 
 EventPoint::EventPoint(size_t row, size_t col)
 {
-  row_ = row;
-  col_ = col;
-  ts_ = ros::Time();
-  polarity_ = 0;
+    row_ = row;
+    col_ = col;
+    ts_ = timePoint();
+    polarity_ = 0;
 }
 
-EventPoint::EventPoint(size_t row, size_t col, ros::Time &ts, uint8_t polarity)
+EventPoint::EventPoint(size_t row, size_t col, timePoint &ts, uint8_t polarity)
 {
-  row_ = row;
-  col_ = col;
-  ts_ = ts;
-  polarity_ = polarity;
+    row_ = row;
+    col_ = col;
+    ts_ = ts;
+    polarity_ = polarity;
 }
 
 EventPoint::~EventPoint()
-{}
-
-size_t
-EventPoint::row() const
 {
-  return row_;
 }
 
-size_t
-EventPoint::col() const
+size_t EventPoint::row() const
 {
-  return col_;
+    return row_;
 }
 
-ros::Time
-EventPoint::ts() const
+size_t EventPoint::col() const
 {
-  return ts_;
+    return col_;
 }
 
-uint8_t
-EventPoint::polarity() const
+timePoint EventPoint::ts() const
 {
-  return polarity_;
+    return ts_;
 }
 
-bool
-EventPoint::valid() const
+uint8_t EventPoint::polarity() const
 {
-  return ts_.toSec() > 0;
+    return polarity_;
 }
 
-void
-EventPoint::copy(const EventPoint &copy)
+bool EventPoint::valid() const
 {
-  ts_= copy.ts_;
-  polarity_ = copy.polarity_;
+    return ts_.toSec() > 0;
 }
 
+void EventPoint::copy(const EventPoint &copy)
+{
+    ts_ = copy.ts_;
+    polarity_ = copy.polarity_;
 }
-}
+
+} // namespace container
+} // namespace esvo2_core

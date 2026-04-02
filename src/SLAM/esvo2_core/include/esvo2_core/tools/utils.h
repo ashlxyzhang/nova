@@ -6,7 +6,7 @@
 
 #include <kindr/minimal/quat-transformation.h>
 
-#include <esvo2_core/tools/ros_free_types.h>
+#include <esvo2_core/tools/types.h>
 
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/highgui.hpp>
