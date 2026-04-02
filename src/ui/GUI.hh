@@ -533,43 +533,9 @@ class GUI
             }
         }
 
-        /**
-         * @brief Draws scrubber window with controls for scrubbing through event data.
-         */
-        void draw_scrubber_window()
+
+        void draw_scrubber_controls(Scrubber::ScrubberState& state)
         {
-            ImGui::Begin("Scrubber");
-
-            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            
-            // Get the appropriate scrubber state to display and edit
-            Scrubber::ScrubberState *active_state = nullptr;
-            
-            if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
-            {
-                // Get state from the selected source's scrubber
-                Scrubber::ScrubberState temp_state = sources[selected_source_index]->scrubber.get_state();
-                synced_scrubber_state = temp_state; // Use synced_scrubber_state as temporary storage
-                active_state = &synced_scrubber_state;
-                ImGui::Text("Mode: Single Source - %s", sources[selected_source_index]->name.c_str());
-            }
-            else
-            {
-                ImGui::TextDisabled("No source selected");
-                ImGui::End();
-                return;
-            }
-    
-            if (!active_state)
-            {
-                ImGui::End();
-                return;
-            }
-
-            Scrubber::ScrubberState &state = *active_state;
-
-            ImGui::Separator();
-
             // Type selection via tab bar
             Scrubber::ScrubberType prev_type = state.type;
             if (ImGui::BeginTabBar("##ScrubberTypeTabs"))
@@ -635,8 +601,7 @@ class GUI
                     ImGui::Separator();
 
                     // Window slider
-                    size_t max_window =
-                        (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
+                    size_t max_window = 1000000; // (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
                     float max_window_f = static_cast<float>(max_window);
                     float win_slider = win_f;
                     if (ImGui::SliderFloat("Window", &win_slider, 1.0f, max_window_f, "%.0f"))
@@ -647,7 +612,7 @@ class GUI
                     ImGui::SetItemTooltip("Number of events behind position to display");
 
                     // Step slider
-                    size_t max_step = (state.max_index - state.min_index) / step_div_factor;
+                    size_t max_step = 1000000; // (state.max_index - state.min_index) / step_div_factor;
                     float max_step_f = static_cast<float>(max_step);
                     float step_f = static_cast<float>(state.index_step);
                     if (ImGui::SliderFloat("Step", &step_f, 0.0f, max_step_f, "%.0f"))
@@ -711,8 +676,9 @@ class GUI
                     ImGui::Separator();
 
                     // Window slider
-                    float max_window_time = (std::max)(0.00001f, (state.max_time - state.min_time) / window_div_factor);
+                    float max_window_time = 1000000; // (std::max)(0.00001f, (state.max_time - state.min_time) / window_div_factor);
                     float max_window_adj = max_window_time / vis_params.unit_time_conversion_factor;
+
                     if (ImGui::SliderFloat("Window", &time_window_adj, 0.00001f, max_window_adj,
                                            time_format_str.c_str()))
                     {
@@ -726,7 +692,7 @@ class GUI
 
                     // Step slider
                     float time_step_adj = state.time_step / vis_params.unit_time_conversion_factor;
-                    float max_step_time = (state.max_time - state.min_time) / step_div_factor;
+                    float max_step_time = 1000000; // (state.max_time - state.min_time) / step_div_factor;
                     float max_step_time_adj = max_step_time / vis_params.unit_time_conversion_factor;
                     if (ImGui::SliderFloat("Step", &time_step_adj, 0.00001f, max_step_time_adj,
                                            time_format_str.c_str()))
@@ -745,13 +711,73 @@ class GUI
 
             // Show Frame Data checkbox
             ImGui::Checkbox("Show Frame Data", &state.show_frame_data);
+        }
 
-            // Write state back to appropriate scrubber(s)
-            if (selected_source_index >= 0 && selected_source_index <static_cast<int>(sources.size()))
-            {
-                sources[selected_source_index]->scrubber.set_state(state);
+
+        /**
+         * @brief Draws scrubber window with controls for scrubbing through event data.
+         */
+        void draw_scrubber_window()
+        {
+            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
+            int num_sources = (int) sources.size();
+
+            ImGui::Begin("Scrubber");
+
+
+            // Get state and status message depending on view mode
+            Scrubber::ScrubberState scrubber_state;
+            std::string scrubber_message;
+
+            if (view_mode == ViewMode::SINGLE)
+            {       
+                if (selected_source_index >= 0 && selected_source_index < num_sources)
+                {
+                    std::shared_ptr<DataSource> data_source = sources[selected_source_index];
+                    scrubber_state = data_source->scrubber.get_state();
+                    scrubber_message = "Single Source Scrubbing - " + data_source->name;
+                } else 
+                {
+                    ImGui::End();
+                    return;
+                }
             }
-            // In synced mode, state will be applied to all scrubbers in apply_synced_scrubber_state()
+            else if (view_mode == ViewMode::SYNCED)
+            {
+                if (num_sources > 0) 
+                {
+                    std::shared_ptr<DataSource> data_source = sources[0];
+                    scrubber_state = data_source->scrubber.get_state();
+                    scrubber_message = "Synced Scrubbing";
+                }
+                else 
+                {
+                    ImGui::End();
+                    return;
+                }
+            }
+
+            ImGui::Text("%s", scrubber_message.c_str());
+            ImGui::Separator();
+            
+            // Draw scrubber controls
+            draw_scrubber_controls(scrubber_state);
+
+            
+            // Write back potentially updated state to appropriate data_sources
+            if (view_mode == ViewMode::SINGLE)
+            {       
+                if (selected_source_index >= 0 && selected_source_index < num_sources)
+                {
+                    sources[selected_source_index]->scrubber.set_state(scrubber_state);
+                }
+            }
+            else if (view_mode == ViewMode::SYNCED)
+            {
+                for (const auto& data_source: sources) {
+                    data_source->scrubber.set_state(scrubber_state);
+                }
+            }
 
             ImGui::End();
         }
@@ -800,15 +826,40 @@ class GUI
             
         }
 
-        void draw_single_dce(std::shared_ptr<DataSource> data_source) {
+        void draw_single_dce(std::shared_ptr<DataSource> data_source, bool centered) {
             SDL_GPUTexture *texture = data_source->render_targets.dce.texture;
             if (texture)
             {
-                // Calculate image size
-                float available_width = ImGui::GetContentRegionAvail().x;
-                float aspect_ratio = data_source->render_targets.dce.width / (float) data_source->render_targets.dce.height;
-                ImVec2 display_size = {available_width, available_width / aspect_ratio};
+                ImVec2 display_size;
                 
+                if (centered)
+                {
+                    ImVec2 pane_size = ImGui::GetContentRegionAvail();
+                    display_size = pane_size;
+                    
+                    float aspect_ratio = data_source->render_targets.dce.width / (float) data_source->render_targets.dce.height;
+                    float pane_aspect = pane_size.x / pane_size.y;
+
+                    if (aspect_ratio > pane_aspect)
+                    {
+                        display_size.y = pane_size.x / aspect_ratio;
+                    }
+                    else
+                    {
+                        display_size.x = pane_size.y * aspect_ratio;
+                    }
+                    float x_pad = (pane_size.x - display_size.x) * 0.5f;
+                    float y_pad = (pane_size.y - display_size.y) * 0.5f;
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+                }
+                else 
+                {
+                    float available_width = ImGui::GetContentRegionAvail().x;
+                    float aspect_ratio = data_source->render_targets.dce.width / (float) data_source->render_targets.dce.height;
+                    display_size = {available_width, available_width / aspect_ratio};
+                }
+
                 // Draw image
                 ImGui::Image((ImTextureID) texture, display_size);
                 data_source->render_targets.dce.is_focused = ImGui::IsItemHovered();
@@ -827,6 +878,7 @@ class GUI
             // Get all data sources
             std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
             int num_sources = (int) sources.size();
+            if (num_sources == 0) return;
 
             // Setup ImGui frame
             ImGuiStyle& style = ImGui::GetStyle();
@@ -837,7 +889,7 @@ class GUI
             if (view_mode == ViewMode::SINGLE) 
             {
                 if (selected_source_index >= 0 && selected_source_index < num_sources) {
-                    draw_single_dce(sources[selected_source_index]);
+                    draw_single_dce(sources[selected_source_index], true);
                 }   
             }
 
@@ -850,28 +902,29 @@ class GUI
 
                 // Make table fill horizontally and scroll vertically
                 ImGuiTableFlags flags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
-                ImGui::BeginTable("", num_cols, flags);
-                
-                // Calculate width of columns
-                float col_width = (ImGui::GetContentRegionAvail().x - style.ScrollbarSize) / num_cols;
-                ImGui::TableSetupColumn("col0", ImGuiTableColumnFlags_WidthFixed, col_width);
-                ImGui::TableSetupColumn("col1", ImGuiTableColumnFlags_WidthFixed, col_width);
-
-                // Draw individual DCE textures
-                for (int row=0; row < num_rows; row++) {
-                    ImGui::TableNextRow();
-                    for (int col=0; col<num_cols; col++) {
-                        ImGui::TableSetColumnIndex(col);
-                        
-                        int source_index = row*num_cols + col;
-                        if (source_index < num_sources)
-                        {
-                            draw_single_dce(sources[source_index]);
+                if (ImGui::BeginTable("", num_cols, flags))
+                {
+                    // Calculate width of columns
+                    float col_width = (ImGui::GetContentRegionAvail().x - style.ScrollbarSize) / num_cols;
+                    ImGui::TableSetupColumn("col0", ImGuiTableColumnFlags_WidthFixed, col_width);
+                    ImGui::TableSetupColumn("col1", ImGuiTableColumnFlags_WidthFixed, col_width);
+    
+                    // Draw individual DCE textures
+                    for (int row=0; row < num_rows; row++) {
+                        ImGui::TableNextRow();
+                        for (int col=0; col<num_cols; col++) {
+                            ImGui::TableSetColumnIndex(col);
+                            
+                            int source_index = row*num_cols + col;
+                            if (source_index < num_sources)
+                            {
+                                draw_single_dce(sources[source_index], false);
+                            }
                         }
                     }
+    
+                    ImGui::EndTable();
                 }
-
-                ImGui::EndTable();
             }
 
             ImGui::End();
@@ -1003,7 +1056,6 @@ class GUI
                     break;
                 }
             }
-
             if (any_focused)
             {
                 switch (event->type)
@@ -1160,8 +1212,6 @@ class GUI
 
             ImGui::DockBuilderFinish(dockspace_id);
         }
-
-        ViewMode get_view_mode() const { return view_mode; }
 };
 
 // Callback functions

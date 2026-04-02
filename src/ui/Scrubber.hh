@@ -41,7 +41,7 @@ class Scrubber
         struct ScrubberState
         {
                 ScrubberType type = ScrubberType::TIME;
-                ScrubberMode mode = ScrubberMode::PLAYING;
+                ScrubberMode mode = ScrubberMode::PAUSED;
                 std::size_t current_index = 0;
                 std::size_t index_window = 50;
                 std::size_t index_step = 0;
