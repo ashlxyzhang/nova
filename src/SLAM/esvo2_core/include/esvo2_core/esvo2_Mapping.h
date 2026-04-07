@@ -41,6 +41,9 @@
 #include <esvo2_core/core/BackendOptimization.h>
 #include <esvo2_core/factor/imu_integration.h>
 #include <sensor_msgs/Imu.h>
+#include <data_passing.h>
+#include <multi_data_passing.h>
+
 namespace esvo2_core
 {
 using namespace core;
@@ -49,7 +52,9 @@ class esvo2_Mapping
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        esvo2_Mapping(const YAML::Node &config);
+        esvo2_Mapping(const YAML::Node &config, 
+            DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track,
+            DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track);
         virtual ~esvo2_Mapping();
 
         // mapping
@@ -104,6 +109,10 @@ class esvo2_Mapping
 
         /************************ member variables ************************/
     private:
+        //queues
+        DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track;
+        DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track;
+
         // configuration variables struct
         YAML::Node config_;
 

@@ -19,12 +19,17 @@
 #include <thread>
 #include <utility>
 
+#include <data_passing.h>
+#include <multi_data_passing.h>
+
 // #define ESVO2_CORE_MAPPING_DEBUG
 // #define ESVO2_CORE_MAPPING_LOG
 
 namespace esvo2_core
 {
-esvo2_Mapping::esvo2_Mapping(const YAML::Node &config)
+esvo2_Mapping::esvo2_Mapping(const YAML::Node &config, 
+            DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track,
+            DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track)
     : config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
       camSysPtr_(new CameraSystem(calibInfoDir_, false)),
       dpConfigPtr_(new DepthProblemConfig(
@@ -48,6 +53,10 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config)
       depthFramePtr_(new DepthFrame(camSysPtr_->cam_left_ptr_->height_, camSysPtr_->cam_left_ptr_->width_)),
       BackendOpt_(camSysPtr_)
 {
+    //queues
+    this->v_ba_bg_Map_to_Track = v_ba_bg_Map_to_Track;
+    this->pointcloud_Map_to_Track = pointcloud_Map_to_Track;
+
     // frame id
     dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
     world_frame_id_ = config_["world_frame_id"].as<std::string>("world");

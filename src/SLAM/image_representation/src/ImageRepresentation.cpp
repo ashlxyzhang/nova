@@ -4,6 +4,8 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
 #include <std_msgs/Float32.h>
+#include <data_passing.h>
+#include <multi_data_passing.h>
 
 #include <cmath>
 #include <vector>
@@ -12,8 +14,16 @@
 
 namespace image_representation
 {
-ImageRepresentation::ImageRepresentation(const YAML::Node &config) : config_(config)
+ImageRepresentation::ImageRepresentation(const YAML::Node &config,  
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>*multi_to_Track, 
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
+             DataPassingDeque<cv::Mat>* AA_left_IR_to_Map) : config_(config)
 {
+    // Adding the queues
+    this->multi_to_Track = multi_to_Track;
+    this->multi_to_Map = multi_to_Map;
+    this->AA_left_IR_to_Map = AA_left_IR_to_Map;
+
     // setup subscribers and publishers
     event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
     image_transport::ImageTransport it_(nh_);

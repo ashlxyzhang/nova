@@ -34,6 +34,9 @@
 #include <esvo2_core/factor/imu_integration.h>
 #include <esvo2_core/tools/types.h>
 
+#include <data_passing.h>
+#include <multi_data_passing.h>
+
 namespace esvo2_core
 {
 using namespace core;
@@ -48,7 +51,9 @@ class esvo2_Tracking
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        esvo2_Tracking(const YAML::Node &config);
+        esvo2_Tracking(const YAML::Node &config,
+        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map,
+        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track);
         virtual ~esvo2_Tracking();
 
         // functions regarding tracking
@@ -84,6 +89,11 @@ class esvo2_Tracking
         Eigen::Matrix3d fixRotationMatrix(const Eigen::Matrix3d &R);
 
     private:
+        //queues
+        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map;
+        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track;
+
+
         // configuration variables struct
         YAML::Node config_;
 

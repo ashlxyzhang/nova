@@ -3,12 +3,16 @@
 #include <minkindr_conversions/kindr_tf.h>
 #include <sys/stat.h>
 #include <tf/transform_broadcaster.h>
+#include <data_passing.h>
+#include <multi_data_passing.h>
 
 // #define ESVO2_CORE_TRACKING_DEBUG
 // #define ESVO2_CORE_TRACKING_DEBUG
 namespace esvo2_core
 {
-esvo2_Tracking::esvo2_Tracking(const YAML::Node &config)
+esvo2_Tracking::esvo2_Tracking(const YAML::Node &config,
+        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map,
+        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track)
     : config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
       camSysPtr_(new CameraSystem(calibInfoDir_, false)),
       rpConfigPtr_(new RegProblemConfig(
@@ -23,6 +27,10 @@ esvo2_Tracking::esvo2_Tracking(const YAML::Node &config)
                 g_optimal),
       ets_(IDLE)
 {
+    //queues
+    this->stamped_pose_Track_to_Map = stamped_pose_Track_to_Map;
+    this->stamped_pose_Track_to_Track = stamped_pose_Track_to_Track;
+
     // offline data
     dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
     world_frame_id_ = config_["world_frame_id"].as<std::string>("world");

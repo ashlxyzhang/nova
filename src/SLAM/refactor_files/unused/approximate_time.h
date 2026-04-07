@@ -1,3 +1,5 @@
+// Edited version is in slam_manager.cpp
+
 /*********************************************************************
  * Software License Agreement (BSD License)
  *

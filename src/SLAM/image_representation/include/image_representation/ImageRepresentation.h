@@ -22,6 +22,8 @@
 #include <vector>
 
 #include <yaml-cpp/yaml.h>
+#include <data_passing.h>
+#include <multi_data_passing.h>
 
 namespace image_representation
 {
@@ -56,7 +58,11 @@ inline static std::vector<Event>::iterator EventVector_lower_bound(std::vector<E
 class ImageRepresentation
 {
     public:
-        ImageRepresentation(const YAML::Node &config);
+        ImageRepresentation(const YAML::Node &config,  
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>*multi_to_Track, 
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
+             DataPassingDeque<cv::Mat>* AA_left_IR_to_Map
+        );
         virtual ~ImageRepresentation();
 
         static bool compare_time(const Event &e, const double reference_time)
@@ -65,6 +71,12 @@ class ImageRepresentation
         }
 
     private:
+        // message passing stuff
+        MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Track;
+        MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map;
+        DataPassingDeque<cv::Mat>* AA_left_IR_to_Map; 
+
+
         // configuration variables struct
         YAML::Node config_;
 
