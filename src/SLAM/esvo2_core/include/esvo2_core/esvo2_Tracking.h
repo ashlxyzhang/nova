@@ -48,7 +48,7 @@ class esvo2_Tracking
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        esvo2_Tracking(ros::NodeHandle &nh, ros::NodeHandle &pnh);
+        esvo2_Tracking(const YAML::Node &config);
         virtual ~esvo2_Tracking();
 
         // functions regarding tracking
@@ -84,7 +84,8 @@ class esvo2_Tracking
         Eigen::Matrix3d fixRotationMatrix(const Eigen::Matrix3d &R);
 
     private:
-        ros::NodeHandle nh_, pnh_;
+        // configuration variables struct
+        YAML::Node config_;
 
         // subscribers and publishers
         // ros::Subscriber events_left_sub_;

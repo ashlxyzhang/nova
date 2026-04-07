@@ -12,12 +12,12 @@
 
 namespace image_representation
 {
-ImageRepresentation::ImageRepresentation(ros::NodeHandle &nh, ros::NodeHandle nh_private) : nh_(nh)
+ImageRepresentation::ImageRepresentation(const YAML::Node &config) : config_(config)
 {
     // setup subscribers and publishers
     event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
     image_transport::ImageTransport it_(nh_);
-    nh_private.param<bool>("is_left", is_left_, true); // is left camera
+    is_left_ = config_["is_left"].as<bool>(true);
     if (is_left_)
     {
         image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5); // for block matching
@@ -33,14 +33,14 @@ ImageRepresentation::ImageRepresentation(ros::NodeHandle &nh, ros::NodeHandle nh
     {
         image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5);
     }
-    nh_private.param<bool>("use_sim_time", bUse_Sim_Time_, true);
+    bUse_Sim_Time_ = config_["use_sim_time"].as<bool>(true);
 
     // system variables
     int representation_mode;
-    nh_private.param<int>("representation_mode", representation_mode, 0);
-    nh_private.param<int>("median_blur_kernel_size", median_blur_kernel_size_, 1);
-    nh_private.param<int>("blur_size", blur_size_, 7);
-    nh_private.param<int>("max_event_queue_len", max_event_queue_length_, 20);
+    representation_mode = config_["representation_mode"].as<int>(0);
+    median_blur_kernel_size_ = config_["median_blur_kernel_size"].as<int>(1);
+    blur_size_ = config_["blur_size"].as<int>(7);
+    max_event_queue_length_ = config_["max_event_queue_len"].as<int>(20);
 
     representation_mode_ = (RepresentationMode)representation_mode;
 
@@ -50,13 +50,13 @@ ImageRepresentation::ImageRepresentation(ros::NodeHandle &nh, ros::NodeHandle nh
     sensor_size_ = cv::Size(0, 0);
 
     // local parameters
-    nh_private.param<bool>("use_stereo_cam", bUseStereoCam_, true);
-    nh_private.param<double>("decay_ms", decay_ms_, 30);
+    bUseStereoCam_ = config_["use_stereo_cam"].as<bool>(true);
+    decay_ms_ = config_["decay_ms"].as<double>(30);
     decay_sec_ = decay_ms_ / 1000.0;
-    nh_private.param<int>("x_patches", x_patches_, 8); // patch of AA
-    nh_private.param<int>("y_patches", y_patches_, 6);
-    nh_private.param<int>("generation_rate_hz", generation_rate_hz_, 100);
-    nh_private.param("calibInfoDir", calibInfoDir_, std::string("path is not given"));
+    x_patches_ = config_["x_patches"].as<int>(8);
+    y_patches_ = config_["y_patches"].as<int>(6);
+    generation_rate_hz_ = config_["generation_rate_hz"].as<int>(100);
+    calibInfoDir_ = config_["calibInfoDir"].as<std::string>("path is not given");
     if (!loadCalibInfo(calibInfoDir_, is_left_))
     {
         ROS_ERROR("Load Calib Info Error!!!  Given path is: %s", calibInfoDir_.c_str());

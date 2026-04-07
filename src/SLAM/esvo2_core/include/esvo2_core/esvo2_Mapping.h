@@ -49,7 +49,7 @@ class esvo2_Mapping
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        esvo2_Mapping(ros::NodeHandle &nh, ros::NodeHandle &pnh);
+        esvo2_Mapping(const YAML::Node &config);
         virtual ~esvo2_Mapping();
 
         // mapping
@@ -104,7 +104,8 @@ class esvo2_Mapping
 
         /************************ member variables ************************/
     private:
-        ros::NodeHandle nh_, pnh_;
+        // configuration variables struct
+        YAML::Node config_;
 
         // Subscribers
         ros::Subscriber stampedPose_sub_, AA_frequency_sub_, events_left_sub_;

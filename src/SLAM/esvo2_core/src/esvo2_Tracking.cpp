@@ -1,6 +1,5 @@
 #include <esvo2_core/esvo2_Tracking.h>
 #include <esvo2_core/tools/TicToc.h>
-#include <esvo2_core/tools/params_helper.h>
 #include <minkindr_conversions/kindr_tf.h>
 #include <sys/stat.h>
 #include <tf/transform_broadcaster.h>
@@ -9,34 +8,33 @@
 // #define ESVO2_CORE_TRACKING_DEBUG
 namespace esvo2_core
 {
-esvo2_Tracking::esvo2_Tracking(ros::NodeHandle &nh, ros::NodeHandle &pnh)
-    : nh_(nh), pnh_(pnh), calibInfoDir_(tools::param(pnh_, "calibInfoDir", std::string(""))),
+esvo2_Tracking::esvo2_Tracking(const YAML::Node &config)
+    : config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
       camSysPtr_(new CameraSystem(calibInfoDir_, false)),
       rpConfigPtr_(new RegProblemConfig(
-          tools::param(pnh_, "patch_size_X", 25), tools::param(pnh_, "patch_size_Y", 25),
-          tools::param(pnh_, "kernelSize", 15), tools::param(pnh_, "LSnorm", std::string("l2")),
-          tools::param(pnh_, "huber_threshold", 10.0), tools::param(pnh_, "invDepth_min_range", 0.0),
-          tools::param(pnh_, "invDepth_max_range", 0.0), tools::param(pnh_, "MIN_NUM_EVENTS", 1000),
-          tools::param(pnh_, "MAX_REGISTRATION_POINTS", 500), tools::param(pnh_, "BATCH_SIZE", 200),
-          tools::param(pnh_, "MAX_ITERATION", 10))),
-      rpType_((RegProblemType)((size_t)tools::param(pnh_, "RegProblemType", 0))),
+          config_["patch_size_X"].as<int>(25), config_["patch_size_Y"].as<int>(25), config_["kernelSize"].as<int>(15),
+          config_["LSnorm"].as<std::string>("l2"), config_["huber_threshold"].as<double>(10.0),
+          config_["invDepth_min_range"].as<double>(0.0), config_["invDepth_max_range"].as<double>(0.0),
+          config_["MIN_NUM_EVENTS"].as<int>(1000), config_["MAX_REGISTRATION_POINTS"].as<int>(500),
+          config_["BATCH_SIZE"].as<int>(200), config_["MAX_ITERATION"].as<int>(10))),
+      rpType_((RegProblemType)((size_t)config_["RegProblemType"].as<int>(0))),
       rpSolver_(camSysPtr_, rpConfigPtr_, rpType_, NUM_THREAD_TRACKING),
       imu_data_(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(),
                 g_optimal),
       ets_(IDLE)
 {
     // offline data
-    dvs_frame_id_ = tools::param(pnh_, "dvs_frame_id", std::string("dvs"));
-    world_frame_id_ = tools::param(pnh_, "world_frame_id", std::string("world"));
+    dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
+    world_frame_id_ = config_["world_frame_id"].as<std::string>("world");
 
     /**** online parameters ***/
-    tracking_rate_hz_ = tools::param(pnh_, "tracking_rate_hz", 100);
-    TS_HISTORY_LENGTH_ = tools::param(pnh_, "TS_HISTORY_LENGTH", 100);
-    REF_HISTORY_LENGTH_ = tools::param(pnh_, "REF_HISTORY_LENGTH", 5);
-    bSaveTrajectory_ = tools::param(pnh_, "SAVE_TRAJECTORY", false);
-    bVisualizeTrajectory_ = tools::param(pnh_, "VISUALIZE_TRAJECTORY", true);
-    bUseImu_ = tools::param(pnh_, "USE_IMU", true);
-    resultPath_ = tools::param(pnh_, "PATH_TO_SAVE_TRAJECTORY", std::string());
+    tracking_rate_hz_ = config_["tracking_rate_hz"].as<int>(100);
+    TS_HISTORY_LENGTH_ = config_["TS_HISTORY_LENGTH"].as<int>(100);
+    REF_HISTORY_LENGTH_ = config_["REF_HISTORY_LENGTH"].as<int>(5);
+    bSaveTrajectory_ = config_["SAVE_TRAJECTORY"].as<bool>(false);
+    bVisualizeTrajectory_ = config_["VISUALIZE_TRAJECTORY"].as<bool>(true);
+    bUseImu_ = config_["USE_IMU"].as<bool>(true);
+    resultPath_ = config_["PATH_TO_SAVE_TRAJECTORY"].as<std::string>(std::string());
     setSystemStatus(SystemStatus::INITIALIZATION);
 
     // get extrinsic parameters

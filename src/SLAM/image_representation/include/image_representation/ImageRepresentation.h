@@ -14,9 +14,6 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <dvs_msgs/Event.h>
-#include <dvs_msgs/EventArray.h>
-
 #include <Eigen/Eigen>
 #include <algorithm>
 #include <deque>
@@ -59,7 +56,7 @@ inline static std::vector<Event>::iterator EventVector_lower_bound(std::vector<E
 class ImageRepresentation
 {
     public:
-        ImageRepresentation(ros::NodeHandle &nh, ros::NodeHandle nh_private);
+        ImageRepresentation(const YAML::Node &config);
         virtual ~ImageRepresentation();
 
         static bool compare_time(const Event &e, const double reference_time)
@@ -68,7 +65,9 @@ class ImageRepresentation
         }
 
     private:
-        ros::NodeHandle nh_;
+        // configuration variables struct
+        YAML::Node config_;
+
         // core
         void init(int width, int height);
         // Support: TS, AA, negative_TS, negative_TS_dx, negative_TS_dy

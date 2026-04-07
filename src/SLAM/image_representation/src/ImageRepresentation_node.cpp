@@ -1,16 +1,9 @@
 #include <image_representation/ImageRepresentation.h>
+#include <yaml-cpp/yaml.h>
 
-int main(int argc, char* argv[])
+int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "image_representation");
-
-  ros::NodeHandle nh;
-  ros::NodeHandle nh_private("~");
-
-  bool left = true;
-  image_representation::ImageRepresentation ts(nh, nh_private);
-
-  ros::spin();
-
-  return 0;
+    YAML::Node cfg = YAML::LoadFile(argv[1]);
+    image_representation::ImageRepresentation ts(cfg);
+    return 0;
 }

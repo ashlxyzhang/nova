@@ -24,33 +24,33 @@
 
 namespace esvo2_core
 {
-esvo2_Mapping::esvo2_Mapping(ros::NodeHandle &nh, ros::NodeHandle &pnh)
-    : nh_(nh), pnh_(pnh), calibInfoDir_(tools::param(pnh_, "calibInfoDir", std::string(""))),
+esvo2_Mapping::esvo2_Mapping(const YAML::Node &config)
+    : config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
       camSysPtr_(new CameraSystem(calibInfoDir_, false)),
       dpConfigPtr_(new DepthProblemConfig(
-          tools::param(pnh_, "patch_size_X", 5), tools::param(pnh_, "patch_size_Y", 5),
-          tools::param(pnh_, "LSnorm_ln", std::string("Tdist")), tools::param(pnh_, "Tdist_nu", 0.0),
-          tools::param(pnh_, "Tdist_scale", 0.0), tools::param(pnh_, "ITERATION_OPTIMIZATION", 1),
-          tools::param(pnh_, "RegularizationRadius", 5), tools::param(pnh_, "RegularizationMinNeighbours", 8),
-          tools::param(pnh_, "RegularizationMinCloseNeighbours", 8))),
+          config_["patch_size_X"].as<int>(5), config_["patch_size_Y"].as<int>(5),
+          config_["LSnorm_ln"].as<std::string>("Tdist"), config_["Tdist_nu"].as<double>(0.0),
+          config_["Tdist_scale"].as<double>(0.0), config_["ITERATION_OPTIMIZATION"].as<int>(1),
+          config_["RegularizationRadius"].as<int>(5), config_["RegularizationMinNeighbours"].as<int>(8),
+          config_["RegularizationMinCloseNeighbours"].as<int>(8))),
       dpSolver_(camSysPtr_, dpConfigPtr_, NUMERICAL, NUM_THREAD_MAPPING, true), dFusor_(camSysPtr_, dpConfigPtr_),
       dRegularizor_(dpConfigPtr_),
       dpConfigPtr_ln_(new DepthProblemConfig(
-          tools::param(pnh_, "patch_size_X", 25), tools::param(pnh_, "patch_size_Y", 25),
-          tools::param(pnh_, "LSnorm_ln", std::string("Tdist")), tools::param(pnh_, "Tdist_nu_ln", 0.0),
-          tools::param(pnh_, "Tdist_scale_ln", 0.0), tools::param(pnh_, "ITERATION_OPTIMIZATION_LN", 1),
-          tools::param(pnh_, "RegularizationRadius", 5), tools::param(pnh_, "RegularizationMinNeighbours", 8),
-          tools::param(pnh_, "RegularizationMinCloseNeighbours", 8))),
+          config_["patch_size_X"].as<int>(25), config_["patch_size_Y"].as<int>(25),
+          config_["LSnorm_ln"].as<std::string>("Tdist"), config_["Tdist_nu_ln"].as<double>(0.0),
+          config_["Tdist_scale_ln"].as<double>(0.0), config_["ITERATION_OPTIMIZATION_LN"].as<int>(1),
+          config_["RegularizationRadius"].as<int>(5), config_["RegularizationMinNeighbours"].as<int>(8),
+          config_["RegularizationMinCloseNeighbours"].as<int>(8))),
       dpSolver_ln_(camSysPtr_, dpConfigPtr_ln_, NUMERICAL, NUM_THREAD_MAPPING, false),
       dFusor_ln_(camSysPtr_, dpConfigPtr_ln_), dRegularizor_ln_(dpConfigPtr_ln_),
-      ebm_(camSysPtr_, NUM_THREAD_MAPPING, tools::param(pnh_, "SmoothTimeSurface", false)), pc_near_(new PointCloud()),
+      ebm_(camSysPtr_, NUM_THREAD_MAPPING, config_["SmoothTimeSurface"].as<bool>(false)), pc_near_(new PointCloud()),
       pc_global_(new PointCloud()),
       depthFramePtr_(new DepthFrame(camSysPtr_->cam_left_ptr_->height_, camSysPtr_->cam_left_ptr_->width_)),
       BackendOpt_(camSysPtr_)
 {
     // frame id
-    dvs_frame_id_ = tools::param(pnh_, "dvs_frame_id", std::string("dvs"));
-    world_frame_id_ = tools::param(pnh_, "world_frame_id", std::string("world"));
+    dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
+    world_frame_id_ = config_["world_frame_id"].as<std::string>("world");
     pc_near_->header.frame_id = world_frame_id_;
     pc_global_->header.frame_id = world_frame_id_;
     pc_color_ = pcl::PointCloud<pcl::PointXYZRGBL>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBL>());
@@ -60,61 +60,61 @@ esvo2_Mapping::esvo2_Mapping(ros::NodeHandle &nh, ros::NodeHandle &pnh)
 
     /**** mapping parameters ***/
     // range and visualization threshold
-    invDepth_min_range_ = tools::param(pnh_, "invDepth_min_range", 0.16);
-    invDepth_max_range_ = tools::param(pnh_, "invDepth_max_range", 2.0);
-    patch_area_ = tools::param(pnh_, "patch_size_X", 25) * tools::param(pnh_, "patch_size_Y", 25);
-    residual_vis_threshold_ = tools::param(pnh_, "residual_vis_threshold", 15);
-    residual_vis_threshold_ln_ = tools::param(pnh_, "residual_vis_threshold_ln", 15);
+    invDepth_min_range_ = config_["invDepth_min_range"].as<double>(0.16);
+    invDepth_max_range_ = config_["invDepth_max_range"].as<double>(2.0);
+    patch_area_ = config_["patch_size_X"].as<int>(25) * config_["patch_size_Y"].as<int>(25);
+    residual_vis_threshold_ = config_["residual_vis_threshold"].as<int>(15);
+    residual_vis_threshold_ln_ = config_["residual_vis_threshold_ln"].as<int>(15);
     cost_vis_threshold_ = pow(residual_vis_threshold_, 2) * patch_area_;
     cost_vis_threshold_ln_ = pow(residual_vis_threshold_ln_, 2) * patch_area_;
-    stdVar_vis_threshold_ = tools::param(pnh_, "stdVar_vis_threshold", 0.005);
-    stdVar_vis_threshold_ln_ = tools::param(pnh_, "stdVar_vis_threshold_ln", 1);
-    age_max_range_ = tools::param(pnh_, "age_max_range", 5);
-    age_vis_threshold_ = tools::param(pnh_, "age_vis_threshold", 0);
-    fusion_radius_ = tools::param(pnh_, "fusion_radius", 0);
-    maxNumFusionFrames_ = tools::param(pnh_, "maxNumFusionFrames", 10);
-    maxNumFusionFrames_ln_ = tools::param(pnh_, "maxNumFusionFrames_ln", 10);
-    FusionStrategy_ = tools::param(pnh_, "FUSION_STRATEGY", std::string("CONST_FRAMES"));
-    maxNumFusionPoints_ = tools::param(pnh_, "maxNumFusionPoints", 2000);
-    INIT_SGM_DP_NUM_Threshold_ = tools::param(pnh_, "INIT_SGM_DP_NUM_THRESHOLD", 500);
+    stdVar_vis_threshold_ = config_["stdVar_vis_threshold"].as<double>(0.005);
+    stdVar_vis_threshold_ln_ = config_["stdVar_vis_threshold_ln"].as<int>(1);
+    age_max_range_ = config_["age_max_range"].as<int>(5);
+    age_vis_threshold_ = config_["age_vis_threshold"].as<int>(0);
+    fusion_radius_ = config_["fusion_radius"].as<int>(0);
+    maxNumFusionFrames_ = config_["maxNumFusionFrames"].as<int>(10);
+    maxNumFusionFrames_ln_ = config_["maxNumFusionFrames_ln"].as<int>(10);
+    FusionStrategy_ = config_["FUSION_STRATEGY"].as<std::string>("CONST_FRAMES");
+    maxNumFusionPoints_ = config_["maxNumFusionPoints"].as<int>(2000);
+    INIT_SGM_DP_NUM_Threshold_ = config_["INIT_SGM_DP_NUM_THRESHOLD"].as<int>(500);
 
     // options
-    bDenoising_ = tools::param(pnh_, "Denoising", false);
-    bRegularization_ = tools::param(pnh_, "Regularization", false);
-    resetButton_ = tools::param(pnh_, "ResetButton", false);
-    blarge_scale_ = tools::param(pnh_, "large_scale", true);
-    bpoints_from_AA_ = tools::param(pnh_, "select_points_from_AA", true);
-    eta_for_select_points_ = tools::param(pnh_, "eta_for_select_points", 0.1);
+    bDenoising_ = config_["Denoising"].as<bool>(false);
+    bRegularization_ = config_["Regularization"].as<bool>(false);
+    resetButton_ = config_["ResetButton"].as<bool>(false);
+    blarge_scale_ = config_["large_scale"].as<bool>(true);
+    bpoints_from_AA_ = config_["select_points_from_AA"].as<bool>(true);
+    eta_for_select_points_ = config_["eta_for_select_points"].as<double>(0.1);
 
     // visualization parameters
-    bVisualizeGlobalPC_ = tools::param(pnh_, "bVisualizeGlobalPC", false);
-    visualizeGPC_interval_ = tools::param(pnh_, "visualizeGPC_interval", 3);
-    visualize_range_ = tools::param(pnh_, "visualize_range", 2.5);
-    numAddedPC_threshold_ = tools::param(pnh_, "NumGPC_added_per_refresh", 1000);
+    bVisualizeGlobalPC_ = config_["bVisualizeGlobalPC"].as<bool>(false);
+    visualizeGPC_interval_ = config_["visualizeGPC_interval"].as<int>(3);
+    visualize_range_ = config_["visualize_range"].as<double>(2.5);
+    numAddedPC_threshold_ = config_["NumGPC_added_per_refresh"].as<int>(1000);
 
     // module parameters
-    PROCESS_EVENT_NUM_ = tools::param(pnh_, "PROCESS_EVENT_NUM", 500);
-    PROCESS_EVENT_NUM_AA_ = tools::param(pnh_, "PROCESS_EVENT_NUM_AA", 500);
-    TS_HISTORY_LENGTH_ = tools::param(pnh_, "TS_HISTORY_LENGTH", 100);
-    mapping_rate_hz_ = tools::param(pnh_, "mapping_rate_hz", 20);
+    PROCESS_EVENT_NUM_ = config_["PROCESS_EVENT_NUM"].as<int>(500);
+    PROCESS_EVENT_NUM_AA_ = config_["PROCESS_EVENT_NUM_AA"].as<int>(500);
+    TS_HISTORY_LENGTH_ = config_["TS_HISTORY_LENGTH"].as<int>(100);
+    mapping_rate_hz_ = config_["mapping_rate_hz"].as<int>(20);
 
     // Event Block Matching (BM) parameters
-    BM_half_slice_thickness_ = tools::param(pnh_, "BM_half_slice_thickness", 0.001);
-    BM_patch_size_X_ = tools::param(pnh_, "patch_size_X", 25);
-    BM_patch_size_Y_ = tools::param(pnh_, "patch_size_Y", 25);
-    BM_patch_size_X_2_ = tools::param(pnh_, "patch_size_X_2", 25);
-    BM_patch_size_Y_2_ = tools::param(pnh_, "patch_size_Y_2", 25);
-    x_patches_ = tools::param(pnh_, "x_patches", 8);
-    y_patches_ = tools::param(pnh_, "y_patches", 6);
-    BM_min_disparity_ = tools::param(pnh_, "BM_min_disparity", 3);
-    BM_max_disparity_ = tools::param(pnh_, "BM_max_disparity", 40);
-    BM_step_ = tools::param(pnh_, "BM_step", 1);
-    BM_ZNCC_Threshold_ = tools::param(pnh_, "BM_ZNCC_Threshold", 0.1);
-    BM_bUpDownConfiguration_ = tools::param(pnh_, "BM_bUpDownConfiguration", false);
-    bUSE_IMU_ = tools::param(pnh_, "USE_IMU", true);
+    BM_half_slice_thickness_ = config_["BM_half_slice_thickness"].as<double>(0.001);
+    BM_patch_size_X_ = config_["patch_size_X"].as<int>(25);
+    BM_patch_size_Y_ = config_["patch_size_Y"].as<int>(25);
+    BM_patch_size_X_2_ = config_["patch_size_X_2"].as<int>(25);
+    BM_patch_size_Y_2_ = config_["patch_size_Y_2"].as<int>(25);
+    x_patches_ = config_["x_patches"].as<int>(8);
+    y_patches_ = config_["y_patches"].as<int>(6);
+    BM_min_disparity_ = config_["BM_min_disparity"].as<int>(3);
+    BM_max_disparity_ = config_["BM_max_disparity"].as<int>(40);
+    BM_step_ = config_["BM_step"].as<int>(1);
+    BM_ZNCC_Threshold_ = config_["BM_ZNCC_Threshold"].as<double>(0.1);
+    BM_bUpDownConfiguration_ = config_["BM_bUpDownConfiguration"].as<bool>(false);
+    bUSE_IMU_ = config_["USE_IMU"].as<bool>(true);
 
     // distance from last frame
-    distance_from_last_frame_ = tools::param(pnh_, "distance_from_last_frame", 0.04);
+    distance_from_last_frame_ = config_["distance_from_last_frame"].as<double>(0.04);
 
     // SGM parameters (Used by Initialization)
     num_disparities_ = BM_max_disparity_;
