@@ -1,4 +1,6 @@
+
 #include "data/DataAcquisition.hh"
+#include <algorithm>
 
 DataAcquisition::DataAcquisition(SDL_GPUDevice* gpu_device): gpu_device(gpu_device) {}
 
@@ -71,5 +73,91 @@ std::vector<std::shared_ptr<DataSource>> DataAcquisition::get_data_sources()
 {
     std::shared_lock da_read_lock(mutex);
     return data_sources;
+}
+
+void DataAcquisition::set_state(Scrubber::ScrubberState state) 
+{
+    std::unique_lock da_read_write_lock(mutex);
+    shared_scrubber_state = state;
+} 
+
+Scrubber::ScrubberState DataAcquisition::get_state() 
+{
+    std::unique_lock da_read_write_lock(mutex);
+
+    // Lazily update the upper bounds of the shared state before returning
+    for (std::shared_ptr<DataSource> data_source: data_sources)
+    {  
+        Scrubber::ScrubberState state = data_source->scrubber.get_state();
+        shared_scrubber_state.max_index = (std::max)(shared_scrubber_state.max_index, state.max_index);
+        shared_scrubber_state.max_time = (std::max)(shared_scrubber_state.max_time, state.max_time);
+    }
+    
+    return shared_scrubber_state;
+} 
+
+void DataAcquisition::sync_start() 
+{   
+    // Make copy of shared/synced scubber state
+    Scrubber::ScrubberState synced = get_state();
+
+    // Apply controls to each individual data_source
+    for (std::shared_ptr<DataSource> data_source: data_sources) {
+        Scrubber::ScrubberState state = data_source->scrubber.get_state();
+
+        // Copy scrubbing parameters
+        state.type = synced.type;
+        state.mode = synced.mode;
+        state.time_window = synced.time_window;
+        state.time_step = synced.time_step;
+        state.index_window = synced.index_window;
+        state.index_step = synced.index_step;
+
+        // To sync to start, simply use the current_index and current_time as is
+        state.current_time = (std::min)(synced.current_time, state.max_time);
+        state.current_index = (std::min)(synced.current_index, state.max_index);
+
+        // Reapply state
+        data_source->scrubber.set_state(state);
+    }
+}
+
+void DataAcquisition::sync_end() 
+{
+    // Make copy of shared/synced scubber state
+    Scrubber::ScrubberState synced = get_state();
+    int synced_index_length = (int) synced.max_index - (int) synced.min_index + 1;
+    float synced_time_length = synced.max_time - synced.min_time;
+
+    // Apply controls to each individual data_source
+    for (std::shared_ptr<DataSource> data_source: data_sources) {
+        Scrubber::ScrubberState state = data_source->scrubber.get_state();
+
+        // Copy scrubbing parameters
+        state.type = synced.type;
+        state.mode = synced.mode;
+        state.time_window = synced.time_window;
+        state.time_step = synced.time_step;
+        state.index_window = synced.index_window;
+        state.index_step = synced.index_step;
+
+        // Sync time to end
+        float current_time = synced.current_time;
+        float time_length = state.max_time - state.min_time;
+        state.current_time = std::clamp(current_time - (synced_time_length - time_length), 0.0f, state.max_time);
+        
+        // Sync event to end
+        int current_index = (int) synced.current_index;
+        int index_length = (int) state.max_index - (int) state.min_index + 1;
+        state.current_index = std::clamp(current_index - (synced_index_length - index_length), 0, (int) state.max_index);
+
+        // Reapply state
+        data_source->scrubber.set_state(state);
+    }
+}
+
+void DataAcquisition::update() {
+    std::unique_lock da_read_write_lock();
+    
 }
 

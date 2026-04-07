@@ -33,6 +33,12 @@ class GUI
             SYNCED   // View all data sources synced to a single scrubber state
         };
 
+        enum class SyncMode
+        {
+            START,  // Aligns start of data sources when sync scrubbing
+            END     // Aligns end of data sources when sync scrubbing
+        };
+
     private:
         // Modules
         DataAcquisition &data_acquisition;
@@ -50,10 +56,8 @@ class GUI
 
         // View mode and selection
         ViewMode view_mode = ViewMode::SINGLE;
+        SyncMode sync_mode = SyncMode::START;
         int selected_source_index = -1;
-
-        // Synced scrubber state applied to all data sources when in SYNCED view mode
-        Scrubber::ScrubberState synced_scrubber_state;
 
         // Camera control state
         bool is_mouse_dragging = false;
@@ -566,6 +570,15 @@ class GUI
             int window_div_factor = (cap_mode_int == 0) ? 100 : 2;
             int step_div_factor = (cap_mode_int == 0) ? 100 : 10;
 
+            // If in sync mode, create drop down to select which type of synchronization 
+            if (view_mode == ViewMode::SYNCED) 
+            {
+                static int sync_mode_int = 0;
+                const char *sync_mode_names[] = {"Start", "End"};
+                ImGui::Combo("Sync Mode", &sync_mode_int, sync_mode_names, 2);
+                sync_mode = sync_mode_int == 0 ? SyncMode::START : SyncMode::END;
+            }
+
             // Get visualizer parameters for time unit conversion
             auto vis_params = visualizer.get_parameters();
 
@@ -746,8 +759,7 @@ class GUI
             {
                 if (num_sources > 0) 
                 {
-                    std::shared_ptr<DataSource> data_source = sources[0];
-                    scrubber_state = data_source->scrubber.get_state();
+                    scrubber_state = data_acquisition.get_state();
                     scrubber_message = "Synced Scrubbing";
                 }
                 else 
@@ -774,9 +786,10 @@ class GUI
             }
             else if (view_mode == ViewMode::SYNCED)
             {
-                for (const auto& data_source: sources) {
-                    data_source->scrubber.set_state(scrubber_state);
-                }
+                data_acquisition.set_state(scrubber_state);
+
+                if (sync_mode == SyncMode::END)         data_acquisition.sync_end();
+                else if (sync_mode == SyncMode::START)  data_acquisition.sync_start();
             }
 
             ImGui::End();
@@ -987,11 +1000,6 @@ class GUI
               callback_data{&data_acquisition}, fps_history_buf(100, 0.0f), fps_buf_index(0),
               check_for_layout_file(true), show_quickstart(false)
         {
-            // Initialize synced scrubber state with defaults
-            synced_scrubber_state.type = Scrubber::ScrubberType::TIME;
-            synced_scrubber_state.mode = Scrubber::ScrubberMode::PLAYING;
-            synced_scrubber_state.time_window = 10000.0f;
-            synced_scrubber_state.time_step = 33333.0f;
 
             // Setup Dear ImGui context
             IMGUI_CHECKVERSION();

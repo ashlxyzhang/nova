@@ -42,18 +42,28 @@ class Scrubber
         {
                 ScrubberType type = ScrubberType::TIME;
                 ScrubberMode mode = ScrubberMode::PAUSED;
-                std::size_t current_index = 0;
-                std::size_t index_window = 50;
+
+                // TIME-based scrubbing -----
+                float time_window = 10000.0f;   // Size of window (10ms default) (set by GUI)
+                float time_step = 33333.0f;     // How much current_time is incremented each frame (~30fps default) (set by GUI)
+                float current_time = 0.0f;      // End of window (set by GUI)
+            
+                float min_time = 0.0f;          // Relative timestamp of first event (pretty much always zero)
+                float max_time = 0.0f;          // Relative timestamp of most recent event
+                float lower_time = 0.0f;        // Start of window (calculated by scrubber)
+                // --------------------------
+                
+                // EVENT-based scrubbing ----- (ditto)
+                std::size_t index_window = 50; 
                 std::size_t index_step = 0;
+                std::size_t current_index = 0;
+                
                 std::size_t min_index = 0;
                 std::size_t max_index = 0;
                 std::size_t lower_index = 0;
-                float lower_time = 0.0f;
-                float current_time = 0.0f;
-                float time_window = 10000.0f; // 10ms default (matches Prophesee)
-                float time_step = 33333.0f;   // ~30fps default (matches Prophesee)
-                float min_time = 0.0f;
-                float max_time = 0.0f;
+                 // --------------------------
+
+                // Currently UNUSED
                 bool show_frame_data = false;
 
                 // Resets every value except for TYPE and MODE
@@ -510,6 +520,76 @@ class Scrubber
         glm::vec2 get_camera_resolution() const
         {
             return camera_resolution;
+        }
+
+        // Thread safe API getters and setters
+        ScrubberType get_type() const {
+            std::shared_lock lock(mutex);
+            return state.type;
+        }
+        void set_type(ScrubberType type) {
+            std::unique_lock lock(mutex);
+            state.type = type;
+        }
+        ScrubberMode get_mode() const {
+            std::shared_lock lock(mutex);
+            return state.mode;
+        }
+        void set_mode(ScrubberMode mode) {
+            std::unique_lock lock(mutex);
+            state.mode = mode;
+        }
+
+        // Time-based Controls
+        float get_time_window() const {
+            std::shared_lock lock(mutex);
+            return state.time_window;
+        }
+        void set_time_window(float window) {
+            std::unique_lock lock(mutex);
+            state.time_window = window;
+        }
+        float get_current_time() const {
+            std::shared_lock lock(mutex);
+            return state.current_time;
+        }
+        void set_current_time(float time) {
+            std::unique_lock lock(mutex);
+            state.current_time = time;
+        }
+        float get_time_step() const {
+            std::shared_lock lock(mutex);
+            return state.time_step;
+        }
+        void set_time_step(float step) {
+            std::unique_lock lock(mutex);
+            state.time_step = step;
+        }
+
+        // Event-based Controls 
+        size_t get_index_window() const {
+            std::shared_lock lock(mutex);
+            return state.index_window;
+        }
+        void set_index_window(size_t window) {
+            std::unique_lock lock(mutex);
+            state.index_window = window;
+        }
+        size_t get_current_index() const {
+            std::shared_lock lock(mutex);
+            return state.current_index;
+        }
+        void set_current_index(size_t index) {
+            std::unique_lock lock(mutex);
+            state.current_index = index;
+        }
+        size_t get_index_step() const {
+            std::shared_lock lock(mutex);
+            return state.index_step;
+        }
+        void set_index_step(size_t step) {
+            std::unique_lock lock(mutex);
+            state.index_step = step;
         }
 };
 
