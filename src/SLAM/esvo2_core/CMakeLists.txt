@@ -60,7 +60,6 @@ set(HEADERS
   include/esvo2_core/tools/TicToc.h
   include/esvo2_core/tools/sobel.h
   include/esvo2_core/tools/cayley.h
-  include/esvo2_core/tools/params_helper.h
 
   include/esvo2_core/factor/utility.h
 
