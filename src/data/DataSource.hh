@@ -6,6 +6,8 @@
 #include "render/RenderTarget.hh"
 #include "ui/Scrubber.hh"
 #include "data/IEventReader.hh"
+#include "render/DigitalCodedExposure.hh"
+#include "render/Visualizer.hh"
 
 #include <string>
 #include <dv-processing/io/camera/discovery.hpp>
@@ -14,28 +16,23 @@
 struct DataSource {
 	mutable std::shared_mutex mutex;
 	SDL_GPUDevice* gpu_device;
-    std::string name; 
 
+	// 
+    std::string name; 
     enum Type { CAMERA, FILE } type;
     enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state = State::PAUSED; 
 
-	std::unique_ptr<IEventReader> reader;
-    EventData event_data;
-    Scrubber scrubber;
-    
-    struct {
-		// DCE
-		RenderTarget positive_values_texture;
-		RenderTarget negative_values_texture;
-        RenderTarget dce;
-
-		// Visualizer
-        RenderTarget visualizer_color;
-		RenderTarget visualizer_depth;
-    } render_targets;
-    
+	// Data acquisition and storage
     float event_discard_odds = 1.0f;
 	cv::Size resolution;
+	std::unique_ptr<IEventReader> reader;
+    EventData event_data;
+	Scrubber scrubber;
+
+	// Per-renderer inputs and outputs
+	DigitalCodedExposure::State dce_state;
+	Visualizer::State visualizer_state;
+    
 
 	DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);
 	DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);

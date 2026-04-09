@@ -75,20 +75,20 @@ std::vector<std::shared_ptr<DataSource>> DataAcquisition::get_data_sources()
     return data_sources;
 }
 
-void DataAcquisition::set_state(Scrubber::ScrubberState state) 
+void DataAcquisition::set_state(Scrubber::State state) 
 {
     std::unique_lock da_read_write_lock(mutex);
     shared_scrubber_state = state;
 } 
 
-Scrubber::ScrubberState DataAcquisition::get_state() 
+Scrubber::State DataAcquisition::get_state() 
 {
     std::unique_lock da_read_write_lock(mutex);
 
     // Lazily update the upper bounds of the shared state before returning
     for (std::shared_ptr<DataSource> data_source: data_sources)
     {  
-        Scrubber::ScrubberState state = data_source->scrubber.get_state();
+        Scrubber::State state = data_source->scrubber.get_state();
         shared_scrubber_state.max_index = (std::max)(shared_scrubber_state.max_index, state.max_index);
         shared_scrubber_state.max_time = (std::max)(shared_scrubber_state.max_time, state.max_time);
     }
@@ -99,11 +99,11 @@ Scrubber::ScrubberState DataAcquisition::get_state()
 void DataAcquisition::sync_start() 
 {   
     // Make copy of shared/synced scubber state
-    Scrubber::ScrubberState synced = get_state();
+    Scrubber::State synced = get_state();
 
     // Apply controls to each individual data_source
     for (std::shared_ptr<DataSource> data_source: data_sources) {
-        Scrubber::ScrubberState state = data_source->scrubber.get_state();
+        Scrubber::State state = data_source->scrubber.get_state();
 
         // Copy scrubbing parameters
         state.type = synced.type;
@@ -125,13 +125,13 @@ void DataAcquisition::sync_start()
 void DataAcquisition::sync_end() 
 {
     // Make copy of shared/synced scubber state
-    Scrubber::ScrubberState synced = get_state();
+    Scrubber::State synced = get_state();
     int synced_index_length = (int) synced.max_index - (int) synced.min_index + 1;
     float synced_time_length = synced.max_time - synced.min_time;
 
     // Apply controls to each individual data_source
     for (std::shared_ptr<DataSource> data_source: data_sources) {
-        Scrubber::ScrubberState state = data_source->scrubber.get_state();
+        Scrubber::State state = data_source->scrubber.get_state();
 
         // Copy scrubbing parameters
         state.type = synced.type;
@@ -154,6 +154,11 @@ void DataAcquisition::sync_end()
         // Reapply state
         data_source->scrubber.set_state(state);
     }
+}
+
+size_t DataAcquisition::size() {
+    std::shared_lock da_read_lock(mutex);
+    return data_sources.size();
 }
 
 void DataAcquisition::update() {

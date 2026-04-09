@@ -33,7 +33,7 @@ class DataAcquisition
         std::vector<std::string> scanned_camera_names;
 
         // Currently available sources
-        Scrubber::ScrubberState shared_scrubber_state;
+        Scrubber::State shared_scrubber_state;
         std::vector<std::shared_ptr<DataSource>> data_sources; 
 
     public:
@@ -48,11 +48,12 @@ class DataAcquisition
         std::vector<std::string> get_scanned_camera_names();        
         std::vector<std::shared_ptr<DataSource>> get_data_sources(); 
 
-        void set_state(Scrubber::ScrubberState state); 
-        Scrubber::ScrubberState get_state(); 
+        void set_state(Scrubber::State state); 
+        Scrubber::State get_state(); 
         void sync_start();
         void sync_end();
         void update();
+        size_t size();
 };
 
 #endif // DATA_ACQUISITION_HH

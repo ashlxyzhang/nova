@@ -57,7 +57,7 @@ class GUI
         // View mode and selection
         ViewMode view_mode = ViewMode::SINGLE;
         SyncMode sync_mode = SyncMode::START;
-        int selected_source_index = -1;
+        int selected_source_index = 0;
 
         // Camera control state
         bool is_mouse_dragging = false;
@@ -284,6 +284,7 @@ class GUI
                 if (ImGui::Button("Add Selected Camera"))
                 {
                     data_acquisition.add_camera_source(camera_selection);
+                    selected_source_index = ((int) data_acquisition.size()) - 1;
                 }
             }
 
@@ -418,8 +419,8 @@ class GUI
         /**
          * @brief Draw a row of playback control buttons.
          */
-        void draw_playback_controls(Scrubber::ScrubberMode current_mode, Scrubber::ScrubberType scrubber_type,
-                                    Scrubber::ScrubberState &state)
+        void draw_playback_controls(Scrubber::Mode current_mode, Scrubber::Type scrubber_type,
+                                    Scrubber::State &state)
         {
             float button_w = ImGui::GetFrameHeight() * 2.0f;
             float button_h = ImGui::GetFrameHeight();
@@ -427,7 +428,7 @@ class GUI
             // Jump to start
             if (ImGui::Button("|<", ImVec2(button_w, button_h)))
             {
-                if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                if (scrubber_type == Scrubber::Type::EVENT)
                 {
                     state.current_index = state.min_index;
                 }
@@ -435,14 +436,14 @@ class GUI
                 {
                     state.current_time = state.min_time;
                 }
-                state.mode = Scrubber::ScrubberMode::PAUSED;
+                state.mode = Scrubber::Mode::PAUSED;
             }
             ImGui::SetItemTooltip("Jump to start");
             ImGui::SameLine();
 
             // Step backward
             bool step_zero = false;
-            if (scrubber_type == Scrubber::ScrubberType::EVENT)
+            if (scrubber_type == Scrubber::Type::EVENT)
                 step_zero = state.index_step == 0;
             else
                 step_zero = state.time_step <= 0.00001f;
@@ -451,7 +452,7 @@ class GUI
                 ImGui::BeginDisabled();
             if (ImGui::Button("<<", ImVec2(button_w, button_h)))
             {
-                if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                if (scrubber_type == Scrubber::Type::EVENT)
                 {
                     state.current_index = (state.current_index > state.index_step + state.min_index)
                                               ? state.current_index - state.index_step
@@ -461,7 +462,7 @@ class GUI
                 {
                     state.current_time = (std::max)(state.current_time - state.time_step, state.min_time);
                 }
-                state.mode = Scrubber::ScrubberMode::PAUSED;
+                state.mode = Scrubber::Mode::PAUSED;
             }
             ImGui::SetItemTooltip("Step backward");
             if (step_zero)
@@ -469,12 +470,12 @@ class GUI
             ImGui::SameLine();
 
             // Play / Pause toggle
-            if (current_mode == Scrubber::ScrubberMode::PLAYING)
+            if (current_mode == Scrubber::Mode::PLAYING)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
                 if (ImGui::Button("Pause", ImVec2(button_w * 1.5f, button_h)))
-                    state.mode = Scrubber::ScrubberMode::PAUSED;
+                    state.mode = Scrubber::Mode::PAUSED;
                 ImGui::SetItemTooltip("Pause playback");
                 ImGui::PopStyleColor(2);
             }
@@ -483,7 +484,7 @@ class GUI
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.7f, 0.3f, 1.0f));
                 if (ImGui::Button("Play", ImVec2(button_w * 1.5f, button_h)))
-                    state.mode = Scrubber::ScrubberMode::PLAYING;
+                    state.mode = Scrubber::Mode::PLAYING;
                 ImGui::SetItemTooltip("Start playback");
                 ImGui::PopStyleColor(2);
             }
@@ -494,7 +495,7 @@ class GUI
                 ImGui::BeginDisabled();
             if (ImGui::Button(">>", ImVec2(button_w, button_h)))
             {
-                if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                if (scrubber_type == Scrubber::Type::EVENT)
                 {
                     state.current_index = (std::min)(state.current_index + state.index_step, state.max_index);
                 }
@@ -502,7 +503,7 @@ class GUI
                 {
                     state.current_time = (std::min)(state.current_time + state.time_step, state.max_time);
                 }
-                state.mode = Scrubber::ScrubberMode::PAUSED;
+                state.mode = Scrubber::Mode::PAUSED;
             }
             ImGui::SetItemTooltip("Step forward");
             if (step_zero)
@@ -510,12 +511,12 @@ class GUI
             ImGui::SameLine();
 
             // Jump to end / LIVE
-            if (current_mode == Scrubber::ScrubberMode::LATEST)
+            if (current_mode == Scrubber::Mode::LATEST)
             {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.8f, 0.1f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.9f, 0.2f, 1.0f));
                 if (ImGui::Button("LIVE", ImVec2(button_w * 1.5f, button_h)))
-                    state.mode = Scrubber::ScrubberMode::PAUSED;
+                    state.mode = Scrubber::Mode::PAUSED;
                 ImGui::SetItemTooltip("Currently tracking latest data. Click to pause.");
                 ImGui::PopStyleColor(2);
             }
@@ -523,7 +524,7 @@ class GUI
             {
                 if (ImGui::Button(">|", ImVec2(button_w, button_h)))
                 {
-                    if (scrubber_type == Scrubber::ScrubberType::EVENT)
+                    if (scrubber_type == Scrubber::Type::EVENT)
                     {
                         state.current_index = state.max_index;
                     }
@@ -531,34 +532,34 @@ class GUI
                     {
                         state.current_time = state.max_time;
                     }
-                    state.mode = Scrubber::ScrubberMode::LATEST;
+                    state.mode = Scrubber::Mode::LATEST;
                 }
                 ImGui::SetItemTooltip("Jump to end / track latest");
             }
         }
 
 
-        void draw_scrubber_controls(Scrubber::ScrubberState& state)
+        void draw_scrubber_controls(Scrubber::State& state)
         {
             // Type selection via tab bar
-            Scrubber::ScrubberType prev_type = state.type;
-            if (ImGui::BeginTabBar("##ScrubberTypeTabs"))
+            Scrubber::Type prev_type = state.type;
+            if (ImGui::BeginTabBar("##TypeTabs"))
             {
                 if (ImGui::BeginTabItem("Time"))
                 {
-                    state.type = Scrubber::ScrubberType::TIME;
+                    state.type = Scrubber::Type::TIME;
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Event"))
                 {
-                    state.type = Scrubber::ScrubberType::EVENT;
+                    state.type = Scrubber::Type::EVENT;
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
             }
             if (state.type != prev_type)
             {
-                state.mode = Scrubber::ScrubberMode::PAUSED;
+                state.mode = Scrubber::Mode::PAUSED;
             }
 
             ImGui::Separator();
@@ -583,7 +584,7 @@ class GUI
             auto vis_params = visualizer.get_parameters();
 
             // Timeline, playback, settings
-            if (state.type == Scrubber::ScrubberType::EVENT)
+            if (state.type == Scrubber::Type::EVENT)
             {
                 float min_f = static_cast<float>(state.min_index);
                 float max_f = static_cast<float>(state.max_index);
@@ -600,8 +601,8 @@ class GUI
                     float new_val = cur_f;
                     if (draw_timeline_bar(min_f, max_f, cur_f, win_f, &new_val, "%.0f", "events", true))
                     {
-                        if (state.mode == Scrubber::ScrubberMode::LATEST)
-                            state.mode = Scrubber::ScrubberMode::PAUSED;
+                        if (state.mode == Scrubber::Mode::LATEST)
+                            state.mode = Scrubber::Mode::PAUSED;
                         new_val = std::clamp(new_val, min_f, max_f);
                         state.current_index = static_cast<std::size_t>(new_val);
                     }
@@ -672,8 +673,8 @@ class GUI
                     if (draw_timeline_bar(min_time_adj, max_time_adj, current_time_adj, time_window_adj, &new_val,
                                           time_format_str.c_str(), time_unit_suffix.c_str(), true))
                     {
-                        if (state.mode == Scrubber::ScrubberMode::LATEST)
-                            state.mode = Scrubber::ScrubberMode::PAUSED;
+                        if (state.mode == Scrubber::Mode::LATEST)
+                            state.mode = Scrubber::Mode::PAUSED;
                         if (max_time_adj > min_time_adj)
                         {
                             new_val = std::clamp(new_val, min_time_adj, max_time_adj);
@@ -739,7 +740,7 @@ class GUI
 
 
             // Get state and status message depending on view mode
-            Scrubber::ScrubberState scrubber_state;
+            Scrubber::State scrubber_state;
             std::string scrubber_message;
 
             if (view_mode == ViewMode::SINGLE)
@@ -806,12 +807,12 @@ class GUI
             {
                 ImGui::Begin("3D Visualizer");
 
-                SDL_GPUTexture *texture = sources[selected_source_index]->render_targets.visualizer_color.texture;
+                SDL_GPUTexture *texture = sources[selected_source_index]->visualizer_state.color_texture.texture;
                 if (texture)
                 {
                     ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                    float tex_aspect = (float)sources[selected_source_index]->render_targets.visualizer_color.width /
-                                        (float)sources[selected_source_index]->render_targets.visualizer_color.height;
+                    float tex_aspect = (float)sources[selected_source_index]->visualizer_state.color_texture.width /
+                                        (float)sources[selected_source_index]->visualizer_state.color_texture.height;
                     ImVec2 display_size = pane_size;
                     float pane_aspect = pane_size.x / pane_size.y;
                     if (tex_aspect > pane_aspect)
@@ -827,7 +828,7 @@ class GUI
                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
                     ImGui::Image((ImTextureID)texture, display_size);
-                    sources[selected_source_index]->render_targets.visualizer_color.is_focused = ImGui::IsItemHovered();
+                    sources[selected_source_index]->visualizer_state.color_texture.is_focused = ImGui::IsItemHovered();
                 }
                 else
                 {
@@ -840,7 +841,7 @@ class GUI
         }
 
         void draw_single_dce(std::shared_ptr<DataSource> data_source, bool centered) {
-            SDL_GPUTexture *texture = data_source->render_targets.dce.texture;
+            SDL_GPUTexture *texture = data_source->dce_state.output_texture.texture;
             if (texture)
             {
                 ImVec2 display_size;
@@ -850,7 +851,7 @@ class GUI
                     ImVec2 pane_size = ImGui::GetContentRegionAvail();
                     display_size = pane_size;
                     
-                    float aspect_ratio = data_source->render_targets.dce.width / (float) data_source->render_targets.dce.height;
+                    float aspect_ratio = data_source->dce_state.output_texture.width / (float) data_source->dce_state.output_texture.height;
                     float pane_aspect = pane_size.x / pane_size.y;
 
                     if (aspect_ratio > pane_aspect)
@@ -869,13 +870,13 @@ class GUI
                 else 
                 {
                     float available_width = ImGui::GetContentRegionAvail().x;
-                    float aspect_ratio = data_source->render_targets.dce.width / (float) data_source->render_targets.dce.height;
+                    float aspect_ratio = data_source->dce_state.output_texture.width / (float) data_source->dce_state.output_texture.height;
                     display_size = {available_width, available_width / aspect_ratio};
                 }
 
                 // Draw image
                 ImGui::Image((ImTextureID) texture, display_size);
-                data_source->render_targets.dce.is_focused = ImGui::IsItemHovered();
+                data_source->dce_state.output_texture.is_focused = ImGui::IsItemHovered();
             }
             else
             {
@@ -1058,7 +1059,7 @@ class GUI
             // Check if any visualizer window is focused
             for (const auto &source : sources)
             {
-                if (source->render_targets.visualizer_color.is_focused)
+                if (source->visualizer_state.color_texture.is_focused)
                 {
                     any_focused = true;
                     break;
@@ -1125,7 +1126,7 @@ class GUI
                 // Clear focus flags
                 for (auto &source : sources)
                 {
-                    source->render_targets.visualizer_color.is_focused = false;
+                    source->visualizer_state.color_texture.is_focused = false;
                 }
             }
         }

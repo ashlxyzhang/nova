@@ -5,7 +5,6 @@
 #include "util/pch.hh"
 
 #include "data/EventData.hh"
-#include "data/DataSource.hh"
 #include "render/Camera.hh"
 #include "render/RenderTarget.hh"
 #include "render/UploadBuffer.hh"
@@ -40,18 +39,51 @@ class Visualizer
             UNIT_US = 2
         };
 
-        struct VisualizerParameters
+        struct State
         {
-                uint32_t grid_x_subdivisions = 5;
-                uint32_t grid_y_subdivisions = 5;
-                uint32_t grid_z_subdivisions = 5;
+            RenderTarget color_texture;
+            RenderTarget depth_texture;
 
-                float particle_scale = 3.0f;
-                glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
-                glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
+            uint32_t grid_x_subdivisions = 5;
+            uint32_t grid_y_subdivisions = 5;
+            uint32_t grid_z_subdivisions = 5;
 
-                TIME unit_type = TIME::UNIT_MS;           // MS is default
-                float unit_time_conversion_factor = 1.0f; // MS is default
+            float particle_scale = 3.0f;
+            glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
+            glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
+
+            TIME unit_type = TIME::UNIT_MS;           // MS is default
+            float unit_time_conversion_factor = 1.0f; // MS is default
+
+            void init_textures(SDL_GPUDevice* gpu_device, cv::Size resolution) {
+                SDL_GPUTextureCreateInfo vis_color_create_info = {
+                    .type = SDL_GPU_TEXTURETYPE_2D,
+                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
+                    .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                    .width = 1920,
+                    .height = 1200,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                color_texture = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
+                
+                SDL_GPUTextureCreateInfo vis_depth_create_info = {
+                    .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+                    .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+                    .width = 1920,
+                    .height = 1200,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                depth_texture = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
+            }
+
+            void delete_textures(SDL_GPUDevice* gpu_device) {
+                SDL_ReleaseGPUTexture(gpu_device, color_texture.texture);
+                SDL_ReleaseGPUTexture(gpu_device, color_texture.texture);
+            }
         };
 
     private:
@@ -69,7 +101,7 @@ class Visualizer
                 /**
                  * @brief Generates grid lines in 3D Visualizer window.
                  */
-                void generate_grid_lines(const VisualizerParameters &params)
+                void generate_grid_lines(const State &params)
                 {
                     lines.clear();
 
@@ -197,7 +229,7 @@ class Visualizer
                 /**
                  * @brief Updates grid visualization on each frame.
                  */
-                void cpu_update(const VisualizerParameters &params)
+                void cpu_update(const State &params)
                 {
                     generate_grid_lines(params);
                 }
@@ -328,7 +360,7 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const VisualizerParameters &params)
+                void cpu_update(std::shared_ptr<DataSource> data_source, const State &params)
                 {
                     // No CPU updates needed for points
                 }
@@ -349,7 +381,7 @@ class Visualizer
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const VisualizerParameters &params)
+                                 const State &params)
                 {
                     if (data_source->scrubber.get_points_buffer_size() == 0)
                         return; 
@@ -599,7 +631,7 @@ class Visualizer
                 /**
                  * @brief Clears text and generates labels for depth axis.
                  */
-                void cpu_update(std::shared_ptr<DataSource> data_source, const VisualizerParameters &params)
+                void cpu_update(std::shared_ptr<DataSource> data_source, const State &params)
                 {
                     vertices.clear();
                     indices.clear();
@@ -682,7 +714,7 @@ class Visualizer
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const VisualizerParameters &params)
+                                 const State &params)
                 {
                     if (draw_calls.empty() || !vertex_buffer || !index_buffer || !text_pipeline)
                         return;
@@ -803,7 +835,7 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const VisualizerParameters &params)
+                void cpu_update(std::shared_ptr<DataSource> data_source, const State &params)
                 {
                 }
 
@@ -817,7 +849,7 @@ class Visualizer
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const VisualizerParameters &params)
+                                 const State &params)
                 {
                     if (!frames_pipeline || data_source->scrubber.get_frames_timestamps()[0] < 0.0f)
                     {
@@ -848,7 +880,7 @@ class Visualizer
         mutable std::shared_mutex mutex;
 
         // Parameters
-        VisualizerParameters params;
+        State params;
 
         // Camera
         Camera camera;
@@ -912,14 +944,14 @@ class Visualizer
         }
 
         // Thread safe state getter
-        VisualizerParameters get_parameters() const
+        State get_parameters() const
         {
             std::shared_lock lock(mutex);
             return params;
         }
 
         // Thread safe state setter
-        void set_parameters(const VisualizerParameters &new_params)
+        void set_parameters(const State &new_params)
         {
             std::unique_lock lock(mutex);
             params = new_params;
@@ -944,7 +976,7 @@ class Visualizer
         {
             // Take snapshot of parameters
             std::shared_lock param_lock(mutex);
-            VisualizerParameters current_params = params;
+            State current_params = params;
             param_lock.unlock();
 
             // CPU Update phase
@@ -969,7 +1001,7 @@ class Visualizer
             // Render pass phase
             {
                 SDL_GPUColorTargetInfo color_target_info = {0};
-                color_target_info.texture = data_source->render_targets.visualizer_color.texture;
+                color_target_info.texture = data_source->visualizer_state.color_texture.texture;
                 SDL_FColor color = {1.0f, 1.0f, 1.0f, 1.0f};
                 color_target_info.clear_color = color;
                 color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
@@ -979,7 +1011,7 @@ class Visualizer
                 color_target_info.cycle = false;
 
                 SDL_GPUDepthStencilTargetInfo depth_target_info = {0};
-                depth_target_info.texture = data_source->render_targets.visualizer_depth.texture;
+                depth_target_info.texture = data_source->visualizer_state.depth_texture.texture;
                 depth_target_info.clear_depth = 1.0f;
                 depth_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
                 depth_target_info.store_op = SDL_GPU_STOREOP_DONT_CARE;

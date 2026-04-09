@@ -11,6 +11,7 @@
 #include "render/UploadBuffer.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
+#include "data/DataSource.hh"
 
 #include "shaders/digital_coded_exposure/clear_comp.h"
 #include "shaders/digital_coded_exposure/dce_comp.h"
@@ -18,6 +19,8 @@
 
 #include <mutex>
 #include <shared_mutex>
+
+
 
 /**
  * @brief Flags passed to the compute shaders to determine how DCE is computed.
@@ -40,29 +43,67 @@ struct PassData
 class DigitalCodedExposure
 {
     public:
-        struct DCEParameters
+        struct State
         {
-                float event_contrib_weight = 0.5f;
-                float morlet_frequency = 0.0f;
-                float morlet_width = 0.01f;
+            RenderTarget output_texture;
+            RenderTarget positive_values_texture;
+            RenderTarget negative_values_texture;
 
-                bool shutter_is_morlet = false;
-                bool shutter_is_positive_only = false;
-                bool combine_color = false;
+            float event_contrib_weight = 0.5f;
+            float morlet_frequency = 0.0f;
+            float morlet_width = 0.01f;
 
-                int32_t dce_color = 0;           // 0 - High/Low, 1 - Tricolor, 2 - Use same colors as visualizer
-                int32_t activation_function = 0; // 0 - Linear, 1 - Sigmoid
+            bool shutter_is_morlet = false;
+            bool shutter_is_positive_only = false;
+            bool combine_color = false;
 
-                glm::vec3 polarity_neg_color = glm::vec3(0.0f, 0.0f, 0.0f);
-                glm::vec3 polarity_pos_color = glm::vec3(1.0f, 1.0f, 1.0f);
-                glm::vec3 polarity_neut_color = glm::vec3(0.5f, 0.5f, 0.5f);
+            int32_t dce_color = 0;           // 0 - High/Low, 1 - Tricolor, 2 - Use same colors as visualizer
+            int32_t activation_function = 0; // 0 - Linear, 1 - Sigmoid
+
+            glm::vec3 polarity_neg_color = glm::vec3(0.0f, 0.0f, 0.0f);
+            glm::vec3 polarity_pos_color = glm::vec3(1.0f, 1.0f, 1.0f);
+            glm::vec3 polarity_neut_color = glm::vec3(0.5f, 0.5f, 0.5f);
+
+            void init_textures(SDL_GPUDevice* gpu_device, cv::Size resolution) { 
+                SDL_GPUTextureCreateInfo dce_create_info = {
+                    .type = SDL_GPU_TEXTURETYPE_2D,
+                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
+                    .width = (Uint32) resolution.width,
+                    .height = (Uint32) resolution.height,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                output_texture = {SDL_CreateGPUTexture(gpu_device, &dce_create_info), dce_create_info.width, dce_create_info.height};
+
+                SDL_GPUTextureCreateInfo dce_intermediate_create_info = {
+                    .type = SDL_GPU_TEXTURETYPE_2D,
+                    .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE |
+                                SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                    .width = (Uint32) resolution.width,
+                    .height = (Uint32) resolution.height,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                positive_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
+                negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
+            }
+
+            void delete_textures(SDL_GPUDevice* gpu_device) {
+                SDL_ReleaseGPUTexture(gpu_device, output_texture.texture);
+                SDL_ReleaseGPUTexture(gpu_device, positive_values_texture.texture);
+                SDL_ReleaseGPUTexture(gpu_device, negative_values_texture.texture);
+            }
         };
 
     private:
         mutable std::shared_mutex mutex;
 
         // Parameters
-        DCEParameters params;
+        State params;
         ErrorQueue &error_queue;
 
         // GPU
@@ -154,11 +195,6 @@ class DigitalCodedExposure
         }
 
         /**
-         * @brief Called to update Digital Coded Exposure every frame.
-         *        Recreates texture should file change.
-         */
-
-        /**
          * @brief Compute pass. Dispatches compute shaders to calculate Digital Coded Exposure output.
          * @param command_buffer GPU command buffer.
          */
@@ -189,17 +225,17 @@ class DigitalCodedExposure
             // Set up texture bindings
             SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
 
-            texture_buffer_bindings[0].texture = data_source->render_targets.dce.texture;
+            texture_buffer_bindings[0].texture = data_source->dce_state.output_texture.texture;
             texture_buffer_bindings[0].mip_level = 0;
             texture_buffer_bindings[0].layer = 0;
             texture_buffer_bindings[0].cycle = false;
 
-            texture_buffer_bindings[1].texture = data_source->render_targets.positive_values_texture.texture;
+            texture_buffer_bindings[1].texture = data_source->dce_state.positive_values_texture.texture;
             texture_buffer_bindings[1].mip_level = 0;
             texture_buffer_bindings[1].layer = 0;
             texture_buffer_bindings[1].cycle = false;
 
-            texture_buffer_bindings[2].texture = data_source->render_targets.negative_values_texture.texture;
+            texture_buffer_bindings[2].texture = data_source->dce_state.negative_values_texture.texture;
             texture_buffer_bindings[2].mip_level = 0;
             texture_buffer_bindings[2].layer = 0;
             texture_buffer_bindings[2].cycle = false;
@@ -219,7 +255,7 @@ class DigitalCodedExposure
             {
                 // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage
                 // in shader)
-                Scrubber::ScrubberState scrubber_state = data_source->scrubber.get_state();
+                Scrubber::State scrubber_state = data_source->scrubber.get_state();
                 float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
                 pass_data.morletParams.z = time_center;
 
@@ -245,13 +281,13 @@ class DigitalCodedExposure
             SDL_WaitForGPUIdle(gpu_device);
         }
 
-        DCEParameters get_parameters()
+        State get_parameters()
         {
             std::shared_lock lock(mutex);
             return params;
         }
 
-        void set_parameters(const DCEParameters &new_parameters)
+        void set_parameters(const State &new_parameters)
         {
             std::unique_lock lock(mutex);
             params = new_parameters;

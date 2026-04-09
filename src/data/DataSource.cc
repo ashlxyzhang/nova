@@ -111,75 +111,22 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevic
 
 void DataSource::init_render_targets()
 {
+    // Read resolution
 	std::optional<cv::Size> event_res = reader->getEventResolution();
-	if (event_res.has_value()) 
-	{
-		resolution = cv::Size(event_res->width, event_res->height);
-	}
-	else
-	{
-		resolution = cv::Size(1920, 1080);
-	}
+    resolution = event_res.has_value() ? cv::Size(event_res->width, event_res->height) : cv::Size(1920, 1080);
 
-	SDL_GPUTextureCreateInfo dce_create_info = {
-		.type = SDL_GPU_TEXTURETYPE_2D,
-		.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-		.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
-		.width = (Uint32) resolution.width,
-		.height = (Uint32) resolution.height,
-		.layer_count_or_depth = 1,
-		.num_levels = 1,
-		.sample_count = SDL_GPU_SAMPLECOUNT_1,
-	};
-    render_targets.dce = {SDL_CreateGPUTexture(gpu_device, &dce_create_info), dce_create_info.width, dce_create_info.height};
-
-    SDL_GPUTextureCreateInfo dce_intermediate_create_info = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
-        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE |
-                    SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
-        .width = (Uint32) resolution.width,
-        .height = (Uint32) resolution.height,
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-    };
-    render_targets.positive_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
-    render_targets.negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
-    
-
-    SDL_GPUTextureCreateInfo vis_color_create_info = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
-        .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
-        .width = 1920,
-        .height = 1200,
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-    };
-	render_targets.visualizer_color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
-	
-    SDL_GPUTextureCreateInfo vis_depth_create_info = {
-        .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-        .width = 1920,
-        .height = 1200,
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-    };
-    render_targets.visualizer_depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
+    // Initialize textures and storage resolution
+    dce_state.init_textures(gpu_device, resolution);
+    visualizer_state.init_textures(gpu_device, resolution);
     event_data.set_camera_event_resolution(resolution.width, resolution.height);
 }
 
 DataSource::~DataSource()
-{
-	SDL_ReleaseGPUTexture(gpu_device, render_targets.dce.texture);
-	SDL_ReleaseGPUTexture(gpu_device, render_targets.positive_values_texture.texture);
-	SDL_ReleaseGPUTexture(gpu_device, render_targets.negative_values_texture.texture);
-    SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_color.texture);
-    SDL_ReleaseGPUTexture(gpu_device, render_targets.visualizer_depth.texture);
+{   
+    // This is done here and not the dce_state and visualizer_state destructors b/c the states are frequently copied
+    // and destroyed to allow for thread-safe access
+    dce_state.delete_textures(gpu_device);
+    visualizer_state.delete_textures(gpu_device);
     event_data.clear();
 }
 

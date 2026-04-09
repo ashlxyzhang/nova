@@ -19,7 +19,7 @@ class Scrubber
         /**
          * @brief Two types of data scrubbing, event based or time based.
          */
-        enum class ScrubberType : std::uint8_t
+        enum class Type : std::uint8_t
         {
             EVENT,
             TIME
@@ -31,17 +31,17 @@ class Scrubber
          *        Playing is good for recreating streaming from past data.
          *        Latest is good for seeing data as it is streamed.
          */
-        enum class ScrubberMode : std::uint8_t
+        enum class Mode : std::uint8_t
         {
             PAUSED,
             PLAYING,
             LATEST
         };
 
-        struct ScrubberState
+        struct State
         {
-                ScrubberType type = ScrubberType::TIME;
-                ScrubberMode mode = ScrubberMode::PAUSED;
+                Type type = Type::TIME;
+                Mode mode = Mode::PAUSED;
 
                 // TIME-based scrubbing -----
                 float time_window = 10000.0f;   // Size of window (10ms default) (set by GUI)
@@ -113,7 +113,7 @@ class Scrubber
                     step_forward();
 
                     // Scrubbing by time requires converting to indices which requires event_data
-                    if (type == ScrubberType::TIME) {
+                    if (type == Type::TIME) {
                         // Convert time values to indices for internal use
                         lower_index = event_data.get_event_index_from_relative_timestamp(lower_time);
                         current_index = event_data.get_event_index_from_relative_timestamp(current_time);
@@ -128,24 +128,24 @@ class Scrubber
                 void step_forward()
                 {
                     // Time-based updates
-                    if (type == ScrubberType::TIME)
+                    if (type == Type::TIME)
                     {
                         // Update based on mode
-                        if (mode == ScrubberMode::PAUSED)
+                        if (mode == Mode::PAUSED)
                         {
                             current_time = std::clamp(current_time, min_time, max_time);
                             time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                             lower_time = (std::max)(min_time, current_time - time_window);
                         }
-                        else if (mode == ScrubberMode::PLAYING)
+                        else if (mode == Mode::PLAYING)
                         {
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                             time_window = std::clamp(time_window, 0.0f, max_time - min_time);
                             current_time = std::clamp(current_time + time_step, min_time, max_time);
                             lower_time = (std::max)(min_time, current_time - time_window);
                         }
-                        else if (mode == ScrubberMode::LATEST)
+                        else if (mode == Mode::LATEST)
                         {
                             current_time = max_time;
                             time_window = std::clamp(time_window, 0.0f, max_time - min_time);
@@ -155,24 +155,24 @@ class Scrubber
                     }
 
                     // Event-based Updates
-                    else if (type == ScrubberType::EVENT)
+                    else if (type == Type::EVENT)
                     {
                         // Update based on mode
-                        if (mode == ScrubberMode::PAUSED)
+                        if (mode == Mode::PAUSED)
                         {
                             current_index = std::clamp(current_index, size_t(0), max_index);
                             index_window = std::clamp(index_window, size_t(0), max_index);
                             index_step = std::clamp(index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
-                        else if (mode == ScrubberMode::PLAYING)
+                        else if (mode == Mode::PLAYING)
                         {
                             index_step = std::clamp(index_step, size_t(0), max_index);
                             index_window = std::clamp(index_window, size_t(0), max_index);
                             current_index = std::clamp(current_index + index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
-                        else if (mode == ScrubberMode::LATEST)
+                        else if (mode == Mode::LATEST)
                         {
                             current_index = max_index;
                             index_window = std::clamp(index_window, size_t(0), max_index);
@@ -185,7 +185,7 @@ class Scrubber
 
     private:
         mutable std::shared_mutex mutex; 
-        ScrubberState state;
+        State state;
         
         
 
@@ -213,8 +213,8 @@ class Scrubber
             //   accumulation time = 10 ms  (time_window = 10 000 us)
             //   display rate      = 30 fps (time_step   ~ 33 333 us)
             //   time-based, playing mode
-            state.type = ScrubberType::TIME;
-            state.mode = ScrubberMode::PLAYING;
+            state.type = Type::TIME;
+            state.mode = Mode::PLAYING;
             state.time_window = 10000.0f;
             state.time_step = 33333.0f;
         }
@@ -239,7 +239,7 @@ class Scrubber
          */
         void cpu_update(EventData &event_data)
         {
-            ScrubberState cur_state = get_state();
+            State cur_state = get_state();
             cur_state.update(event_data);
             set_state(cur_state);
         }
@@ -256,7 +256,7 @@ class Scrubber
             event_data.lock_data_vectors();
 
             // Read indices from state
-            ScrubberState scrubber_state = get_state();
+            State scrubber_state = get_state();
             std::size_t current_index = scrubber_state.current_index;
             std::size_t lower_index = scrubber_state.lower_index;
 
@@ -470,14 +470,14 @@ class Scrubber
         }
 
         // Thread safe state getter
-        ScrubberState get_state() const
+        State get_state() const
         {
             std::shared_lock lock(mutex);
             return state;
         }
 
         // Thread safe state setter
-        void set_state(const ScrubberState &new_state)
+        void set_state(const State &new_state)
         {
             std::unique_lock lock(mutex);
             state = new_state;
@@ -531,19 +531,19 @@ class Scrubber
         }
 
         // Thread safe API getters and setters
-        ScrubberType get_type() const {
+        Type get_type() const {
             std::shared_lock lock(mutex);
             return state.type;
         }
-        void set_type(ScrubberType type) {
+        void set_type(Type type) {
             std::unique_lock lock(mutex);
             state.type = type;
         }
-        ScrubberMode get_mode() const {
+        Mode get_mode() const {
             std::shared_lock lock(mutex);
             return state.mode;
         }
-        void set_mode(ScrubberMode mode) {
+        void set_mode(Mode mode) {
             std::unique_lock lock(mutex);
             state.mode = mode;
         }
