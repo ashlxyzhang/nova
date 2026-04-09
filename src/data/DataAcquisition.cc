@@ -157,7 +157,14 @@ void DataAcquisition::sync_end()
 }
 
 void DataAcquisition::update() {
-    std::unique_lock da_read_write_lock();
-    
+    std::unique_lock da_read_write_lock(mutex);
+
+    // Shared state doesn't need full update since there is no associated event_data & data to upload
+    shared_scrubber_state.step_forward();
+
+    // Each data source does a full update
+    for (const auto& data_source: data_sources) {
+        data_source->update();
+    }
 }
 

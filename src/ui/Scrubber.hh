@@ -84,8 +84,8 @@ class Scrubber
                     show_frame_data = false;
                 }
 
-                // Updates based on event_data
-                void update(EventData &event_data)
+                // Update min and max indices based on event_data
+                void update_bounds(EventData& event_data) 
                 {
                     event_data.lock_data_vectors();
                     const auto &event_vector = event_data.get_evt_vector_ref();
@@ -101,14 +101,35 @@ class Scrubber
                     // Get size of event data
                     min_index = 0;
                     max_index = event_vector.size() - 1;
+                    min_time = 0.0f;
+                    max_time = event_vector.empty() ? 0.0f : event_vector.back().z;
 
+                    event_data.unlock_data_vectors();
+                }
+
+                // Update state based on event_data
+                void update(EventData& event_data) {
+                    update_bounds(event_data);
+                    step_forward();
+
+                    // Scrubbing by time requires converting to indices which requires event_data
+                    if (type == ScrubberType::TIME) {
+                        // Convert time values to indices for internal use
+                        lower_index = event_data.get_event_index_from_relative_timestamp(lower_time);
+                        current_index = event_data.get_event_index_from_relative_timestamp(current_time);
+
+                        // Clamp indices
+                        lower_index = std::clamp(lower_index, size_t(0), max_index);
+                        current_index = std::clamp(current_index, size_t(0), max_index);
+                    }  
+                }
+
+                // Updates and clamps current_index/current_time based on state
+                void step_forward()
+                {
                     // Time-based updates
                     if (type == ScrubberType::TIME)
                     {
-                        // Get time bounds from event data
-                        min_time = 0.0f;
-                        max_time = event_vector.empty() ? 0.0f : event_vector.back().z;
-
                         // Update based on mode
                         if (mode == ScrubberMode::PAUSED)
                         {
@@ -131,44 +152,34 @@ class Scrubber
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                             lower_time = (std::max)(min_time, current_time - time_window);
                         }
-
-                        // Convert time values to indices for internal use
-                        lower_index = event_data.get_event_index_from_relative_timestamp(lower_time);
-                        current_index = event_data.get_event_index_from_relative_timestamp(current_time);
-
-                        // Clamp indices
-                        lower_index = std::clamp(lower_index, size_t(0), event_vector.size() - 1);
-                        current_index = std::clamp(current_index, size_t(0), event_vector.size() - 1);
                     }
+
                     // Event-based Updates
                     else if (type == ScrubberType::EVENT)
                     {
                         // Update based on mode
                         if (mode == ScrubberMode::PAUSED)
                         {
-                            current_index = std::clamp(current_index, size_t(0), event_vector.size() - 1);
-                            index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
-                            index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
+                            current_index = std::clamp(current_index, size_t(0), max_index);
+                            index_window = std::clamp(index_window, size_t(0), max_index);
+                            index_step = std::clamp(index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
                         else if (mode == ScrubberMode::PLAYING)
                         {
-                            index_step = std::clamp(index_step, size_t(0), event_vector.size() - 1);
-                            index_window = std::clamp(index_window, size_t(0), event_vector.size() - 1);
-                            current_index = std::clamp(current_index + index_step, size_t(0), event_vector.size() - 1);
+                            index_step = std::clamp(index_step, size_t(0), max_index);
+                            index_window = std::clamp(index_window, size_t(0), max_index);
+                            current_index = std::clamp(current_index + index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
                         else if (mode == ScrubberMode::LATEST)
                         {
-                            std::size_t event_data_size = event_vector.empty() ? 0 : event_vector.size() - 1;
-                            current_index = event_data_size;
-                            index_window = std::clamp(index_window, size_t(0), event_data_size);
-                            index_step = std::clamp(index_step, size_t(0), event_data_size);
+                            current_index = max_index;
+                            index_window = std::clamp(index_window, size_t(0), max_index);
+                            index_step = std::clamp(index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
                     }
-
-                    event_data.unlock_data_vectors();
                 }
         };
 
@@ -228,11 +239,8 @@ class Scrubber
          */
         void cpu_update(EventData &event_data)
         {
-            // Make copy of state to prevent changes from being made mid function
             ScrubberState cur_state = get_state();
-            // Update this intermediate state based on event-data
             cur_state.update(event_data);
-            // Save changes made to state (may potentially override changes from the GUI)
             set_state(cur_state);
         }
 

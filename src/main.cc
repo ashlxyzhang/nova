@@ -149,11 +149,14 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
+
+    // Update all of the data sources
+    app->data_acq->update();
+    
     // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();
     for (const auto& data_source : data_sources)
     {
-        data_source->update();
         app->digital_coded_exposure->render(data_source);
         app->visualizer->render(data_source);
     }
