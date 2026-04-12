@@ -7,12 +7,25 @@
 #include <string>
 #include <vector>
 
-#include <esvo2_core/tools/SystemStatus.h>
+#include "SystemStatus.h"
+#include <opencv2/core/core.hpp>
 
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 namespace esvo2_core
 {
+
+double timePointToSec(timePoint& timestamp)
+{
+     return std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();
+}
+
+timePoint secondsToTimePoint(double seconds)
+{
+        std::chrono::duration<double> dur(seconds);
+        std::chrono::steady_clock::duration yep = std::chrono::duration_cast<std::chrono::steady_clock::duration>(dur);
+        return std::chrono::time_point<std::chrono::steady_clock>(yep);
+}
 
 // Replaces Event
 struct Event
@@ -64,6 +77,24 @@ struct VBaBg
         std::vector<double> bg; // bias gyro
         std::vector<double> Vs; // velocity
         std::vector<double> g;  // gravity
+};
+
+// Replaces sensor_msgs::ImageConstPtr
+struct ImagePtr
+{
+    timePoint header_stamp;
+    std::shared_ptr<cv::Mat> image;
+    public:
+        ImagePtr(std::shared_ptr<cv::Mat> image, std::chrono::time_point<std::chrono::steady_clock> time)
+        {
+            this->image = image;
+            this->header_stamp = time;
+        }
+        ImagePtr(std::pair<std::shared_ptr<cv::Mat>, std::chrono::time_point<std::chrono::steady_clock>> stuff)
+        {
+            this->image = stuff.first;
+            this->header_stamp = stuff.second;
+        }    
 };
 
 } // namespace esvo2_core

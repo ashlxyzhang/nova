@@ -51,10 +51,10 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
       ebm_(camSysPtr_, NUM_THREAD_MAPPING, config_["SmoothTimeSurface"].as<bool>(false)), pc_near_(new PointCloud()),
       pc_global_(new PointCloud()),
       depthFramePtr_(new DepthFrame(camSysPtr_->cam_left_ptr_->height_, camSysPtr_->cam_left_ptr_->width_)),
-      BackendOpt_(camSysPtr_)
+      BackendOpt_(camSysPtr_, v_ba_bg_Map_to_Track)
 {
     //queues
-    this->v_ba_bg_Map_to_Track = v_ba_bg_Map_to_Track;
+    // this->v_ba_bg_Map_to_Track = v_ba_bg_Map_to_Track;
     this->pointcloud_Map_to_Track = pointcloud_Map_to_Track;
 
     // frame id
@@ -155,12 +155,13 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     setSystemStatus(SystemStatus::INITIALIZATION);
 
     // callback functions
-    stampedPose_sub_ = nh_.subscribe("stamped_pose", 0, &esvo2_Mapping::stampedPoseCallback, this);
-    TS_AA_sync_.registerCallback(boost::bind(&esvo2_Mapping::timeSurfaceCallback, this, _1, _2, _3, _4, _5, _6));
+    // stampedPose_sub_ = nh_.subscribe("stamped_pose", 0, &esvo2_Mapping::stampedPoseCallback, this);
+    // TS_AA_sync_.registerCallback(boost::bind(&esvo2_Mapping::timeSurfaceCallback, this, _1, _2, _3, _4, _5, _6));
 
     // point sampling
     if (bpoints_from_AA_)
-        AA_frequency_sub_ = nh_.subscribe<sensor_msgs::Image>("AA_left", 0, &esvo2_Mapping::AACallback, this);
+        // AA_frequency_sub_ = nh_.subscribe<sensor_msgs::Image>("AA_left", 0, &esvo2_Mapping::AACallback, this);
+        const int one = 1;
     else
         events_left_sub_ = nh_.subscribe<EventArray>(
             "events_left", 0, boost::bind(&esvo2_Mapping::eventsCallback, this, _1, boost::ref(events_left_)));
@@ -174,8 +175,8 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
 
     // result publishers
     invDepthMap_pub_ = it_.advertise("Inverse_Depth_Map2", 1);
-    V_ba_bg_pub_ = nh_.advertise<events_repacking_tool::V_ba_bg>("/esvo2_mapping/V_ba_bg", 1);
-    pc_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_local2", 1);
+    // V_ba_bg_pub_ = nh_.advertise<events_repacking_tool::V_ba_bg>("/esvo2_mapping/V_ba_bg", 1);
+    // pc_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_local2", 1);
     pc_filtered_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_filtered2", 1);
     if (bVisualizeGlobalPC_)
     {
@@ -193,8 +194,8 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
                               std::move(reset_future_));
     MappingThread.detach();
 
-    // **The onlineParameterChangeCallback is empty, so I am pretty sure this does nothing.
-    // **I also commented out the onlineParameterChangeCallback function.
+    // The onlineParameterChangeCallback is empty, so I am pretty sure this does nothing.
+    // I also commented out the onlineParameterChangeCallback function.
     // Dynamic reconfigure.
     // dynamic_reconfigure_callback_ = boost::bind(&esvo2_Mapping::onlineParameterChangeCallback, this, _1, _2);
 
@@ -204,10 +205,10 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
 
 esvo2_Mapping::~esvo2_Mapping()
 {
-    pc_pub_.shutdown();
+    // pc_pub_.shutdown();
     pc_filtered_pub_.shutdown();
     invDepthMap_pub_.shutdown();
-    V_ba_bg_pub_.shutdown();
+    // V_ba_bg_pub_.shutdown();
 }
 
 void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<void> future_reset)
@@ -646,9 +647,9 @@ bool esvo2_Mapping::dataTransferring()
         return false;
 
     std::vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
-    double curTime = TS_obs_ptr_->first.toSec();
+    double curTime = esvo2_core::timePointToSec(TS_obs_ptr_->first);
     if (prevTime == 0)
-        prevTime = TS_obs_ptr_->first.toSec() - 0.5;
+        prevTime = esvo2_core::timePointToSec(TS_obs_ptr_->first) - 0.5;
     mBuf.lock();
     // get the IMU data by time interval
     getIMUInterval(prevTime, curTime, accVector, gyrVector);
@@ -678,13 +679,13 @@ bool esvo2_Mapping::dataTransferring()
         timePoint t_end, t_begin;
         if (bpoints_from_AA_)
         {
-            t_end = timePoint(TS_obs_ptr_->first.toSec() + 0.005);
-            t_begin = timePoint(TS_obs_ptr_->first.toSec() - 0.005);
+            t_end = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) + 0.005);
+            t_begin = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) - 0.005);
         }
         else
         {
             t_end = TS_obs_ptr_->first;
-            t_begin = timePoint(std::max(0.0, t_end.toSec() - 10 * BM_half_slice_thickness_));
+            t_begin = timePoint(std::max(0.0, esvo2_core::timePointToSec(t_end) - 10 * BM_half_slice_thickness_));
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
@@ -709,13 +710,13 @@ bool esvo2_Mapping::dataTransferring()
         timePoint t_end, t_begin;
         if (bpoints_from_AA_)
         {
-            t_end = timePoint(TS_obs_ptr_->first.toSec() + 0.005);
-            t_begin = timePoint(TS_obs_ptr_->first.toSec() - 0.005);
+            t_end = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) + 0.005);
+            t_begin = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) - 0.005);
         }
         else
         {
             t_end = TS_obs_ptr_->first;
-            t_begin = timePoint(std::max(0.0, t_end.toSec() - 10 * BM_half_slice_thickness_));
+            t_begin = timePoint(std::max(0.0, esvo2_core::timePointToSec(t_end) - 10 * BM_half_slice_thickness_));
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
@@ -746,31 +747,31 @@ bool esvo2_Mapping::dataTransferring()
     return true;
 }
 
-void esvo2_Mapping::stampedPoseCallback(const geometry_msgs::PoseStampedConstPtr &ps_msg)
+void esvo2_Mapping::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &ps_msg)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
     // To check inconsistent timestamps and reset.
     static constexpr double max_time_diff_before_reset_s = 0.5;
-    const timePoint stamp_first_event = ps_msg->header.stamp;
+    const timePoint stamp_first_event = ps_msg->timestamp;
     std::string *err_tf = new std::string();
     delete err_tf;
 
-    if (tf_lastest_common_time_.toSec() != 0)
+    if (esvo2_core::timePointToSec(tf_lastest_common_time_) != 0)
     {
-        const double dt = stamp_first_event.toSec() - tf_lastest_common_time_.toSec();
+        const double dt = esvo2_core::timePointToSec(stamp_first_event) - esvo2_core::timePointToSec(tf_lastest_common_time_);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
             ROS_INFO("Inconsistent event timestamps detected <stampedPoseCallback> (new: %f, old %f), resetting.",
-                     stamp_first_event.toSec(), tf_lastest_common_time_.toSec());
+                     esvo2_core::timePointToSec(stamp_first_event), esvo2_core::timePointToSec(tf_lastest_common_time_));
             reset();
         }
     }
 
     // add pose to tf
-    tf::Transform tf(tf::Quaternion(ps_msg->pose.orientation.x, ps_msg->pose.orientation.y, ps_msg->pose.orientation.z,
-                                    ps_msg->pose.orientation.w),
-                     tf::Vector3(ps_msg->pose.position.x, ps_msg->pose.position.y, ps_msg->pose.position.z));
-    tf::StampedTransform st(tf, ps_msg->header.stamp, ps_msg->header.frame_id, dvs_frame_id_.c_str());
+    tf::Transform tf(tf::Quaternion(ps_msg->orientation[0], ps_msg->orientation[1], ps_msg->orientation[2],
+                                    ps_msg->orientation[3]),
+                     tf::Vector3(ps_msg->position[0], ps_msg->position[1], ps_msg->position[2]));
+    tf::StampedTransform st(tf, ps_msg->timestamp, ps_msg->frame_id, dvs_frame_id_.c_str());
     tf_->setTransform(st);
 }
 
@@ -807,11 +808,11 @@ void esvo2_Mapping::eventsCallback(const EventArray::ConstPtr &msg, EventQueue &
     // check timestamp consistency
     if (!msg->events.empty() && !EQ.empty())
     {
-        const double dt = stamp_first_event.toSec() - EQ.back().ts.toSec();
+        const double dt = esvo2_core::timePointToSec(stamp_first_event) - esvo2_core::timePointToSec(EQ.back().ts);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
             ROS_INFO("Inconsistent event timestamps detected <eventCallback> (new: %f, old %f), resetting.",
-                     stamp_first_event.toSec(), events_left_.back().ts.toSec());
+                     esvo2_core::timePointToSec(stamp_first_event), esvo2_core::timePointToSec(events_left_.back().ts));
             reset();
         }
     }
@@ -847,12 +848,12 @@ void esvo2_Mapping::clearEventQueue(EventQueue &EQ)
     }
 }
 
-void esvo2_Mapping::timeSurfaceCallback(const sensor_msgs::ImageConstPtr &time_surface_left,
-                                        const sensor_msgs::ImageConstPtr &time_surface_right,
-                                        const sensor_msgs::ImageConstPtr &AA_map,
-                                        const sensor_msgs::ImageConstPtr &time_surface_negative,
-                                        const sensor_msgs::ImageConstPtr &time_surface_negative_dx,
-                                        const sensor_msgs::ImageConstPtr &time_surface_negative_dy)
+void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface_left,
+                                        const esvo2_core::ImagePtr &time_surface_right,
+                                        const esvo2_core::ImagePtr &AA_map,
+                                        const esvo2_core::ImagePtr &time_surface_negative,
+                                        const esvo2_core::ImagePtr &time_surface_negative_dx,
+                                        const esvo2_core::ImagePtr &time_surface_negative_dy)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
     // check time-stamp inconsistency
@@ -860,23 +861,23 @@ void esvo2_Mapping::timeSurfaceCallback(const sensor_msgs::ImageConstPtr &time_s
     {
         static constexpr double max_time_diff_before_reset_s = 1;
         const timePoint stamp_last_image = TS_history_.rbegin()->first;
-        const double dt = time_surface_left->header.stamp.toSec() - stamp_last_image.toSec();
+        const double dt = esvo2_core::timePointToSec(time_surface_left.header_stamp) - esvo2_core::timePointToSec(stamp_last_image);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
             ROS_INFO("Inconsistent frame timestamp detected <timeSurfaceCallback> (new: %f, old %f), resetting.",
-                     time_surface_left->header.stamp.toSec(), stamp_last_image.toSec());
+                     esvo2_core::timePointToSec(time_surface_left.header_stamp), esvo2_core::timePointToSec(stamp_last_image));
             reset();
         }
     }
     cv::Mat cv_ptr_left, cv_ptr_right, cv_ptr_AA_map_left, cv_ptr_negative, cv_ptr_negative_dx, cv_ptr_negative_dy;
     try
     {
-        cv_ptr_left = cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_right = cv_bridge::toCvCopy(time_surface_right, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_AA_map_left = cv_bridge::toCvCopy(AA_map, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_negative = cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_negative_dx = cv_bridge::toCvCopy(time_surface_negative_dx, sensor_msgs::image_encodings::TYPE_16SC1);
-        cv_ptr_negative_dy = cv_bridge::toCvCopy(time_surface_negative_dy, sensor_msgs::image_encodings::TYPE_16SC1);
+        cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
+        cv_ptr_right = *(time_surface_right.image); //cv_bridge::toCvCopy(time_surface_right, sensor_msgs::image_encodings::MONO8);
+        cv_ptr_AA_map_left = *(AA_map.image); //cv_bridge::toCvCopy(AA_map, sensor_msgs::image_encodings::MONO8);
+        cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
+        cv_ptr_negative_dx = *(time_surface_negative_dx.image); //cv_bridge::toCvCopy(time_surface_negative_dx, sensor_msgs::image_encodings::TYPE_16SC1);
+        cv_ptr_negative_dy = *(time_surface_negative_dy.image); //cv_bridge::toCvCopy(time_surface_negative_dy, sensor_msgs::image_encodings::TYPE_16SC1);
     }
     catch (cv_bridge::Exception &e)
     {
@@ -884,7 +885,7 @@ void esvo2_Mapping::timeSurfaceCallback(const sensor_msgs::ImageConstPtr &time_s
         return;
     }
     // push back the new time surface map
-    timePoint t_new_TS = time_surface_left->header.stamp;
+    timePoint t_new_TS = time_surface_left.header_stamp;
 
     // Made the gradient computation optional which is up to the jacobian choice.
     if (dpSolver_.getProblemType() == NUMERICAL || dpSolver_ln_.getProblemType() == NUMERICAL)
@@ -903,7 +904,7 @@ void esvo2_Mapping::timeSurfaceCallback(const sensor_msgs::ImageConstPtr &time_s
     }
 }
 
-void esvo2_Mapping::AACallback(const sensor_msgs::ImageConstPtr &AA_left)
+void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
     // check timestamp consistency
@@ -911,11 +912,11 @@ void esvo2_Mapping::AACallback(const sensor_msgs::ImageConstPtr &AA_left)
     {
         static constexpr double max_time_diff_before_reset_s = 1;
         const timePoint stamp_last_image = TS_history_.rbegin()->first;
-        const double dt = AA_left->header.stamp.toSec() - stamp_last_image.toSec();
+        const double dt = esvo2_core::timePointToSec(AA_left.header_stamp) - esvo2_core::timePointToSec(stamp_last_image);
         if (std::fabs(dt) >= max_time_diff_before_reset_s)
         {
             ROS_INFO("Inconsistent frame timestamp detected <AACallback> (new: %f, old %f), resetting.",
-                     AA_left->header.stamp.toSec(), stamp_last_image.toSec());
+                     esvo2_core::timePointToSec(AA_left.header_stamp), esvo2_core::timePointToSec(stamp_last_image));
             reset();
         }
     }
@@ -923,7 +924,7 @@ void esvo2_Mapping::AACallback(const sensor_msgs::ImageConstPtr &AA_left)
     cv::Mat cv_ptr_left, cv_ptr_right;
     try
     {
-        cv_ptr_left = cv_bridge::toCvCopy(AA_left, sensor_msgs::image_encodings::MONO8);
+        cv_ptr_left = *(AA_left.image); //cv_bridge::toCvCopy(AA_left, sensor_msgs::image_encodings::MONO8);
     }
     catch (cv_bridge::Exception &e)
     {
@@ -970,7 +971,7 @@ void esvo2_Mapping::AACallback(const sensor_msgs::ImageConstPtr &AA_left)
             Event e;
             e.x = roi_events[i][j].second.x;
             e.y = roi_events[i][j].second.y;
-            e.ts = timePoint(AA_left->header.stamp.toSec() + 0.0000001);
+            e.ts = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(AA_left.header_stamp) + 0.0000001);
             EQ_tmp.push_back(e);
             drift_t++;
             AA.at<uchar>(e.y, e.x) = 255;
@@ -992,7 +993,7 @@ void esvo2_Mapping::AACallback(const sensor_msgs::ImageConstPtr &AA_left)
                 Event e;
                 e.x = roi_events[i][j].second.x;
                 e.y = roi_events[i][j].second.y;
-                e.ts = timePoint(AA_left->header.stamp.toSec() + 0.0000001);
+                e.ts = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(AA_left->header.stamp) + 0.0000001);
                 EQ_tmp.push_back(e);
                 drift_t++;
                 AA.at<uchar>(e.y, e.x) = 255;
@@ -1005,15 +1006,15 @@ void esvo2_Mapping::AACallback(const sensor_msgs::ImageConstPtr &AA_left)
     clearEventQueue(events_left_);
 }
 
-void esvo2_Mapping::refImuCallback(const sensor_msgs::ImuPtr &msg)
+void esvo2_Mapping::refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &msg)
 {
-    double t = msg->header.stamp.toSec();
-    double dx = msg->linear_acceleration.x;
-    double dy = msg->linear_acceleration.y;
-    double dz = msg->linear_acceleration.z;
-    double rx = msg->angular_velocity.x;
-    double ry = msg->angular_velocity.y;
-    double rz = msg->angular_velocity.z;
+    double t = esvo2_core::timePointToSec(msg->timestamp);
+    double dx = msg->linear_acceleration[0];
+    double dy = msg->linear_acceleration[1];
+    double dz = msg->linear_acceleration[2];
+    double rx = msg->angular_velocity[0];
+    double ry = msg->angular_velocity[1];
+    double rz = msg->angular_velocity[2];
     Eigen::Vector3d acc(dx, dy, dz);
     Eigen::Vector3d gyr(rx, ry, rz);
     mBuf.lock();
@@ -1148,9 +1149,13 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
     // publish the local 3D map which is used by the tracker.
     if (!pc_color_->empty())
     {
-        pcl::toROSMsg(*pc_color_, *pc_to_publish);
-        pc_to_publish->header.stamp = t;
-        pc_pub_.publish(pc_to_publish);
+        // --Publishing the point cloud to tracking 
+        // pcl::toROSMsg(*pc_color_, *pc_to_publish);
+        // pc_to_publish->header.stamp = t;
+        // pc_pub_.publish(pc_to_publish);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
+        *pointcloud = pc_color_;
+        pointcloud_Map_to_Track.add(pointcloud, t);
     }
     if (!pc_filtered_->empty())
     {
@@ -1162,7 +1167,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
     // publish global pointcloud
     if (bVisualizeGlobalPC_)
     {
-        if (t.toSec() - t_last_pub_pc_ > visualizeGPC_interval_)
+        if (esvo2_core::timePointToSec(t) - t_last_pub_pc_ > visualizeGPC_interval_)
         {
             PointCloud::Ptr pc_filtered(new PointCloud());
             pcl::VoxelGrid<pcl::PointXYZ> sor;
@@ -1183,7 +1188,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
             pcl::toROSMsg(*pc_global_, *pc_to_publish);
             pc_to_publish->header.stamp = t;
             gpc_pub_.publish(pc_to_publish);
-            t_last_pub_pc_ = t.toSec();
+            t_last_pub_pc_ = esvo2_core::timePointToSec(t);
         }
     }
 }

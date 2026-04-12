@@ -13,6 +13,7 @@
 #include <functional>
 #include <opencv4/opencv2/core.hpp>
 #include <opencv4/opencv2/imgproc.hpp>
+#include <esvo2_core/tools/types.h>
 
 namespace esvo2_core
 {
@@ -68,6 +69,9 @@ class BackendOptimization
         // bool getPoseAt(const timePoint &t, esvo2_core::Transformation &Tr, const std::string& source_frame);
 
     private:
+        // Queue
+        DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track;
+
         CameraSystem::Ptr camSysPtr_;
         std::deque<DepthPointFrame> *pDepthPoints_;
         TimeSurfaceHistory *pTS_history_;

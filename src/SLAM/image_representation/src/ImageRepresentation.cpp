@@ -19,7 +19,7 @@ ImageRepresentation::ImageRepresentation(const YAML::Node &config,
             MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
              DataPassingDeque<cv::Mat>* AA_left_IR_to_Map) : config_(config)
 {
-    // Adding the queues
+    // Setting the queues
     this->multi_to_Track = multi_to_Track;
     this->multi_to_Map = multi_to_Map;
     this->AA_left_IR_to_Map = AA_left_IR_to_Map;
@@ -28,21 +28,21 @@ ImageRepresentation::ImageRepresentation(const YAML::Node &config,
     event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
     image_transport::ImageTransport it_(nh_);
     is_left_ = config_["is_left"].as<bool>(true);
-    if (is_left_)
-    {
-        image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5); // for block matching
-        image_representation_pub_negative_TS_ =
-            it_.advertise("image_representation_negative_TS_", 5); // negative OS-TS for 3D-2D regristration
-        image_representation_pub_AA_frequency_ = it_.advertise("image_representation_AA_frequency_", 5);
-        image_representation_pub_AA_mat_ =
-            it_.advertise("image_representation_AA_mat_", 5); // for temporal stereo matching
-        dx_image_pub_ = it_.advertise("dx_image_pub_", 5);    // gradient map for point sampling
-        dy_image_pub_ = it_.advertise("dy_image_pub_", 5);
-    }
-    else
-    {
-        image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5);
-    }
+    // if (is_left_)
+    // {
+    //     image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5); // for block matching
+    //     image_representation_pub_negative_TS_ =
+    //         it_.advertise("image_representation_negative_TS_", 5); // negative OS-TS for 3D-2D regristration
+    //     image_representation_pub_AA_frequency_ = it_.advertise("image_representation_AA_frequency_", 5);
+    //     image_representation_pub_AA_mat_ =
+    //         it_.advertise("image_representation_AA_mat_", 5); // for temporal stereo matching
+    //     dx_image_pub_ = it_.advertise("dx_image_pub_", 5);    // gradient map for point sampling
+    //     dy_image_pub_ = it_.advertise("dy_image_pub_", 5);
+    // }
+    // else
+    // {
+    //     image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5);
+    // }
     bUse_Sim_Time_ = config_["use_sim_time"].as<bool>(true);
 
     // system variables
@@ -84,12 +84,12 @@ ImageRepresentation::ImageRepresentation(const YAML::Node &config,
 
 ImageRepresentation::~ImageRepresentation()
 {
-    dx_image_pub_.shutdown();
-    dy_image_pub_.shutdown();
-    image_representation_pub_TS_.shutdown();
-    image_representation_pub_negative_TS_.shutdown();
-    image_representation_pub_AA_frequency_.shutdown();
-    image_representation_pub_AA_mat_.shutdown();
+    // dx_image_pub_.shutdown();
+    // dy_image_pub_.shutdown();
+    // image_representation_pub_TS_.shutdown();
+    // image_representation_pub_negative_TS_.shutdown();
+    // image_representation_pub_AA_frequency_.shutdown();
+    // image_representation_pub_AA_mat_.shutdown();
 }
 
 void ImageRepresentation::init(int width, int height)
@@ -145,11 +145,11 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
         int y = e.y / (int)ceil((double)sensor_size_.height / (double)y_patches_);
         int x = e.x / (int)ceil((double)sensor_size_.width / (double)x_patches_);
         beta[y * x_patches_ + x] = 1 / (1 + final_activity[y * x_patches_ + x] *
-                                                abs(e.ts.toSec() - last_event_time[y * x_patches_ + x])); // eq. 2
+                                                abs(esvo2_core::timePointToSec(e.ts) - last_event_time[y * x_patches_ + x])); // eq. 2
         if (y * x_patches_ + x >= x_patches_ * y_patches_)
             exit(-1);
         final_activity[y * x_patches_ + x] = beta[y * x_patches_ + x] * final_activity[y * x_patches_ + x] + 1; // eq. 1
-        last_event_time[y * x_patches_ + x] = e.ts.toSec();
+        last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.ts);
         // nums_temp[y * x_patches_ + x]++;
     }
     // for(int i = 0; i < x_patches_ * y_patches_; i++)
@@ -165,9 +165,9 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
         if (flag[y * x_patches_ + x] != true)
             continue;
         beta[y * x_patches_ + x] = 1 / (1 + event_activity[y * x_patches_ + x] *
-                                                abs(e.ts.toSec() - last_event_time[y * x_patches_ + x]));       // eq. 2
+                                                abs(esvo2_core::timePointToSec(e.ts) - last_event_time[y * x_patches_ + x]));       // eq. 2
         event_activity[y * x_patches_ + x] = beta[y * x_patches_ + x] * event_activity[y * x_patches_ + x] + 1; // eq. 1
-        last_event_time[y * x_patches_ + x] = e.ts.toSec();
+        last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.ts);
         AA_frequency.at<uchar>(e.y, e.x)++;
         num[y * x_patches_ + x]++;
         if (AA_frequency.at<uchar>(e.y, e.x) >= 1)
@@ -194,15 +194,27 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     // distortion correction
     cv::remap(representation_AA_, representation_AA_, undistort_map1_, undistort_map2_, CV_INTER_LINEAR);
 
-    cv_bridge::CvImage cv_AA_frequency, cv_AA_mat;
-    cv_AA_frequency.encoding = "mono8";
-    cv_AA_mat.encoding = "mono8";
-    cv_AA_frequency.image = AA_frequency.clone();
-    cv_AA_mat.image = representation_AA_.clone();
-    cv_AA_frequency.header.stamp = external_sync_time;
-    cv_AA_mat.header.stamp = external_sync_time;
-    image_representation_pub_AA_frequency_.publish(cv_AA_frequency.toImageMsg());
-    image_representation_pub_AA_mat_.publish(cv_AA_mat.toImageMsg());
+    // cv_bridge::CvImage cv_AA_frequency, cv_AA_mat;
+
+    // ---Publishing AA_frequency AKA AA_Left
+    // cv_bridge::CvImage cv_AA_frequency
+    // cv_AA_frequency.encoding = "mono8";
+    // cv_AA_frequency.image = AA_frequency.clone();
+    // cv_AA_frequency.header.stamp = external_sync_time;
+    // image_representation_pub_AA_frequency_.publish(cv_AA_frequency.toImageMsg());
+    std::shared_ptr<cv::Mat> AA_freq = make_shared<cv::Mat();
+    *AA_freq = AA_frequency;
+    AA_left_IR_to_Map->add(AA_freq, external_sync_time);
+
+    // ---Publishing AA_map
+    // cv_AA_mat.encoding = "mono8";
+    // cv_AA_mat.image = representation_AA_.clone();
+    // cv_AA_mat.header.stamp = external_sync_time;
+    // image_representation_pub_AA_mat_.publish(cv_AA_mat.toImageMsg());
+    std::shared_ptr<cv::Mat> AA_map = make_shared<cv::Mat();
+    *AA_map = representation_AA_;
+    multi_to_Map->add<2>({representation_AA_, external_sync_time});
+
 }
 
 void ImageRepresentation::createImageRepresentationAtTime(const timePoint &external_sync_time)
@@ -224,7 +236,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
     {
         if (vEvents_.size() == 0)
             return;
-        double external_t = external_sync_time.toSec();
+        double external_t = esvo2_core::timePointToSec(external_sync_time);
         std::vector<Event>::iterator ptr_e = EventVector_lower_bound(vEvents_, external_t);
         int distance = std::distance(vEvents_.begin(), ptr_e);
 
@@ -248,7 +260,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
                 if (index > distance - 2)
                     break;
                 Event e = *(it + index);
-                TS_temp_map(e.y, e.x) = e.ts.toSec() / decay_sec_;
+                TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.ts) / decay_sec_;
             }
 
             cv::eigen2cv(TS_temp_map, representation_TS_);
@@ -276,28 +288,39 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             negative_TS_img = negative_TS_img * 255;
             negative_TS_img = negative_TS_img - OS_TS;
 
-            cv_bridge::CvImage cv_TS_image, cv_negative_TS_image;
-
-            cv_TS_image.encoding = "mono8";
-            cv_negative_TS_image.encoding = "mono8";
-            cv_dx_image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
-            cv_dy_image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
-
-            cv_TS_image.header.stamp = timePoint(external_t);
-            cv_negative_TS_image.header.stamp = timePoint(external_t);
-            cv_dx_image.header.stamp = timePoint(external_t);
-            cv_dy_image.header.stamp = timePoint(external_t);
-
-            cv_TS_image.image = TS_img.clone();
-            cv_negative_TS_image.image = negative_TS_img.clone();
-
+            // cv_bridge::CvImage cv_TS_image, cv_negative_TS_image;
+            // dx and dy are published in sobel so idk why have the below
+            // cv_dx_image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
+            // cv_dy_image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
+            // cv_dx_image.header.stamp = timePoint(external_t);
+            // cv_dy_image.header.stamp = timePoint(external_t);
+            
             thread_sobel = std::thread(&ImageRepresentation::sobel, this, external_t);
 
-            cv_TS_image.header.stamp = external_sync_time;
-            cv_negative_TS_image.header.stamp = external_sync_time;
+            // ---Publishing TS_left
+            // cv_TS_image.encoding = "mono8";
+            // cv_TS_image.header.stamp = timePoint(external_t);
+            // cv_TS_image.image = TS_img.clone();
+            // cv_TS_image.header.stamp = external_sync_time;
+            // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
+            std::shared_ptr<cv::Mat> TS_left = make_shared<cv::Mat();
+            *TS_left = TS_img;
+            // Can add same shared ptr to both because they treat it as a const in the callback functions I think
+            multi_to_Track->add<0>({TS_left, external_sync_time});
+            multi_to_Map->add<0>({TS_left, external_sync_time});
 
-            image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
-            image_representation_pub_negative_TS_.publish(cv_negative_TS_image.toImageMsg());
+            // ---Publishing TS_neg
+            // cv_negative_TS_image.encoding = "mono8";
+            // cv_negative_TS_image.header.stamp = timePoint(external_t);
+            // cv_negative_TS_image.image = negative_TS_img.clone();
+            // cv_negative_TS_image.header.stamp = external_sync_time;
+            // image_representation_pub_negative_TS_.publish(cv_negative_TS_image.toImageMsg());
+            std::shared_ptr<cv::Mat> TS_neg = make_shared<cv::Mat();
+            *TS_neg = negative_TS_img;
+            // Can add same shared ptr to both because they treat it as a const in the callback functions I think
+            multi_to_Track->add<1>({TS_neg, external_sync_time});
+            multi_to_Map->add<3>({TS_neg, external_sync_time});
+            
             thread0.join();
         }
         else // generate TS, just for right camera
@@ -315,7 +338,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
                 if (index > distance - 2)
                     break;
                 Event e = *(it + index);
-                TS_temp_map(e.y, e.x) = e.ts.toSec() / decay_sec_;
+                TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.ts) / decay_sec_;
             }
             cv::eigen2cv(TS_temp_map, representation_TS_);
 
@@ -328,11 +351,18 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
 
             cv::medianBlur(TS_img, TS_img, 2 * median_blur_kernel_size_ + 1);
 
-            cv_bridge::CvImage cv_TS_image;
-            cv_TS_image.encoding = "mono8";
-            cv_TS_image.header.stamp = timePoint(external_t);
-            cv_TS_image.image = TS_img.clone();
-            image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
+           
+
+            // ---Publishing TS_right
+            // cv_bridge::CvImage cv_TS_image;
+            // cv_TS_image.encoding = "mono8";
+            // cv_TS_image.header.stamp = timePoint(external_t);
+            // cv_TS_image.image = TS_img.clone();
+            // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
+            std::shared_ptr<cv::Mat> TS_right = make_shared<cv::Mat();
+            *TS_right = TS_img;
+            // Can add same shared ptr to both because they treat it as a const in the callback functions I think
+            multi_to_Map->add<1>({TS_right, external_sync_time});
         }
 
         clearEvents(distance, ptr_e);
@@ -384,12 +414,30 @@ void ImageRepresentation::clearEventQueue()
 
 void ImageRepresentation::sobel(double external_t)
 {
-    cv::Sobel(negative_TS_img, cv_dx_image.image, CV_16SC1, 1, 0);
-    cv::Sobel(negative_TS_img, cv_dy_image.image, CV_16SC1, 0, 1);
-    cv_dx_image.header.stamp = timePoint(external_t);
-    cv_dy_image.header.stamp = timePoint(external_t);
-    dx_image_pub_.publish(cv_dx_image.toImageMsg());
-    dy_image_pub_.publish(cv_dy_image.toImageMsg());
+    cv::Mat dx_result;
+    cv::Mat dy_result;
+    cv::Sobel(negative_TS_img, dx_result, CV_16SC1, 1, 0);
+    cv::Sobel(negative_TS_img, dy_result, CV_16SC1, 0, 1);
+
+    // Publishing dx
+    // cv_dx_image.header.stamp = timePoint(external_t);
+    // dx_image_pub_.publish(cv_dx_image.toImageMsg());
+    std::shared_ptr<cv::Mat> dx_image = make_shared<cv::Mat();
+    *dx_image = std::move(dx_result);
+    // Can add same shared ptr to both because they treat it as a const in the callback functions I think
+    multi_to_Track->add<2>({dx_image, timePoint(external_t)});
+    multi_to_Map->add<4>({dx_image, timePoint(external_t)});
+
+
+    // Publishing dy
+    // cv_dy_image.header.stamp = timePoint(external_t);
+    // dy_image_pub_.publish(cv_dy_image.toImageMsg());
+    std::shared_ptr<cv::Mat> dy_image = make_shared<cv::Mat();
+    *dy_image = std::move(dy_result);
+    // Can add same shared ptr to both because they treat it as a const in the callback functions I think
+    multi_to_Track->add<3>({dy_image, timePoint(external_t)});
+    multi_to_Map->add<5>({dy_image, timePoint(external_t)});
+
 }
 
 bool ImageRepresentation::loadCalibInfo(const std::string &cameraSystemDir, bool &is_left)

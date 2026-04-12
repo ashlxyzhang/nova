@@ -63,14 +63,14 @@ class esvo2_Tracking
                                     // updated at the same frequency.
         bool curImuTransferring();
         // topic callback functions
-        void refMapCallback(const sensor_msgs::PointCloud2::ConstPtr &msg);
-        void refImuCallback(const sensor_msgs::ImuPtr &msg);
-        void VBaBgCallback(const VBaBg &msg);
+        void refMapCallback(const std::pair<std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>>, timePoint> &msg);
+        void refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &msg);
+        void VBaBgCallback(const std::shared_ptr<esvo2_core::VBaBg> &msg);
         void groundTruthCallback(const geometry_msgs::PoseStampedConstPtr &msg);
-        void timeSurface_NegaTS_Callback(const sensor_msgs::ImageConstPtr &time_surface_left,
-                                         const sensor_msgs::ImageConstPtr &time_surface_negative,
-                                         const sensor_msgs::ImageConstPtr &time_surface_dx,
-                                         const sensor_msgs::ImageConstPtr &time_surface_dy);
+        void timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &time_surface_left,
+                                         const esvo2_core::ImagePtr &time_surface_negative,
+                                         const esvo2_core::ImagePtr &time_surface_dx,
+                                         const esvo2_core::ImagePtr &time_surface_dy);
         void eventsCallback(const EventArray::ConstPtr &msg);
 
         // results
@@ -81,7 +81,7 @@ class esvo2_Tracking
         // utils
         void reset();
         void clearEventQueue();
-        void stampedPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg);
+        void stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &msg);
         bool getPoseAt(const timePoint &t,
                        esvo2_core::Transformation &Tr, // T_world_something
                        const std::string &source_frame);
@@ -92,7 +92,6 @@ class esvo2_Tracking
         //queues
         DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map;
         DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track;
-
 
         // configuration variables struct
         YAML::Node config_;

@@ -64,18 +64,18 @@ class esvo2_Mapping
         bool dataTransferring();
 
         // callback functions
-        void stampedPoseCallback(const geometry_msgs::PoseStampedConstPtr &ps_msg);
+        void stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &ps_msg);
         void eventsCallback(const EventArray::ConstPtr &msg, EventQueue &EQ);
-        void timeSurfaceCallback(const sensor_msgs::ImageConstPtr &time_surface_left,
-                                 const sensor_msgs::ImageConstPtr &time_surface_right,
-                                 const sensor_msgs::ImageConstPtr &AA_map,
-                                 const sensor_msgs::ImageConstPtr &time_surface_negative,
-                                 const sensor_msgs::ImageConstPtr &time_surface_dx,
-                                 const sensor_msgs::ImageConstPtr &time_surface_dy);
+        void timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface_left,
+                                 const esvo2_core::ImagePtr &time_surface_right,
+                                 const esvo2_core::ImagePtr &AA_map,
+                                 const esvo2_core::ImagePtr &time_surface_negative,
+                                 const esvo2_core::ImagePtr &time_surface_dx,
+                                 const esvo2_core::ImagePtr &time_surface_dy);
         // void onlineParameterChangeCallback(DVS_MappingStereoConfig &config, uint32_t level);
-        void AACallback(const sensor_msgs::ImageConstPtr &AA_left);
+        void AACallback(const esvo2_core::ImagePtr &AA_left);
         // EventQueue& EQ);
-        void refImuCallback(const sensor_msgs::ImuPtr &msg);
+        void refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &msg);
         // utils
         bool getPoseAt(const timePoint &t, Transformation &Tr, const std::string &source_frame);
         void clearEventQueue(EventQueue &EQ);
@@ -108,40 +108,43 @@ class esvo2_Mapping
                         const Eigen::Vector3d &angular_velocity);
 
         /************************ member variables ************************/
+        bool bpoints_from_AA_; // must be public so slam_manager can access it
     private:
         //queues
-        DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track;
+        // DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track; MOVED TO BACKEND_OPTIMIZATION.h
         DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track;
 
         // configuration variables struct
         YAML::Node config_;
 
         // Subscribers
-        ros::Subscriber stampedPose_sub_, AA_frequency_sub_, events_left_sub_;
-        message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
-        message_filters::Subscriber<sensor_msgs::Image> AA_map_sub_;
-        message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
+        ros::Subscriber events_left_sub_;
+        // ros::Subscriber stampedPose_sub_, AA_frequency_sub_;
+        // message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
+        // message_filters::Subscriber<sensor_msgs::Image> AA_map_sub_;
+        // message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
 
         ros::Subscriber imu_sub_;
 
         // Publishers
-        ros::Publisher pc_pub_, gpc_pub_, pc_filtered_pub_;
-        ros::Publisher V_ba_bg_pub_;
+        // ros::Publisher pc_pub_;
+         ros::Publisher gpc_pub_, pc_filtered_pub_;
+        // ros::Publisher V_ba_bg_pub_;
         image_transport::ImageTransport it_;
         double t_last_pub_pc_;
 
         // Time-Surface sync policy
-        typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image> ExactSyncPolicy;
-        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image,
-                                                                sensor_msgs::Image, sensor_msgs::Image,
-                                                                sensor_msgs::Image, sensor_msgs::Image>
-            ApproxSyncPolicy2;
-        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>
-            ApproxSyncPolicy;
-        message_filters::Synchronizer<ApproxSyncPolicy> TS_sync_;
-        message_filters::Synchronizer<ApproxSyncPolicy2> TS_AA_sync_;
+        // typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image> ExactSyncPolicy;
+        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image,
+        //                                                         sensor_msgs::Image, sensor_msgs::Image,
+        //                                                         sensor_msgs::Image, sensor_msgs::Image>
+        //     ApproxSyncPolicy2;
+        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>
+        //     ApproxSyncPolicy;
+        // message_filters::Synchronizer<ApproxSyncPolicy> TS_sync_;
+        // message_filters::Synchronizer<ApproxSyncPolicy2> TS_AA_sync_;
 
-        //  **In esvo2_Mapping.cpp, the below stuff never actually happens. Also commented out the
+        //  In esvo2_Mapping.cpp, the below stuff never actually happens. Also commented out the
         //  onlineParameterChangeCallback function.
         // dynamic configuration (modify parameters online).
         // boost::shared_ptr<dynamic_reconfigure::Server<DVS_MappingStereoConfig>> server_;
@@ -188,7 +191,7 @@ class esvo2_Mapping
         PointCloud::Ptr pc_near_, pc_global_;
         pcl::PointCloud<pcl::PointXYZRGBL>::Ptr pc_color_, pc_filtered_;
         DepthFrame::Ptr depthFramePtr_;
-        bool blarge_scale_, bpoints_from_AA_;
+        bool blarge_scale_;
 
         // std::deque<std::vector<DepthPoint> > dqvDepthPoints_,dqvDepthPoints_ln_;
         std::deque<DepthPointFrame> dqvDepthPoints_, dqvDepthPoints_ln_;

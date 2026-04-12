@@ -54,7 +54,7 @@ uint8_t EventPoint::polarity() const
 
 bool EventPoint::valid() const
 {
-    return ts_.toSec() > 0;
+    return esvo2_core::timePointToSec(ts_) > 0;
 }
 
 void EventPoint::copy(const EventPoint &copy)

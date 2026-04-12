@@ -20,6 +20,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <chrono>
 
 #include <yaml-cpp/yaml.h>
 #include <data_passing.h>
@@ -27,6 +28,7 @@
 
 namespace image_representation
 {
+using std::chrono::time_point<std::chrono::steady_clock> timePoint; 
 using EventQueue = std::deque<Event>;
 
 struct ROSTimeCmp
@@ -41,18 +43,18 @@ using GlobalEventQueue = std::map<timePoint, Event, ROSTimeCmp>;
 inline static EventQueue::iterator EventBuffer_lower_bound(EventQueue &eb, timePoint &t)
 {
     return std::lower_bound(eb.begin(), eb.end(), t,
-                            [](const Event &e, const timePoint &t) { return e.ts.toSec() < t.toSec(); });
+                            [](const Event &e, const timePoint &t) { return esvo2_core::timePointToSec(e.ts) < esvo2_core::timePointToSec(t); });
 }
 
 inline static EventQueue::iterator EventBuffer_upper_bound(EventQueue &eb, timePoint &t)
 {
     return std::upper_bound(eb.begin(), eb.end(), t,
-                            [](const timePoint &t, const Event &e) { return t.toSec() < e.ts.toSec(); });
+                            [](const timePoint &t, const Event &e) { return esvo2_core::timePointToSec(t) < esvo2_core::timePointToSec(e.ts); });
 }
 
 inline static std::vector<Event>::iterator EventVector_lower_bound(std::vector<Event> &ev, double &t)
 {
-    return std::lower_bound(ev.begin(), ev.end(), t, [](const Event &e, const double &t) { return e.ts.toSec() < t; });
+    return std::lower_bound(ev.begin(), ev.end(), t, [](const Event &e, const double &t) { return esvo2_core::timePointToSec(e.ts) < t; });
 }
 
 class ImageRepresentation
@@ -67,12 +69,15 @@ class ImageRepresentation
 
         static bool compare_time(const Event &e, const double reference_time)
         {
-            return reference_time < e.ts.toSec();
+            return reference_time < esvo2_core::timePointToSec(e.ts);
         }
 
     private:
         // message passing stuff
+
+        // TSleft, TSnegative, dx, dy; All left only
         MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Track;
+        // TSleft, TSright, AA MAP, TS neg, dx, dy; ALL left except for TSright!
         MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map;
         DataPassingDeque<cv::Mat>* AA_left_IR_to_Map; 
 
@@ -110,11 +115,11 @@ class ImageRepresentation
         ros::Subscriber event_sub_;
         ros::Subscriber camera_info_sub_;
 
-        image_transport::Publisher dx_image_pub_, dy_image_pub_;
-        image_transport::Publisher image_representation_pub_TS_;
-        image_transport::Publisher image_representation_pub_negative_TS_;
-        image_transport::Publisher image_representation_pub_AA_frequency_;
-        image_transport::Publisher image_representation_pub_AA_mat_;
+        // image_transport::Publisher dx_image_pub_, dy_image_pub_;
+        // image_transport::Publisher image_representation_pub_TS_;
+        // image_transport::Publisher image_representation_pub_negative_TS_;
+        // image_transport::Publisher image_representation_pub_AA_frequency_;
+        // image_transport::Publisher image_representation_pub_AA_mat_;
 
         bool left_;
         cv::Mat negative_TS_img;

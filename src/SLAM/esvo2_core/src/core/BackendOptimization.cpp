@@ -121,7 +121,7 @@ void BackendOptimization::sloveProblem()
 
     // Check if the solver converged
     if (initVsFlag && summary.termination_type == ceres::CONVERGENCE)
-        publishVBaBg((*pDepthPoints_)[(*pDepthPoints_).size() - 1].timestamp_.toSec());
+        publishVBaBg(esvo2_core::timePointToSec((*pDepthPoints_)[(*pDepthPoints_).size() - 1].timestamp_));
 
     // stereo + IMU initilization
     if (bUSE_IMU_)
@@ -260,9 +260,9 @@ void BackendOptimization::double2Vector(double para_Pose[][7], double para_Speed
 
 void BackendOptimization::publishVBaBg(double time_v)
 {
-    events_repacking_tool::V_ba_bg msg;
+    esvo2_core::VBaBg msg;
     Eigen::Vector3d V_temp = Rs[WINDOW_SIZE] * RIC_.transpose() * Vs[WINDOW_SIZE];
-    msg.head.push_back(time_v);
+    msg.head = esvo2_core::secondsToTimePoint(time_v);
     if (Bgs[WINDOW_SIZE].norm() > 1 || Bas[WINDOW_SIZE].norm() > 1)
         return;
     for (int i = 0; i < 3; i++)
@@ -272,7 +272,11 @@ void BackendOptimization::publishVBaBg(double time_v)
         msg.bg.push_back(Bgs[WINDOW_SIZE](i));
         msg.g.push_back(g_optimal(i));
     }
-    (*pV_ba_bg_pub_).publish(msg);
+    // Publishing the pv_ba_bg
+    // (*pV_ba_bg_pub_).publish(msg);
+    std::shared_ptr<V_ba_bg> bag = make_shared<V_ba_bg>();
+    *bag = msg;
+    v_ba_bg_Map_to_Track.add(bag, esvo2_core::secondsToTimePoint(time_v));
 }
 
 bool BackendOptimization::CalibrationExRotation(Eigen::Matrix3d &calib_ric_result)

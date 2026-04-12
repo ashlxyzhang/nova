@@ -16,8 +16,9 @@
 
 class SlamManager {
 public:
-    SlamManager()
-    {}
+    using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
+
+    SlamManager() {}
 
     // Spawns threads for all the modules
     void startSlam()
@@ -106,7 +107,7 @@ private:
             cv.wait(lock, std::chrono::seconds(1));
             
             // Get data until all queues are empty
-            bool gotOne = false;
+            bool gotOne = true;
             while(gotOne)
             {
                 if(!running)
@@ -133,12 +134,12 @@ private:
                     std::pair<std::shared_ptr<cv::Mat>, timePoint> dx = std::get<4>(result);
                     std::pair<std::shared_ptr<cv::Mat>, timePoint> dy = std::get<5>(result);
 
-                    sensor_msgs::ImageConstPtr time_surface_left(ts_left);
-                    sensor_msgs::ImageConstPtr time_surface_right(ts_right);
-                    sensor_msgs::ImageConstPtr AA_map(aa_map);
-                    sensor_msgs::ImageConstPtr time_surface_negative(ts_neg);
-                    sensor_msgs::ImageConstPtr time_surface_negative_dx(dx);
-                    sensor_msgs::ImageConstPtr time_surface_negative_dy(dy);
+                    esvo2_core::ImagePtr time_surface_left(ts_left);
+                    esvo2_core::ImagePtr time_surface_right(ts_right);
+                    esvo2_core::ImagePtr AA_map(aa_map);
+                    esvo2_core::ImagePtr time_surface_negative(ts_neg);
+                    esvo2_core::ImagePtr time_surface_negative_dx(dx);
+                    esvo2_core::ImagePtr time_surface_negative_dy(dy);
 
                     mapping->timeSurfaceCallback(time_surface_left, time_surface_right, AA_map, time_surface_negative, time_surface_negative_dx, time_surface_negative_dy);
                 }
@@ -156,24 +157,27 @@ private:
                     std::pair<std::shared_ptr<esvo2_core::PoseStamped>, timePoint> result = stamped_pose_Track_to_Map.getValue();
                     stamped_pose_Track_to_Map.unlock();
 
-                    esvo2_core::PoseStamped stamped_pose = result->first;
+                    std::shared_ptr<esvo2_core::PoseStamped> stamped_pose = result.first;
                     mapping->stampedPoseCallback(stamped_pose);
                 }
 
-                // checking the AA_left_IR_to_Map
-                AA_left_IR_to_Map.lock();
-                if(AA_left_IR_to_Map.queueEmpty())
+                // checking the AA_left_IR_to_Map. Only do so if bpoints_from_AA is true
+                if(mapping->bpoints_from_AA_)
                 {
-                    AA_left_IR_to_Map.unlock();
-                }
-                else
-                {
-                    gotOne=true;
-                    std::pair<std::shared_ptr<cv::Mat>, timePoint> result = AA_left_IR_to_Map.getValue();
-                    AA_left_IR_to_Map.unlock();
+                    AA_left_IR_to_Map.lock();
+                    if(AA_left_IR_to_Map.queueEmpty())
+                    {
+                        AA_left_IR_to_Map.unlock();
+                    }
+                    else
+                    {
+                        gotOne=true;
+                        std::pair<std::shared_ptr<cv::Mat>, timePoint> result = AA_left_IR_to_Map.getValue();
+                        AA_left_IR_to_Map.unlock();
 
-                    sensor_msgs::ImageConstPtr AA_left(result);
-                    mapping->AACallback(AA_left);
+                        esvo2_core::ImagePtr AA_left(result);
+                        mapping->AACallback(AA_left);
+                    }
                 }
             }
         }
@@ -188,7 +192,7 @@ private:
             cv.wait(lock, std::chrono::seconds(1));
             
             // Get data until all queues are empty
-            bool gotOne = false;
+            bool gotOne = true;
             while(gotOne)
             {
                 if(!running)
@@ -213,10 +217,10 @@ private:
                     std::pair<std::shared_ptr<cv::Mat>, timePoint> dx = std::get<2>(result);
                     std::pair<std::shared_ptr<cv::Mat>, timePoint> dy = std::get<3>(result);
 
-                    sensor_msgs::ImageConstPtr time_surface_left(ts_left);
-                    sensor_msgs::ImageConstPtr time_surface_negative(ts_neg);
-                    sensor_msgs::ImageConstPtr time_surface_negative_dx(dx);
-                    sensor_msgs::ImageConstPtr time_surface_negative_dy(dy);
+                    esvo2_core::ImagePtr time_surface_left(ts_left);
+                    esvo2_core::ImagePtr time_surface_negative(ts_neg);
+                    esvo2_core::ImagePtr time_surface_negative_dx(dx);
+                    esvo2_core::ImagePtr time_surface_negative_dy(dy);
 
                     tracking->timeSurface_NegaTS_Callback(time_surface_left, time_surface_negative, time_surface_negative_dx, time_surface_negative_dy);
                 }
@@ -234,7 +238,7 @@ private:
                     std::pair<std::shared_ptr<esvo2_core::VBaBg>, timePoint> result = v_ba_bg_Map_to_Track.getValue();
                     v_ba_bg_Map_to_Track.unlock();
 
-                    esvo2_core::VBaBg msg = result->first;
+                    std::shared_ptr<esvo2_core::VBaBg> msg = result.first;
                     tracking->VBaBgCallback(msg);
                 }
 
@@ -265,7 +269,7 @@ private:
                     std::pair<std::shared_ptr<esvo2_core::PoseStamped>, timePoint> result = stamped_pose_Track_to_Track.getValue();
                     stamped_pose_Track_to_Track.unlock();
 
-                    esvo2_core::PoseStamped stamped_pose = result->first;
+                    std::shared_ptr<esvo2_core::PoseStamped> stamped_pose = result.first;
                     tracking->stampedPoseCallback(stamped_pose);
                 }
             }
@@ -303,14 +307,14 @@ private:
     DataPassingDeque<cv::Mat> AA_left_IR_to_Map;
    
     // Multi Data Passing
-    // TSleft, TSnegative, dx, dy; All LEFT!
+    // TSleft, TSnegative, dx, dy; All left!
     MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat> multi_to_Track;
     // DataPassingDeque<cv::Mat> time_surface_left_IR_to_Track; // part of multidata
     // DataPassingDeque<cv::Mat> neg_time_surface_left_IR_to_Track; // part of multidata
     // DataPassingDeque<cv::Mat> neg_time_surface_dx_left_IR_to_Track; // part of multidata
     // DataPassingDeque<cv::Mat> neg_time_surface_dy_left_IR_to_Track;// part of multidata
 
-    // TS left, TS right, AA MAP, TS neg, dx, dy; ALL LEFT!
+    // TSleft, TSright, AA MAP, TS neg, dx, dy; ALL left except for TSright!
     MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat> multi_to_Map;
     // DataPassingDeque<cv::Mat> time_surface_left_IR_to_Map; // part of multidata
     // DataPassingDeque<cv::Mat> time_surface_right_IR_to_Map; // part of multidata
@@ -345,8 +349,6 @@ private:
 };
 
 // TODO
-    // merge with Ashley's code 
-    // get rid of subscribe/publish/advertises in mapping, tracking, and image representation
     // figure out how pull in events and set up queues for them? or do something different
     // figure out the visualization stuff and what we need in order to display it all
 
@@ -355,3 +357,4 @@ private:
         // - might have to add is_left as a constructor param to the ImageRepresentation nodes? Because only set in calibrate right now? 
         //    OR is it in one of the yaml files? I can't tell if the right one always advertises everything as well but then never 
         //    publishes those due to a quirk in the logic?
+        // -  I am pretty sure stuff in the subscribe callback functions treat variables as a const, so is okay to send same shared ptr to multiple queues probably

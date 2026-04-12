@@ -18,7 +18,7 @@ struct EventMessageEditor
         void resetBuffer(timePoint startTimeStamp)
         {
             start_time_ = startTimeStamp;
-            end_time_ = timePoint(start_time_.toSec() + duration_threshold_);
+            end_time_ = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(start_time_) + duration_threshold_);
             eArray_.events.clear();
             eArray_.header.stamp = end_time_;
         }
@@ -37,7 +37,7 @@ struct EventMessageEditor
                 bFirstMessage_ = false;
             }
 
-            if (e.ts.toSec() >= end_time_.toSec())
+            if (esvo2_core::timePointToSec(e.ts) >= esvo2_core::timePointToSec(end_time_))
             {
                 bag->write(message_topic_.c_str(), eArray_.header.stamp, eArray_);
                 resetBuffer(end_time_);
@@ -108,8 +108,8 @@ int main(int argc, char *argv[])
     {
         rosbag::View view(bag_src, rosbag::TopicQuery(topics[i]));
         EventMessageEditor eArrayEditor(frequency, topics_rename[i]);
-        start_time = timePoint(view.getBeginTime().toSec());
-        end_time = timePoint(view.getEndTime().toSec() + 0.01);
+        start_time = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(view.getBeginTime()));
+        end_time = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(view.getEndTime()) + 0.01);
 
         // topic loop
         for (rosbag::MessageInstance const m : view)
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
     for (rosbag::MessageInstance const m : view)
     {
         sensor_msgs::Imu::ConstPtr msg = m.instantiate<sensor_msgs::Imu>();
-        if (msg->header.stamp.toSec() < start_time.toSec() || msg->header.stamp.toSec() > end_time.toSec())
+        if (esvo2_core::timePointToSec(msg->header.stamp) < esvo2_core::timePointToSec(start_time) || esvo2_core::timePointToSec(msg->header.stamp) > esvo2_core::timePointToSec(end_time))
             continue;
         // the topic name in the output bag file
         bag_dst.write("/imu/data", msg->header.stamp, *msg);
