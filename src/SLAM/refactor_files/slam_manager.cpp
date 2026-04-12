@@ -370,7 +370,6 @@ private:
 
     - Visualization stuff
        - Figure out how to visualize PCL (point cloud library)
-           - Add PCL to the vcpckg
            - Set up a class for SLAM in the visualizer
            - Send data to that class from the Mapping pointcloud_global2 publisher??
        - If have time, can add ways to visualize the other stuff 
@@ -380,7 +379,6 @@ private:
          - visualize the various cv::Mat images produced (like time surface, aa, inverse depth, etc.)
         
     - Try to compile
-        - Add point cloud library to vcpkg (I think just need common??)
         - Update cmake lists
         - Fix all compile errors once get them
         - Hope it runs properly

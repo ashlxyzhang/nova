@@ -10,6 +10,7 @@
     },
     "sdl3-ttf",
     "boost-iostreams",
-    "openeb"
+    "openeb",
+    "pcl"
   ]
 }
