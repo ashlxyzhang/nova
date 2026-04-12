@@ -28,7 +28,7 @@
 
 namespace image_representation
 {
-using std::chrono::time_point<std::chrono::steady_clock> timePoint; 
+using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 using EventQueue = std::deque<Event>;
 
 struct ROSTimeCmp

@@ -425,8 +425,8 @@ void ImageRepresentation::sobel(double external_t)
     std::shared_ptr<cv::Mat> dx_image = make_shared<cv::Mat();
     *dx_image = std::move(dx_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-    multi_to_Track->add<2>({dx_image, timePoint(external_t)});
-    multi_to_Map->add<4>({dx_image, timePoint(external_t)});
+    multi_to_Track->add<2>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
+    multi_to_Map->add<4>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
 
 
     // Publishing dy
@@ -435,8 +435,8 @@ void ImageRepresentation::sobel(double external_t)
     std::shared_ptr<cv::Mat> dy_image = make_shared<cv::Mat();
     *dy_image = std::move(dy_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-    multi_to_Track->add<3>({dy_image, timePoint(external_t)});
-    multi_to_Map->add<5>({dy_image, timePoint(external_t)});
+    multi_to_Track->add<3>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
+    multi_to_Map->add<5>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
 
 }
 

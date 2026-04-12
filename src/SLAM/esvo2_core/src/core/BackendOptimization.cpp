@@ -6,7 +6,8 @@ namespace esvo2_core
 {
 namespace core
 {
-BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr) : camSysPtr_(camSysPtr)
+BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>* _v_ba_bg_Map_to_Track) 
+: camSysPtr_(camSysPtr), v_ba_bg_Map_to_Track(_v_ba_bg_Map_to_Track)
 {
     // Init camera system
     RIC_ = camSysPtr_->cam_left_ptr_->T_b_c_.block<3, 3>(0, 0);

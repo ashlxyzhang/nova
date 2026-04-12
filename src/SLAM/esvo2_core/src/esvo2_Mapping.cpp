@@ -685,7 +685,7 @@ bool esvo2_Mapping::dataTransferring()
         else
         {
             t_end = TS_obs_ptr_->first;
-            t_begin = timePoint(std::max(0.0, esvo2_core::timePointToSec(t_end) - 10 * BM_half_slice_thickness_));
+            t_begin = esvo2_core::secondsToTimePoint(std::max(0.0, esvo2_core::timePointToSec(t_end) - 10 * BM_half_slice_thickness_));
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
@@ -716,7 +716,7 @@ bool esvo2_Mapping::dataTransferring()
         else
         {
             t_end = TS_obs_ptr_->first;
-            t_begin = timePoint(std::max(0.0, esvo2_core::timePointToSec(t_end) - 10 * BM_half_slice_thickness_));
+            t_begin = esvo2_core::secondsToTimePoint(std::max(0.0, esvo2_core::timePointToSec(t_end) - 10 * BM_half_slice_thickness_));
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
@@ -1153,9 +1153,9 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         // pcl::toROSMsg(*pc_color_, *pc_to_publish);
         // pc_to_publish->header.stamp = t;
         // pc_pub_.publish(pc_to_publish);
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
-        *pointcloud = pc_color_;
-        pointcloud_Map_to_Track.add(pointcloud, t);
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_local_2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
+        *pointcloud_local_2 = pc_color_;
+        pointcloud_Map_to_Track.add(pointcloud_local_2, t);
     }
     if (!pc_filtered_->empty())
     {
