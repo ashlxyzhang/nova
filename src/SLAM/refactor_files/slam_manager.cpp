@@ -348,13 +348,49 @@ private:
     
 };
 
-// TODO
-    // figure out how pull in events and set up queues for them? or do something different
-    // figure out the visualization stuff and what we need in order to display it all
+// -------TODO---------
+/* 
+    - Do event stuff!
+        - Need to check with Ryan to make sure scrubbers are ready.
+        - Also need to check with Ashley to make sure I am understanding this right
+        - maybe just make another thread that reads from the left and right camera scrubbers, assembles events into an event array 
+          of size according to what the google doc says (all events in a 0.001 second interval), then sends them to 3 queues
+        - update process_image_representation_left_thread and process_image_representation_right_thread to process the left/right queues
+        - update process_mapping_thread() to process the left_map queue
 
-  // NOTES
-        // - (10,10) for multi_data_passing queue sizes might be incorrect, but it should be fine
-        // - might have to add is_left as a constructor param to the ImageRepresentation nodes? Because only set in calibrate right now? 
-        //    OR is it in one of the yaml files? I can't tell if the right one always advertises everything as well but then never 
-        //    publishes those due to a quirk in the logic?
-        // -  I am pretty sure stuff in the subscribe callback functions treat variables as a const, so is okay to send same shared ptr to multiple queues probably
+    - Comment out all IMU stuff
+        - comment out all the IMU code that we aren't using that isn't already disabled by the flag not being set
+        - shouldn't be too bad
+
+    - Update ros time stuff!
+       - The main mapping/tracking thread functions use some ROS time stuff. Should update to use std::chrono stuff instead
+
+    - Get rid of any remaining cv_bridge stuff!
+       - It shouldn't be necessary anymore and can just replace with a cv::Mat
+
+    - Visualization stuff
+       - Figure out how to visualize PCL (point cloud library)
+           - Add PCL to the vcpckg
+           - Set up a class for SLAM in the visualizer
+           - Send data to that class from the Mapping pointcloud_global2 publisher??
+       - If have time, can add ways to visualize the other stuff 
+         - All visualization queues are commented out above, so can readd them if want to 
+         - visualize the other types of point clouds 
+         - visualize the pose/trajectory info 
+         - visualize the various cv::Mat images produced (like time surface, aa, inverse depth, etc.)
+        
+    - Try to compile
+        - Add point cloud library to vcpkg (I think just need common??)
+        - Update cmake lists
+        - Fix all compile errors once get them
+        - Hope it runs properly
+        - Fix bugs when it doesn't run properly
+           - Might be worth to visualize the cv::Mat inverse depth if need to debug something
+*/
+
+// -----------NOTES on sus things---------
+/*
+    - (10,10) for multi_data_passing queue sizes might be incorrect, but it should be fine
+    - I am pretty sure stuff in the subscribe callback functions treat variables as a const, 
+        so I have been treating it as okay to send the same shared ptr to multiple queues
+*/
