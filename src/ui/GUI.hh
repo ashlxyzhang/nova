@@ -3,6 +3,7 @@
 #define GUI_HH
 
 #include "data/DataAcquisition.hh"
+#include "data/DataSource.hh"
 #include "fonts/CascadiaCode.ttf.h"
 #include "imgui_internal.h"
 #include "render/DigitalCodedExposure.hh"

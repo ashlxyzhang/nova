@@ -2,7 +2,6 @@
 #ifndef DATA_ACQUISITION_HH
 #define DATA_ACQUISITION_HH
 
-#include "data/DataSource.hh"
 #include "ui/Scrubber.hh"
 #include "data/DVEventReader.hh"
 #include "data/EventData.hh"
@@ -17,6 +16,8 @@
 
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
+
+struct DataSource;
 
 /**
  * @brief This class provides a nice wrapper for managing and creating multiple DataSource's in a thread-safe way

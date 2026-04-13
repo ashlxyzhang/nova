@@ -1,5 +1,6 @@
 
 #include "data/DataAcquisition.hh"
+#include "data/DataSource.hh"
 #include <algorithm>
 
 DataAcquisition::DataAcquisition(SDL_GPUDevice* gpu_device): gpu_device(gpu_device) {}
