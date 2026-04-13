@@ -167,9 +167,10 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     app->data_acquisition_running = false;
     app->data_acquisition_thread.join();
 
-    SDL_DestroyWindow(app->window);
-
+    // It's important to free window after we delete app b/c GPUDevice wrapper releases window from GPU
+    SDL_Window *window = app->window;
     delete app;
     
+    SDL_DestroyWindow(window);
     SDL_Quit();
 }
