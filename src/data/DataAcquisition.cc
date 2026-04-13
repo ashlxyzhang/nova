@@ -88,7 +88,7 @@ Scrubber::State DataAcquisition::get_state()
     // Lazily update the upper bounds of the shared state before returning
     for (std::shared_ptr<DataSource> data_source: data_sources)
     {  
-        Scrubber::State state = data_source->scrubber.get_state();
+        Scrubber::State state = data_source->scrubber.state;
         shared_scrubber_state.max_index = (std::max)(shared_scrubber_state.max_index, state.max_index);
         shared_scrubber_state.max_time = (std::max)(shared_scrubber_state.max_time, state.max_time);
     }
@@ -103,7 +103,7 @@ void DataAcquisition::sync_start()
 
     // Apply controls to each individual data_source
     for (std::shared_ptr<DataSource> data_source: data_sources) {
-        Scrubber::State state = data_source->scrubber.get_state();
+        Scrubber::State state = data_source->scrubber.state;
 
         // Copy scrubbing parameters
         state.type = synced.type;
@@ -118,7 +118,7 @@ void DataAcquisition::sync_start()
         state.current_index = (std::min)(synced.current_index, state.max_index);
 
         // Reapply state
-        data_source->scrubber.set_state(state);
+        data_source->scrubber.state = state;
     }
 }
 
@@ -131,7 +131,7 @@ void DataAcquisition::sync_end()
 
     // Apply controls to each individual data_source
     for (std::shared_ptr<DataSource> data_source: data_sources) {
-        Scrubber::State state = data_source->scrubber.get_state();
+        Scrubber::State state = data_source->scrubber.state;
 
         // Copy scrubbing parameters
         state.type = synced.type;
@@ -152,13 +152,18 @@ void DataAcquisition::sync_end()
         state.current_index = std::clamp(current_index - (synced_index_length - index_length), 0, (int) state.max_index);
 
         // Reapply state
-        data_source->scrubber.set_state(state);
+        data_source->scrubber.state = state;
     }
 }
 
-size_t DataAcquisition::size() {
+int DataAcquisition::size() {
     std::shared_lock da_read_lock(mutex);
-    return data_sources.size();
+    return (int) data_sources.size();
+}
+
+std::shared_ptr<DataSource> DataAcquisition::at(int index) {
+    std::shared_lock da_read_lock(mutex);
+    return data_sources.at(index);
 }
 
 void DataAcquisition::update() {

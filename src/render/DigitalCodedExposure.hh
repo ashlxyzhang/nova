@@ -17,10 +17,6 @@
 #include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/process_comp.h"
 
-#include <mutex>
-#include <shared_mutex>
-
-
 
 /**
  * @brief Flags passed to the compute shaders to determine how DCE is computed.
@@ -43,12 +39,49 @@ struct PassData
 class DigitalCodedExposure
 {
     public:
-        struct State
+        struct RenderTargets
         {
-            RenderTarget output_texture;
-            RenderTarget positive_values_texture;
-            RenderTarget negative_values_texture;
+            RenderTarget output;
+            RenderTarget positive_values;
+            RenderTarget negative_values;
 
+            void init_textures(SDL_GPUDevice* gpu_device, cv::Size resolution) { 
+                SDL_GPUTextureCreateInfo dce_create_info = {
+                    .type = SDL_GPU_TEXTURETYPE_2D,
+                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
+                    .width = (Uint32) resolution.width,
+                    .height = (Uint32) resolution.height,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                output = {SDL_CreateGPUTexture(gpu_device, &dce_create_info), dce_create_info.width, dce_create_info.height};
+
+                SDL_GPUTextureCreateInfo dce_intermediate_create_info = {
+                    .type = SDL_GPU_TEXTURETYPE_2D,
+                    .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
+                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE |
+                                SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
+                    .width = (Uint32) resolution.width,
+                    .height = (Uint32) resolution.height,
+                    .layer_count_or_depth = 1,
+                    .num_levels = 1,
+                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                };
+                positive_values = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
+                negative_values = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
+            }
+            
+            void delete_textures(SDL_GPUDevice* gpu_device) {
+                SDL_ReleaseGPUTexture(gpu_device, output.texture);
+                SDL_ReleaseGPUTexture(gpu_device, positive_values.texture);
+                SDL_ReleaseGPUTexture(gpu_device, negative_values.texture);
+            }
+        };
+
+        struct Parameters
+        {
             float event_contrib_weight = 0.5f;
             float morlet_frequency = 0.0f;
             float morlet_width = 0.01f;
@@ -63,48 +96,9 @@ class DigitalCodedExposure
             glm::vec3 polarity_neg_color = glm::vec3(0.0f, 0.0f, 0.0f);
             glm::vec3 polarity_pos_color = glm::vec3(1.0f, 1.0f, 1.0f);
             glm::vec3 polarity_neut_color = glm::vec3(0.5f, 0.5f, 0.5f);
-
-            void init_textures(SDL_GPUDevice* gpu_device, cv::Size resolution) { 
-                SDL_GPUTextureCreateInfo dce_create_info = {
-                    .type = SDL_GPU_TEXTURETYPE_2D,
-                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE,
-                    .width = (Uint32) resolution.width,
-                    .height = (Uint32) resolution.height,
-                    .layer_count_or_depth = 1,
-                    .num_levels = 1,
-                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                };
-                output_texture = {SDL_CreateGPUTexture(gpu_device, &dce_create_info), dce_create_info.width, dce_create_info.height};
-
-                SDL_GPUTextureCreateInfo dce_intermediate_create_info = {
-                    .type = SDL_GPU_TEXTURETYPE_2D,
-                    .format = SDL_GPU_TEXTUREFORMAT_R32_UINT,
-                    .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_SIMULTANEOUS_READ_WRITE |
-                                SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_TEXTUREUSAGE_COMPUTE_STORAGE_WRITE,
-                    .width = (Uint32) resolution.width,
-                    .height = (Uint32) resolution.height,
-                    .layer_count_or_depth = 1,
-                    .num_levels = 1,
-                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                };
-                positive_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
-                negative_values_texture = {SDL_CreateGPUTexture(gpu_device, &dce_intermediate_create_info), dce_intermediate_create_info.width, dce_intermediate_create_info.height};
-            }
-
-            void delete_textures(SDL_GPUDevice* gpu_device) {
-                SDL_ReleaseGPUTexture(gpu_device, output_texture.texture);
-                SDL_ReleaseGPUTexture(gpu_device, positive_values_texture.texture);
-                SDL_ReleaseGPUTexture(gpu_device, negative_values_texture.texture);
-            }
         };
 
     private:
-        mutable std::shared_mutex mutex;
-
-        // Parameters
-        State params;
-        ErrorQueue &error_queue;
 
         // GPU
         SDL_GPUDevice *gpu_device = nullptr;
@@ -118,10 +112,9 @@ class DigitalCodedExposure
          * @brief Constructor. Initializes compute pipelines.
          * @param data_acq DataAcquisition object used to access event data for processing
          * @param gpu_device SDL_GPUDevice to create texture on
-         * @param error_queue ErrorQueue object used for reporting errors to be displayed and/or logged
          */
-        DigitalCodedExposure(SDL_GPUDevice *gpu_device, ErrorQueue &error_queue)
-            : gpu_device(gpu_device), error_queue(error_queue)
+        DigitalCodedExposure(SDL_GPUDevice *gpu_device)
+            : gpu_device(gpu_device)
         {
 
             SDL_GPUComputePipelineCreateInfo clear_compute_pipeline_info = {0};
@@ -187,23 +180,18 @@ class DigitalCodedExposure
         }
 
         /**
-         * @brief Unimplemented event handler function for digital coded exposure. For future functionality.
-         */
-        bool event_handler(SDL_Event *event)
-        {
-            return false;
-        }
-
-        /**
          * @brief Compute pass. Dispatches compute shaders to calculate Digital Coded Exposure output.
          * @param command_buffer GPU command buffer.
          */
         void render(std::shared_ptr<DataSource> data_source)
-        {
+        {   
+            // Read parameters, rendering textures, and resolution from data source
+            Parameters params = data_source->dce_parameters;
+            RenderTargets render_targets = data_source->dce_render_targets;
+            cv::Size resolution = data_source->resolution;
 
-            // Read DCE parameters & construct uniform data once for all data sources
-            std::shared_lock dce_read_lock(mutex);
 
+            // Format parameters to send to the GPU
             PassData pass_data;
             pass_data.posCol = glm::vec4(params.polarity_pos_color, 1.0f);
             pass_data.neutCol = glm::vec4(params.polarity_neut_color, 1.0f);
@@ -214,37 +202,34 @@ class DigitalCodedExposure
                                         (params.shutter_is_morlet ? 1.0f : 0.0f), 0.0f, 0.0f);
             pass_data.morletParams = glm::vec4(params.morlet_frequency, params.morlet_width, 0.0f, 0.0f);
 
-            dce_read_lock.unlock();
 
-            SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
-
-            // Read resolution
-            int width = data_source->resolution.width;
-            int height = data_source->resolution.height;
-
-            // Set up texture bindings
+            // Format textures to send to the GPU
             SDL_GPUStorageTextureReadWriteBinding texture_buffer_bindings[3] = {0};
 
-            texture_buffer_bindings[0].texture = data_source->dce_state.output_texture.texture;
+            texture_buffer_bindings[0].texture = render_targets.output.texture;
             texture_buffer_bindings[0].mip_level = 0;
             texture_buffer_bindings[0].layer = 0;
             texture_buffer_bindings[0].cycle = false;
 
-            texture_buffer_bindings[1].texture = data_source->dce_state.positive_values_texture.texture;
+            texture_buffer_bindings[1].texture = render_targets.positive_values.texture;
             texture_buffer_bindings[1].mip_level = 0;
             texture_buffer_bindings[1].layer = 0;
             texture_buffer_bindings[1].cycle = false;
 
-            texture_buffer_bindings[2].texture = data_source->dce_state.negative_values_texture.texture;
+            texture_buffer_bindings[2].texture = render_targets.negative_values.texture;
             texture_buffer_bindings[2].mip_level = 0;
             texture_buffer_bindings[2].layer = 0;
             texture_buffer_bindings[2].cycle = false;
 
+
+
+            // Begin GPU passes
+            SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
+
             // --- Pass A: Clear all textures ---
-            SDL_GPUComputePass *clear_pass =
-                SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
+            SDL_GPUComputePass *clear_pass = SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
             SDL_BindGPUComputePipeline(clear_pass, clear_compute_pipeline);
-            SDL_DispatchGPUCompute(clear_pass, width, height, 1);
+            SDL_DispatchGPUCompute(clear_pass, resolution.width, resolution.height, 1);
             SDL_EndGPUComputePass(clear_pass);
 
             // Get points buffer; run passes B and C only if there are points to process
@@ -256,6 +241,7 @@ class DigitalCodedExposure
                 // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage
                 // in shader)
                 Scrubber::State scrubber_state = data_source->scrubber.get_state();
+
                 float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
                 pass_data.morletParams.z = time_center;
 
@@ -273,24 +259,12 @@ class DigitalCodedExposure
                     SDL_BeginGPUComputePass(command_buffer, texture_buffer_bindings, 3, nullptr, 0);
                 SDL_BindGPUComputePipeline(process_pass, process_compute_pipeline);
                 SDL_PushGPUComputeUniformData(command_buffer, 0, &pass_data, sizeof(pass_data));
-                SDL_DispatchGPUCompute(process_pass, width, height, 1);
+                SDL_DispatchGPUCompute(process_pass, resolution.width, resolution.height, 1);
                 SDL_EndGPUComputePass(process_pass);
             }
 
             SDL_SubmitGPUCommandBuffer(command_buffer);
             SDL_WaitForGPUIdle(gpu_device);
-        }
-
-        State get_parameters()
-        {
-            std::shared_lock lock(mutex);
-            return params;
-        }
-
-        void set_parameters(const State &new_parameters)
-        {
-            std::unique_lock lock(mutex);
-            params = new_parameters;
         }
 };
 

@@ -14,10 +14,10 @@
 #include <dv-processing/io/camera/usb_device.hpp>
 
 struct DataSource {
-	mutable std::shared_mutex mutex;
-	SDL_GPUDevice* gpu_device;
 
-	// 
+	mutable std::shared_mutex mutex;
+
+	// State of source
     std::string name; 
     enum Type { CAMERA, FILE } type;
     enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state = State::PAUSED; 
@@ -29,9 +29,12 @@ struct DataSource {
     EventData event_data;
 	Scrubber scrubber;
 
-	// Per-renderer inputs and outputs
-	DigitalCodedExposure::State dce_state;
-	Visualizer::State visualizer_state;
+	// Rendering parameters and outputs
+	SDL_GPUDevice* gpu_device;
+	DigitalCodedExposure::Parameters dce_parameters;
+	DigitalCodedExposure::RenderTargets dce_render_targets;
+	Visualizer::Parameters visualizer_parameters;
+	Visualizer::RenderTargets visualizer_render_targets;
     
 
 	DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);

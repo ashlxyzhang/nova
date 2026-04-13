@@ -22,9 +22,6 @@
 
 #include "fonts/CascadiaCode.ttf.h"
 
-#include <mutex>
-#include <shared_mutex>
-
 /**
  * @brief Provides functions for rendering the 3D event data particle plot visualization (3D Visualizer window).
  */
@@ -39,21 +36,10 @@ class Visualizer
             UNIT_US = 2
         };
 
-        struct State
+        struct RenderTargets
         {
-            RenderTarget color_texture;
-            RenderTarget depth_texture;
-
-            uint32_t grid_x_subdivisions = 5;
-            uint32_t grid_y_subdivisions = 5;
-            uint32_t grid_z_subdivisions = 5;
-
-            float particle_scale = 3.0f;
-            glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
-            glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
-
-            TIME unit_type = TIME::UNIT_MS;           // MS is default
-            float unit_time_conversion_factor = 1.0f; // MS is default
+            RenderTarget color;
+            RenderTarget depth;
 
             void init_textures(SDL_GPUDevice* gpu_device, cv::Size resolution) {
                 SDL_GPUTextureCreateInfo vis_color_create_info = {
@@ -66,7 +52,7 @@ class Visualizer
                     .num_levels = 1,
                     .sample_count = SDL_GPU_SAMPLECOUNT_1,
                 };
-                color_texture = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
+                color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
                 
                 SDL_GPUTextureCreateInfo vis_depth_create_info = {
                     .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
@@ -77,13 +63,27 @@ class Visualizer
                     .num_levels = 1,
                     .sample_count = SDL_GPU_SAMPLECOUNT_1,
                 };
-                depth_texture = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
+                depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
             }
 
             void delete_textures(SDL_GPUDevice* gpu_device) {
-                SDL_ReleaseGPUTexture(gpu_device, color_texture.texture);
-                SDL_ReleaseGPUTexture(gpu_device, color_texture.texture);
+                SDL_ReleaseGPUTexture(gpu_device, color.texture);
+                SDL_ReleaseGPUTexture(gpu_device, depth.texture);
             }
+        };
+
+        struct Parameters
+        {
+            uint32_t grid_x_subdivisions = 5;
+            uint32_t grid_y_subdivisions = 5;
+            uint32_t grid_z_subdivisions = 5;
+
+            float particle_scale = 3.0f;
+            glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
+            glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
+
+            TIME unit_type = TIME::UNIT_MS;           // MS is default
+            float unit_time_conversion_factor = 1.0f; // MS is default
         };
 
     private:
@@ -101,7 +101,7 @@ class Visualizer
                 /**
                  * @brief Generates grid lines in 3D Visualizer window.
                  */
-                void generate_grid_lines(const State &params)
+                void generate_grid_lines(const Parameters &params)
                 {
                     lines.clear();
 
@@ -229,7 +229,7 @@ class Visualizer
                 /**
                  * @brief Updates grid visualization on each frame.
                  */
-                void cpu_update(const State &params)
+                void cpu_update(const Parameters &params)
                 {
                     generate_grid_lines(params);
                 }
@@ -360,7 +360,7 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const State &params)
+                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
                 {
                     // No CPU updates needed for points
                 }
@@ -381,7 +381,7 @@ class Visualizer
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const State &params)
+                                 const Parameters &params)
                 {
                     if (data_source->scrubber.get_points_buffer_size() == 0)
                         return; 
@@ -631,7 +631,7 @@ class Visualizer
                 /**
                  * @brief Clears text and generates labels for depth axis.
                  */
-                void cpu_update(std::shared_ptr<DataSource> data_source, const State &params)
+                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
                 {
                     vertices.clear();
                     indices.clear();
@@ -714,7 +714,7 @@ class Visualizer
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const State &params)
+                                 const Parameters &params)
                 {
                     if (draw_calls.empty() || !vertex_buffer || !index_buffer || !text_pipeline)
                         return;
@@ -835,7 +835,7 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const State &params)
+                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
                 {
                 }
 
@@ -849,7 +849,7 @@ class Visualizer
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const State &params)
+                                 const Parameters &params)
                 {
                     if (!frames_pipeline || data_source->scrubber.get_frames_timestamps()[0] < 0.0f)
                     {
@@ -876,24 +876,13 @@ class Visualizer
                 }
         };
 
-        // Mutex used by getters, setters, and internal methods performing bulk atomic operations
-        mutable std::shared_mutex mutex;
-
-        // Parameters
-        State params;
-
         // Camera
         Camera camera;
         glm::vec3 box_min;
         glm::vec3 box_max;
 
-        // Modules
-        ErrorQueue &error_queue;
-
         // GPU
         SDL_GPUDevice *gpu_device = nullptr;
-
-        // Upload buffer - member of this renderer
         UploadBuffer upload_buffer;
 
         GridRenderer *grid_renderer = nullptr;
@@ -905,11 +894,9 @@ class Visualizer
         /**
          * @brief Constructor. Initializes pipelines only.
          * @param gpu_device SDL_GPUDevice to create texture on
-         * @param error_queue ErrorQueue object used to report errors to be displayed and/or logged
          */
-        Visualizer(SDL_GPUDevice *gpu_device, ErrorQueue &error_queue)
-            : gpu_device(gpu_device), 
-              error_queue(error_queue),
+        Visualizer(SDL_GPUDevice *gpu_device)
+            : gpu_device(gpu_device),
               upload_buffer(gpu_device)
         {
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
@@ -943,20 +930,6 @@ class Visualizer
             }
         }
 
-        // Thread safe state getter
-        State get_parameters() const
-        {
-            std::shared_lock lock(mutex);
-            return params;
-        }
-
-        // Thread safe state setter
-        void set_parameters(const State &new_params)
-        {
-            std::unique_lock lock(mutex);
-            params = new_params;
-        }
-
         // Camera control methods for GUI
         void rotate_camera(float x_offset, float y_offset)
         {
@@ -974,16 +947,14 @@ class Visualizer
          */
         void render(std::shared_ptr<DataSource> data_source)
         {
-            // Take snapshot of parameters
-            std::shared_lock param_lock(mutex);
-            State current_params = params;
-            param_lock.unlock();
+            Parameters params = data_source->visualizer_parameters;
+            RenderTargets render_targets = data_source->visualizer_render_targets;
 
             // CPU Update phase
-            grid_renderer->cpu_update(current_params);
-            points_renderer->cpu_update(data_source, current_params);
-            text_renderer->cpu_update(data_source, current_params);
-            frames_renderer->cpu_update(data_source, current_params);
+            grid_renderer->cpu_update(params);
+            points_renderer->cpu_update(data_source, params);
+            text_renderer->cpu_update(data_source, params);
+            frames_renderer->cpu_update(data_source, params);
 
             // Create command buffer and copy pass once for all sub-renderers
             SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
@@ -999,38 +970,37 @@ class Visualizer
             SDL_EndGPUCopyPass(copy_pass);
 
             // Render pass phase
-            {
-                SDL_GPUColorTargetInfo color_target_info = {0};
-                color_target_info.texture = data_source->visualizer_state.color_texture.texture;
-                SDL_FColor color = {1.0f, 1.0f, 1.0f, 1.0f};
-                color_target_info.clear_color = color;
-                color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
-                color_target_info.store_op = SDL_GPU_STOREOP_STORE;
-                color_target_info.mip_level = 0;
-                color_target_info.layer_or_depth_plane = 0;
-                color_target_info.cycle = false;
+            SDL_GPUColorTargetInfo color_target_info = {0};
+            color_target_info.texture = render_targets.color.texture;
+            SDL_FColor color = {1.0f, 1.0f, 1.0f, 1.0f};
+            color_target_info.clear_color = color;
+            color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+            color_target_info.store_op = SDL_GPU_STOREOP_STORE;
+            color_target_info.mip_level = 0;
+            color_target_info.layer_or_depth_plane = 0;
+            color_target_info.cycle = false;
 
-                SDL_GPUDepthStencilTargetInfo depth_target_info = {0};
-                depth_target_info.texture = data_source->visualizer_state.depth_texture.texture;
-                depth_target_info.clear_depth = 1.0f;
-                depth_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
-                depth_target_info.store_op = SDL_GPU_STOREOP_DONT_CARE;
-                depth_target_info.cycle = false;
+            SDL_GPUDepthStencilTargetInfo depth_target_info = {0};
+            depth_target_info.texture = render_targets.depth.texture;
+            depth_target_info.clear_depth = 1.0f;
+            depth_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+            depth_target_info.store_op = SDL_GPU_STOREOP_DONT_CARE;
+            depth_target_info.cycle = false;
 
-                SDL_GPURenderPass *render_pass =
-                    SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
+            SDL_GPURenderPass *render_pass =
+                SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
 
-                glm::mat4 view = camera.getViewMatrix();
-                glm::mat4 projection = camera.getProjectionMatrix();
-                glm::mat4 vp = projection * view;
+            glm::mat4 view = camera.getViewMatrix();
+            glm::mat4 projection = camera.getProjectionMatrix();
+            glm::mat4 vp = projection * view;
 
-                grid_renderer->render_pass(command_buffer, render_pass, vp);
-                points_renderer->render_pass(command_buffer, render_pass, vp, data_source, current_params);
-                frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, current_params);
-                text_renderer->render_pass(command_buffer, render_pass, vp, data_source, current_params);
+            grid_renderer->render_pass(command_buffer, render_pass, vp);
+            points_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+            frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+            text_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
 
-                SDL_EndGPURenderPass(render_pass);
-            }
+            SDL_EndGPURenderPass(render_pass);
+            
 
             // Submit the command buffer
             SDL_SubmitGPUCommandBuffer(command_buffer);

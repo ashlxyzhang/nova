@@ -107,10 +107,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     // Initialize modules
     app->error_queue = std::make_unique<ErrorQueue>();
     app->data_acq = std::make_unique<DataAcquisition>(app->gpu_device_wrapper.get_device());
-    app->visualizer = std::make_unique<Visualizer>(app->gpu_device_wrapper.get_device(), *app->error_queue);
-    app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device_wrapper.get_device(), *app->error_queue);
-    app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, 
-                                     *app->digital_coded_exposure, *app->error_queue, 
+    app->visualizer = std::make_unique<Visualizer>(app->gpu_device_wrapper.get_device());
+    app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device_wrapper.get_device());
+    app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, *app->error_queue, 
                                      app->window, app->gpu_device_wrapper.get_device());
 
     // Spawn separate thread to manage the DataAcquisition

@@ -116,17 +116,15 @@ void DataSource::init_render_targets()
     resolution = event_res.has_value() ? cv::Size(event_res->width, event_res->height) : cv::Size(1920, 1080);
 
     // Initialize textures and storage resolution
-    dce_state.init_textures(gpu_device, resolution);
-    visualizer_state.init_textures(gpu_device, resolution);
+    dce_render_targets.init_textures(gpu_device, resolution);
+    visualizer_render_targets.init_textures(gpu_device, resolution);
     event_data.set_camera_event_resolution(resolution.width, resolution.height);
 }
 
 DataSource::~DataSource()
 {   
-    // This is done here and not the dce_state and visualizer_state destructors b/c the states are frequently copied
-    // and destroyed to allow for thread-safe access
-    dce_state.delete_textures(gpu_device);
-    visualizer_state.delete_textures(gpu_device);
+    dce_render_targets.delete_textures(gpu_device);
+    visualizer_render_targets.delete_textures(gpu_device);
     event_data.clear();
 }
 

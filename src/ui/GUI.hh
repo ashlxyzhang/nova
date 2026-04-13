@@ -12,12 +12,6 @@
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
 
-// Structure to pass pointers to callbacks
-struct CallbackData
-{
-    DataAcquisition *data_acquisition;
-};
-
 // Forward declarations for callbacks
 inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
 
@@ -43,16 +37,12 @@ class GUI
         // Modules
         DataAcquisition &data_acquisition;
         Visualizer &visualizer;
-        DigitalCodedExposure &dce;
         ErrorQueue &error_queue;
 
         // GPU
         SDL_Window *window = nullptr;
         SDL_GPUDevice *gpu_device = nullptr;
         ImDrawData *draw_data = nullptr;
-
-        // Callback data for file dialogs
-        CallbackData callback_data;
 
         // View mode and selection
         ViewMode view_mode = ViewMode::SINGLE;
@@ -160,46 +150,49 @@ class GUI
          */
         void draw_info_window()
         {
-            ImGui::Begin("Info");
-            auto vis_params = visualizer.get_parameters();
-            ImGui::SliderFloat("Particle Scale", &vis_params.particle_scale, 0.1f, 6.0f);
-            ImGui::Separator();
-            ImGui::ColorEdit3("Negative Polarity Color", (float *)&vis_params.polarity_neg_color);
-            ImGui::ColorEdit3("Positive Polarity Color", (float *)&vis_params.polarity_pos_color);
-            ImGui::Separator();
-            int32_t unit_type = static_cast<int32_t>(vis_params.unit_type);
-            ImGui::Combo("Time Unit", &unit_type, "s\0ms\0us\0");
-            vis_params.unit_type = static_cast<Visualizer::TIME>(unit_type);
-            const float units[] = {1000000.0f, 1000.0f, 1.0f};
-            vis_params.unit_time_conversion_factor = units[unit_type];
-            visualizer.set_parameters(vis_params);
-            ImGui::End();
+            if (selected_source_index < data_acquisition.size()) {
+                std::shared_ptr<DataSource> data_source = data_acquisition.at(selected_source_index);
 
-            // DCE Controls
-            ImGui::Begin("Digital Coded Exposure Controls");
-            auto dce_params = dce.get_parameters();
-            ImGui::SliderFloat("Event Contribution Weight", &dce_params.event_contrib_weight, 0.0f, 10.0f);
-            ImGui::Separator();
-            ImGui::Checkbox("Morlet Shutter", &dce_params.shutter_is_morlet);
-            ImGui::Checkbox("Positive Events Only", &dce_params.shutter_is_positive_only);
-            ImGui::Separator();
-            ImGui::Combo("Digital Exposure Color", &dce_params.dce_color,
-                         "High/Low\0Tricolor\0Use Visualizer Colors\0");
-            if (dce_params.dce_color < 2)
-            {
-                ImGui::ColorEdit3("Negative Color", (float *)&dce_params.polarity_neg_color);
-                ImGui::ColorEdit3("Positive Color", (float *)&dce_params.polarity_pos_color);
-                if (dce_params.dce_color == 1)
+                DigitalCodedExposure::Parameters& dce_params = data_source->dce_parameters;
+                Visualizer::Parameters& vis_params = data_source->visualizer_parameters;
+
+                ImGui::Begin("Info");
+                ImGui::SliderFloat("Particle Scale", &vis_params.particle_scale, 0.1f, 6.0f);
+                ImGui::Separator();
+                ImGui::ColorEdit3("Negative Polarity Color", (float *)&vis_params.polarity_neg_color);
+                ImGui::ColorEdit3("Positive Polarity Color", (float *)&vis_params.polarity_pos_color);
+                ImGui::Separator();
+                int32_t unit_type = static_cast<int32_t>(vis_params.unit_type);
+                ImGui::Combo("Time Unit", &unit_type, "s\0ms\0us\0");
+                vis_params.unit_type = static_cast<Visualizer::TIME>(unit_type);
+                const float units[] = {1000000.0f, 1000.0f, 1.0f};
+                vis_params.unit_time_conversion_factor = units[unit_type];
+                ImGui::End();
+
+                // DCE Controls
+                ImGui::Begin("Digital Coded Exposure Controls");
+                ImGui::SliderFloat("Event Contribution Weight", &dce_params.event_contrib_weight, 0.0f, 10.0f);
+                ImGui::Separator();
+                ImGui::Checkbox("Morlet Shutter", &dce_params.shutter_is_morlet);
+                ImGui::Checkbox("Positive Events Only", &dce_params.shutter_is_positive_only);
+                ImGui::Separator();
+                ImGui::Combo("Digital Exposure Color", &dce_params.dce_color,
+                            "High/Low\0Tricolor\0Use Visualizer Colors\0");
+                if (dce_params.dce_color < 2)
                 {
-                    ImGui::ColorEdit3("Neutral Color", (float *)&dce_params.polarity_neut_color);
+                    ImGui::ColorEdit3("Negative Color", (float *)&dce_params.polarity_neg_color);
+                    ImGui::ColorEdit3("Positive Color", (float *)&dce_params.polarity_pos_color);
+                    if (dce_params.dce_color == 1)
+                    {
+                        ImGui::ColorEdit3("Neutral Color", (float *)&dce_params.polarity_neut_color);
+                    }
                 }
+                ImGui::Combo("Activation Function", &dce_params.activation_function, "Linear\0Sigmoid\0");
+                ImGui::Separator();
+                ImGui::SliderFloat("Morlet Frequency", &dce_params.morlet_frequency, 0.0f, 10000.0f);
+                ImGui::SliderFloat("Morlet Width", &dce_params.morlet_width, 0.001f, 100000.0f);
+                ImGui::End();
             }
-            ImGui::Combo("Activation Function", &dce_params.activation_function, "Linear\0Sigmoid\0");
-            ImGui::Separator();
-            ImGui::SliderFloat("Morlet Frequency", &dce_params.morlet_frequency, 0.0f, 10000.0f);
-            ImGui::SliderFloat("Morlet Width", &dce_params.morlet_width, 0.001f, 100000.0f);
-            dce.set_parameters(dce_params);
-            ImGui::End();
         }
 
         /**
@@ -259,7 +252,7 @@ class GUI
             
             if (ImGui::Button("Add File Source"))
             {
-                SDL_ShowOpenFileDialog(stream_file_handle_callback, &callback_data, window, nullptr, 0, nullptr, 0);
+                SDL_ShowOpenFileDialog(stream_file_handle_callback, &data_acquisition, window, nullptr, 0, nullptr, 0);
             }
 
             ImGui::SameLine();
@@ -539,7 +532,7 @@ class GUI
         }
 
 
-        void draw_scrubber_controls(Scrubber::State& state)
+        void draw_scrubber_controls(Scrubber::State& state, Visualizer::TIME unit_time)
         {
             // Type selection via tab bar
             Scrubber::Type prev_type = state.type;
@@ -579,9 +572,6 @@ class GUI
                 ImGui::Combo("Sync Mode", &sync_mode_int, sync_mode_names, 2);
                 sync_mode = sync_mode_int == 0 ? SyncMode::START : SyncMode::END;
             }
-
-            // Get visualizer parameters for time unit conversion
-            auto vis_params = visualizer.get_parameters();
 
             // Timeline, playback, settings
             if (state.type == Scrubber::Type::EVENT)
@@ -642,9 +632,9 @@ class GUI
             }
             else // TIME
             {
-                std::string time_unit_suffix = time_units[static_cast<int>(vis_params.unit_type)];
+                std::string time_unit_suffix = time_units[static_cast<int>(unit_time)];
                 std::string time_format_str;
-                switch (vis_params.unit_type)
+                switch (unit_time)
                 {
                 case Visualizer::TIME::UNIT_US:
                     time_format_str = "%.2f";
@@ -657,10 +647,13 @@ class GUI
                     break;
                 }
 
-                float current_time_adj = state.current_time / vis_params.unit_time_conversion_factor;
-                float min_time_adj = state.min_time / vis_params.unit_time_conversion_factor;
-                float max_time_adj = state.max_time / vis_params.unit_time_conversion_factor;
-                float time_window_adj = state.time_window / vis_params.unit_time_conversion_factor;
+                const float units[] = {1000000.0f, 1000.0f, 1.0f};
+                float unit_time_conversion_factor = units[(int) unit_time];
+
+                float current_time_adj = state.current_time / unit_time_conversion_factor;
+                float min_time_adj = state.min_time / unit_time_conversion_factor;
+                float max_time_adj = state.max_time / unit_time_conversion_factor;
+                float time_window_adj = state.time_window / unit_time_conversion_factor;
 
                 if (max_time_adj <= min_time_adj)
                 {
@@ -678,7 +671,7 @@ class GUI
                         if (max_time_adj > min_time_adj)
                         {
                             new_val = std::clamp(new_val, min_time_adj, max_time_adj);
-                            state.current_time = new_val * vis_params.unit_time_conversion_factor;
+                            state.current_time = new_val * unit_time_conversion_factor;
                         }
                     }
 
@@ -691,7 +684,7 @@ class GUI
 
                     // Window slider
                     float max_window_time = 1000000; // (std::max)(0.00001f, (state.max_time - state.min_time) / window_div_factor);
-                    float max_window_adj = max_window_time / vis_params.unit_time_conversion_factor;
+                    float max_window_adj = max_window_time / unit_time_conversion_factor;
 
                     if (ImGui::SliderFloat("Window", &time_window_adj, 0.00001f, max_window_adj,
                                            time_format_str.c_str()))
@@ -699,22 +692,22 @@ class GUI
                         if (max_window_adj > 0.00001f)
                         {
                             time_window_adj = std::clamp(time_window_adj, 0.00001f, max_window_adj);
-                            state.time_window = time_window_adj * vis_params.unit_time_conversion_factor;
+                            state.time_window = time_window_adj * unit_time_conversion_factor;
                         }
                     }
                     ImGui::SetItemTooltip("Time window behind position to display");
 
                     // Step slider
-                    float time_step_adj = state.time_step / vis_params.unit_time_conversion_factor;
+                    float time_step_adj = state.time_step / unit_time_conversion_factor;
                     float max_step_time = 1000000; // (state.max_time - state.min_time) / step_div_factor;
-                    float max_step_time_adj = max_step_time / vis_params.unit_time_conversion_factor;
+                    float max_step_time_adj = max_step_time / unit_time_conversion_factor;
                     if (ImGui::SliderFloat("Step", &time_step_adj, 0.00001f, max_step_time_adj,
                                            time_format_str.c_str()))
                     {
                         if (max_step_time_adj > 0.00001f)
                         {
                             time_step_adj = std::clamp(time_step_adj, 0.00001f, max_step_time_adj);
-                            state.time_step = time_step_adj * vis_params.unit_time_conversion_factor;
+                            state.time_step = time_step_adj * unit_time_conversion_factor;
                         }
                     }
                     ImGui::SetItemTooltip("Time to advance per frame during playback");
@@ -745,10 +738,10 @@ class GUI
 
             if (view_mode == ViewMode::SINGLE)
             {       
-                if (selected_source_index >= 0 && selected_source_index < num_sources)
+                if (selected_source_index < num_sources)
                 {
                     std::shared_ptr<DataSource> data_source = sources[selected_source_index];
-                    scrubber_state = data_source->scrubber.get_state();
+                    scrubber_state = data_source->scrubber.state;
                     scrubber_message = "Single Source Scrubbing - " + data_source->name;
                 } else 
                 {
@@ -774,7 +767,7 @@ class GUI
             ImGui::Separator();
             
             // Draw scrubber controls
-            draw_scrubber_controls(scrubber_state);
+            draw_scrubber_controls(scrubber_state, Visualizer::TIME::UNIT_MS);
 
             
             // Write back potentially updated state to appropriate data_sources
@@ -782,7 +775,7 @@ class GUI
             {       
                 if (selected_source_index >= 0 && selected_source_index < num_sources)
                 {
-                    sources[selected_source_index]->scrubber.set_state(scrubber_state);
+                    sources[selected_source_index]->scrubber.state = scrubber_state;
                 }
             }
             else if (view_mode == ViewMode::SYNCED)
@@ -801,18 +794,17 @@ class GUI
          */
         void draw_visualizers()
         {
-            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-
-            if (selected_source_index >= 0 && selected_source_index < static_cast<int>(sources.size()))
+            if (selected_source_index < data_acquisition.size())
             {
-                ImGui::Begin("3D Visualizer");
+                std::shared_ptr<DataSource> data_source = data_acquisition.at(selected_source_index);
+                RenderTarget& color_target = data_source->visualizer_render_targets.color;
 
-                SDL_GPUTexture *texture = sources[selected_source_index]->visualizer_state.color_texture.texture;
-                if (texture)
+                ImGui::Begin("3D Visualizer");
+                if (color_target.texture)
                 {
+                    
                     ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                    float tex_aspect = (float)sources[selected_source_index]->visualizer_state.color_texture.width /
-                                        (float)sources[selected_source_index]->visualizer_state.color_texture.height;
+                    float tex_aspect = (float)color_target.width / (float) color_target.height;
                     ImVec2 display_size = pane_size;
                     float pane_aspect = pane_size.x / pane_size.y;
                     if (tex_aspect > pane_aspect)
@@ -827,8 +819,8 @@ class GUI
                     float y_pad = (pane_size.y - display_size.y) * 0.5f;
                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                    ImGui::Image((ImTextureID)texture, display_size);
-                    sources[selected_source_index]->visualizer_state.color_texture.is_focused = ImGui::IsItemHovered();
+                    ImGui::Image((ImTextureID) color_target.texture, display_size);
+                    color_target.is_focused = ImGui::IsItemHovered();
                 }
                 else
                 {
@@ -841,19 +833,18 @@ class GUI
         }
 
         void draw_single_dce(std::shared_ptr<DataSource> data_source, bool centered) {
-            SDL_GPUTexture *texture = data_source->dce_state.output_texture.texture;
-            if (texture)
+            RenderTarget& output = data_source->dce_render_targets.output;
+
+            if (output.texture)
             {
                 ImVec2 display_size;
-                
                 if (centered)
                 {
                     ImVec2 pane_size = ImGui::GetContentRegionAvail();
                     display_size = pane_size;
                     
-                    float aspect_ratio = data_source->dce_state.output_texture.width / (float) data_source->dce_state.output_texture.height;
+                    float aspect_ratio = output.width / (float)output.height;
                     float pane_aspect = pane_size.x / pane_size.y;
-
                     if (aspect_ratio > pane_aspect)
                     {
                         display_size.y = pane_size.x / aspect_ratio;
@@ -870,13 +861,13 @@ class GUI
                 else 
                 {
                     float available_width = ImGui::GetContentRegionAvail().x;
-                    float aspect_ratio = data_source->dce_state.output_texture.width / (float) data_source->dce_state.output_texture.height;
+                    float aspect_ratio = output.width / (float) output.height;
                     display_size = {available_width, available_width / aspect_ratio};
                 }
 
                 // Draw image
-                ImGui::Image((ImTextureID) texture, display_size);
-                data_source->dce_state.output_texture.is_focused = ImGui::IsItemHovered();
+                ImGui::Image((ImTextureID) output.texture, display_size);
+                output.is_focused = ImGui::IsItemHovered();
             }
             else
             {
@@ -994,12 +985,9 @@ class GUI
         /**
          * @brief Constructor for GUI.
          */
-        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer,
-            DigitalCodedExposure &dce, ErrorQueue &error_queue, SDL_Window *window, SDL_GPUDevice *gpu_device)
-            : data_acquisition(data_acquisition), visualizer(visualizer), dce(dce),
-              error_queue(error_queue), window(window), gpu_device(gpu_device),
-              callback_data{&data_acquisition}, fps_history_buf(100, 0.0f), fps_buf_index(0),
-              check_for_layout_file(true), show_quickstart(false)
+        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer, ErrorQueue &error_queue, SDL_Window *window, SDL_GPUDevice *gpu_device)
+            : data_acquisition(data_acquisition), visualizer(visualizer), error_queue(error_queue), window(window), gpu_device(gpu_device), fps_history_buf(100, 0.0f), 
+              fps_buf_index(0), check_for_layout_file(true), show_quickstart(false)
         {
 
             // Setup Dear ImGui context
@@ -1059,7 +1047,7 @@ class GUI
             // Check if any visualizer window is focused
             for (const auto &source : sources)
             {
-                if (source->visualizer_state.color_texture.is_focused)
+                if (source->visualizer_render_targets.color.is_focused)
                 {
                     any_focused = true;
                     break;
@@ -1126,7 +1114,7 @@ class GUI
                 // Clear focus flags
                 for (auto &source : sources)
                 {
-                    source->visualizer_state.color_texture.is_focused = false;
+                    source->visualizer_render_targets.color.is_focused = false;
                 }
             }
         }
@@ -1226,11 +1214,11 @@ class GUI
 // Callback functions
 inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused)
 {
-    CallbackData *data = static_cast<CallbackData *>(user_data);
+    DataAcquisition *data_acq = static_cast<DataAcquisition*>(user_data);
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};
-        data->data_acquisition->add_file_source(file_name);
+        data_acq->add_file_source(file_name);
     }
     else
     {

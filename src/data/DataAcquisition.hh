@@ -47,13 +47,15 @@ class DataAcquisition
         void discover_cameras();
         std::vector<std::string> get_scanned_camera_names();        
         std::vector<std::shared_ptr<DataSource>> get_data_sources(); 
+        
+        int size();
+        std::shared_ptr<DataSource> at(int index);
 
         void set_state(Scrubber::State state); 
         Scrubber::State get_state(); 
         void sync_start();
         void sync_end();
         void update();
-        size_t size();
 };
 
 #endif // DATA_ACQUISITION_HH
