@@ -156,8 +156,15 @@ class GUI
 
                 DigitalCodedExposure::Parameters& dce_params = data_source->dce_parameters;
                 Visualizer::Parameters& vis_params = data_source->visualizer_parameters;
+                Scrubber::State& scrubber_state = data_source->scrubber.state;
 
-                ImGui::Begin("Info");
+                // Scrubber parameters
+                ImGui::Begin("Scrubber Parameters");
+                ImGui::SliderFloat("Event Discard Odds", &(data_source->event_discard_odds), 1.0f, 10.0f);
+                ImGui::End();
+
+                // Visualizer controls
+                ImGui::Begin("Visualizer Parameters");
                 ImGui::SliderFloat("Particle Scale", &vis_params.particle_scale, 0.1f, 6.0f);
                 ImGui::Separator();
                 ImGui::ColorEdit3("Negative Polarity Color", (float *)&vis_params.polarity_neg_color);
@@ -171,7 +178,7 @@ class GUI
                 ImGui::End();
 
                 // DCE Controls
-                ImGui::Begin("Digital Coded Exposure Controls");
+                ImGui::Begin("DCE Parameters");
                 ImGui::SliderFloat("Event Contribution Weight", &dce_params.event_contrib_weight, 0.0f, 10.0f);
                 ImGui::Separator();
                 ImGui::Checkbox("Morlet Shutter", &dce_params.shutter_is_morlet);
@@ -1200,8 +1207,9 @@ class GUI
             ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom,
                                         &dock_id_right_top_top);
 
-            ImGui::DockBuilderDockWindow("Digital Coded Exposure Controls", dock_id_right_top_bottom);
-            ImGui::DockBuilderDockWindow("Info", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("Scrubber Parameters", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("DCE Parameters", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("Visualizer Parameters", dock_id_right_top_bottom);
             ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
             ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
             ImGui::DockBuilderDockWindow("Frame", dock_id_main);

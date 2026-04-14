@@ -118,6 +118,9 @@ Scrubber::State DataAcquisition::get_state()
 {
     std::unique_lock da_read_write_lock(mutex);
 
+    shared_scrubber_state.max_index = 0;
+    shared_scrubber_state.max_time = 0;
+
     // Lazily update the upper bounds of the shared state before returning
     for (std::shared_ptr<DataSource> data_source : data_sources)
     {

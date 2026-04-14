@@ -100,7 +100,7 @@ class MetavisionEventReader final : public IEventReader
                 auto *erc = camera_->get_device().get_facility<Metavision::I_ErcModule>();
                 if (erc)
                 {
-                    erc->set_cd_event_rate(10'000'000); // 10 Mev/s
+                    erc->set_cd_event_rate(1'000'000); // 10 Mev/s
                     erc->enable(true);
                 }
             }
