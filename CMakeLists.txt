@@ -89,3 +89,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Metavision::HAL
     ${PCL_LIBRARIES}
 )
+option(NOVA_BUILD_TESTS "Build NOVA test suite" ON)
+if(NOVA_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

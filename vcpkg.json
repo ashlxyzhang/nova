@@ -1,7 +1,9 @@
 {
   "dependencies": [
+    "boost-iostreams",
     "dv-processing",
     "glm",
+    "openeb",
     {
       "name": "sdl3",
       "features": [
@@ -9,8 +11,7 @@
       ]
     },
     "sdl3-ttf",
-    "boost-iostreams",
-    "openeb",
+    "gtest",
     "pcl"
   ]
 }

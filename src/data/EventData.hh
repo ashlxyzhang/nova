@@ -417,6 +417,14 @@ class EventData
         {
         }
 
+        size_t size()
+        {
+            std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
+            size_t size = evt_data_vector_relative.size();
+            evt_lock_ul.unlock();
+            return size;
+        }
+
         /**
          * @brief Clears everything
          */

@@ -7,4 +7,4 @@ vcpkg_installed/
 imgui.ini
 resources/shaders/**/*.h
 vcpkg/
-.DS_Store
+tests/fixtures/cmake_test_discovery_*.json
