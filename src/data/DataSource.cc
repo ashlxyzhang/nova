@@ -72,6 +72,41 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
 }
 
 
+DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera)
+	: gpu_device(gpu_device), name(camera.serial.empty() ? std::string("Prophesee (first available)") : camera.serial),
+	  type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
+{
+	std::unique_lock read_write_lock(mutex);
+
+    try
+    {
+        reader = std::make_unique<MetavisionEventReader>(camera);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Prophesee camera reader initialization error: " << e.what() << std::endl;
+        state = State::FAILED_TO_OPEN;
+        return;
+    }
+
+    if (reader->isEventStreamAvailable())
+    {
+        auto evt_resolution = reader->getEventResolution();
+        if (evt_resolution.has_value())
+        {
+            resolution = cv::Size(evt_resolution->width, evt_resolution->height);
+        }
+    }
+    else
+    {
+        std::cerr << "Prophesee camera does not have an event stream available." << std::endl;
+        state = State::FAILED_TO_OPEN;
+        return;
+    }
+
+	init_render_targets();
+}
+
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera)
 	: gpu_device(gpu_device), name(camera.serialNumber), type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
 {

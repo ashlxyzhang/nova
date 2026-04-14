@@ -6,6 +6,7 @@
 #include "render/RenderTarget.hh"
 #include "ui/Scrubber.hh"
 #include "data/IEventReader.hh"
+#include "data/MetavisionEventReader.hh"
 #include "render/DigitalCodedExposure.hh"
 #include "render/Visualizer.hh"
 
@@ -39,6 +40,7 @@ struct DataSource {
 
 	DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);
 	DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
+	DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera);
 	~DataSource();
 
 	void init_render_targets();

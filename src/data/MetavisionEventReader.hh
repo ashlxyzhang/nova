@@ -4,6 +4,8 @@
 
 #include "data/IEventReader.hh"
 #include <atomic>
+#include <iostream>
+#include <metavision/hal/facilities/i_erc_module.h>
 #include <metavision/sdk/base/events/event_cd.h>
 #include <metavision/sdk/stream/camera.h>
 #include <mutex>
@@ -22,8 +24,14 @@
  */
 class MetavisionEventReader final : public IEventReader
 {
+    public:
+        /// Tag type selecting the live-camera constructor. Empty serial = first available.
+        struct LiveCamera { std::string serial; };
+
+    private:
         std::optional<Metavision::Camera> camera_;
         bool started_{false};
+        bool is_live_{false};
         std::atomic<bool> camera_stopped_{false};
 
         mutable std::mutex buffer_mutex_;
@@ -32,19 +40,11 @@ class MetavisionEventReader final : public IEventReader
         int32_t width_{0};
         int32_t height_{0};
 
-    public:
-        explicit MetavisionEventReader(const std::string &path)
+        void install_callbacks()
         {
-            Metavision::FileConfigHints hints;
-            hints.real_time_playback(false); // Read as fast as possible
-
-            camera_.emplace(Metavision::Camera::from_file(path, hints));
-
-            width_ = camera_->geometry().get_width();
-            height_ = camera_->geometry().get_height();
-
             camera_->cd().add_callback([this](const Metavision::EventCD *begin, const Metavision::EventCD *end) {
                 std::lock_guard<std::mutex> lock(buffer_mutex_);
+                event_buffer_.reserve(event_buffer_.size() + static_cast<size_t>(end - begin));
                 for (auto it = begin; it != end; ++it)
                 {
                     event_buffer_.push_back({.x = static_cast<int32_t>(it->x),
@@ -63,6 +63,53 @@ class MetavisionEventReader final : public IEventReader
                     camera_stopped_ = true;
                 }
             });
+        }
+
+    public:
+        explicit MetavisionEventReader(const std::string &path)
+        {
+            Metavision::FileConfigHints hints;
+            hints.real_time_playback(false); // Read as fast as possible
+
+            camera_.emplace(Metavision::Camera::from_file(path, hints));
+
+            width_ = camera_->geometry().get_width();
+            height_ = camera_->geometry().get_height();
+
+            install_callbacks();
+        }
+
+        explicit MetavisionEventReader(const LiveCamera &live)
+        {
+            is_live_ = true;
+
+            if (live.serial.empty())
+                camera_.emplace(Metavision::Camera::from_first_available());
+            else
+                camera_.emplace(Metavision::Camera::from_serial(live.serial));
+
+            width_ = camera_->geometry().get_width();
+            height_ = camera_->geometry().get_height();
+
+            // Cap the sensor's outgoing event rate in hardware so the host is
+            // never asked to consume more than it can process. Without this,
+            // scene activity can trivially saturate the USB link and the
+            // consumer falls perpetually behind.
+            try
+            {
+                auto *erc = camera_->get_device().get_facility<Metavision::I_ErcModule>();
+                if (erc)
+                {
+                    erc->set_cd_event_rate(10'000'000); // 10 Mev/s
+                    erc->enable(true);
+                }
+            }
+            catch (...)
+            {
+                std::cerr << "MetavisionEventReader: ERC module unavailable; event rate is uncapped." << std::endl;
+            }
+
+            install_callbacks();
         }
 
         ~MetavisionEventReader() override
