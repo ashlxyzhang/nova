@@ -160,7 +160,7 @@ class GUI
 
                 // Scrubber parameters
                 ImGui::Begin("Scrubber Parameters");
-                ImGui::SliderFloat("Event Discard Odds", &(data_source->event_discard_odds), 1.0f, 10.0f);
+                ImGui::SliderFloat("Event Discard Odds", &(data_source->event_discard_odds), 0.0f, 1.0f);
                 ImGui::End();
 
                 // Visualizer controls

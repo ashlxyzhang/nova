@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <filesystem>
+#include <random>
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
 	: gpu_device(gpu_device), type(Type::FILE), state(State::PAUSED), scrubber(gpu_device)
@@ -182,8 +183,11 @@ void DataSource::get_batch_event_data()
     // Ensure a reader has been initialized
     if (!reader) return;
 
-    // Calculate drop out threshold
-    float threshold = 1.0f / event_discard_odds;
+    // event_discard_odds is the per-event discard probability in [0, 1]
+    const bool discard_enabled = event_discard_odds > 0.0f;
+
+    thread_local std::mt19937 rng{std::random_device{}()};
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
     // Attempt to read data
     try
@@ -194,7 +198,7 @@ void DataSource::get_batch_event_data()
             {
                 for (const auto &evt : *events)
                 {
-                    if (static_cast<float>(rand()) / RAND_MAX > threshold)
+                    if (discard_enabled && dist(rng) < event_discard_odds)
                         continue;
 
                     event_data.write_evt_data(evt);

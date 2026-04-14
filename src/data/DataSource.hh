@@ -24,7 +24,7 @@ struct DataSource {
     enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state = State::PAUSED; 
 
 	// Data acquisition and storage
-    float event_discard_odds = 1.0f;
+    float event_discard_odds = 0.0f;
 	cv::Size resolution;
 	std::unique_ptr<IEventReader> reader;
     EventData event_data;
