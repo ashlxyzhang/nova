@@ -1,7 +1,6 @@
 #ifndef image_representation_H_
 #define image_representation_H_
 
-#include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
 #include <image_representation/TicToc.h>
 #include <image_transport/image_transport.h>
@@ -123,7 +122,7 @@ class ImageRepresentation
 
         bool left_;
         cv::Mat negative_TS_img;
-        cv_bridge::CvImage cv_dx_image, cv_dy_image;
+        // cv_bridge::CvImage cv_dx_image, cv_dy_image;
         std::thread thread_sobel;
 
         // online parameters

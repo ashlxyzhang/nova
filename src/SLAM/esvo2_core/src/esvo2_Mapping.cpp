@@ -5,7 +5,6 @@
 
 #include <geometry_msgs/TransformStamped.h>
 
-#include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc.hpp>
 
 #include <pcl/filters/voxel_grid.h>
@@ -870,20 +869,13 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
         }
     }
     cv::Mat cv_ptr_left, cv_ptr_right, cv_ptr_AA_map_left, cv_ptr_negative, cv_ptr_negative_dx, cv_ptr_negative_dy;
-    try
-    {
-        cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_right = *(time_surface_right.image); //cv_bridge::toCvCopy(time_surface_right, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_AA_map_left = *(AA_map.image); //cv_bridge::toCvCopy(AA_map, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_negative_dx = *(time_surface_negative_dx.image); //cv_bridge::toCvCopy(time_surface_negative_dx, sensor_msgs::image_encodings::TYPE_16SC1);
-        cv_ptr_negative_dy = *(time_surface_negative_dy.image); //cv_bridge::toCvCopy(time_surface_negative_dy, sensor_msgs::image_encodings::TYPE_16SC1);
-    }
-    catch (cv_bridge::Exception &e)
-    {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-    }
+    cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_right = *(time_surface_right.image); //cv_bridge::toCvCopy(time_surface_right, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_AA_map_left = *(AA_map.image); //cv_bridge::toCvCopy(AA_map, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_negative_dx = *(time_surface_negative_dx.image); //cv_bridge::toCvCopy(time_surface_negative_dx, sensor_msgs::image_encodings::TYPE_16SC1);
+    cv_ptr_negative_dy = *(time_surface_negative_dy.image); //cv_bridge::toCvCopy(time_surface_negative_dy, sensor_msgs::image_encodings::TYPE_16SC1);
+   
     // push back the new time surface map
     timePoint t_new_TS = time_surface_left.header_stamp;
 
@@ -921,16 +913,8 @@ void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
         }
     }
 
-    cv::Mat cv_ptr_left, cv_ptr_right;
-    try
-    {
-        cv_ptr_left = *(AA_left.image); //cv_bridge::toCvCopy(AA_left, sensor_msgs::image_encodings::MONO8);
-    }
-    catch (cv_bridge::Exception &e)
-    {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-    }
+    cv::Mat cv_ptr_left;//, cv_ptr_right; ptr_right is unused
+    cv_ptr_left = *(AA_left.image); //cv_bridge::toCvCopy(AA_left, sensor_msgs::image_encodings::MONO8);
 
     // select the pixels with high event frequency
     int num_of_resultImg = 0, drift_t = 0;
@@ -1077,7 +1061,9 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
     invDepthImage = TS_obs_ptr_->second.img_left_.clone();
     visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
                          stdVar_vis_threshold_, age_vis_threshold_);
-    publishImage(invDepthImage, t, invDepthMap_pub_);
+
+    // Skip publishing the inv depth map for now
+    // publishImage(invDepthImage, t, invDepthMap_pub_);
 
     if (getSystemStatus() == SystemStatus::INITIALIZATION)
         publishPointCloud(depthMapPtr, tr, t);
@@ -1101,7 +1087,7 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
 
 void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation &tr, timePoint &t)
 {
-    sensor_msgs::PointCloud2::Ptr pc_to_publish(new sensor_msgs::PointCloud2);
+    // sensor_msgs::PointCloud2::Ptr pc_to_publish(new sensor_msgs::PointCloud2);
     Eigen::Matrix<double, 4, 4> T_world_result = tr.getTransformationMatrix();
 
     pc_color_->clear();
@@ -1154,14 +1140,19 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         // pc_to_publish->header.stamp = t;
         // pc_pub_.publish(pc_to_publish);
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_local_2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
-        *pointcloud_local_2 = pc_color_;
+        *pointcloud_local_2 = *pc_color_;
         pointcloud_Map_to_Track.add(pointcloud_local_2, t);
     }
     if (!pc_filtered_->empty())
     {
-        pcl::toROSMsg(*pc_filtered_, *pc_to_publish);
-        pc_to_publish->header.stamp = t;
-        pc_filtered_pub_.publish(pc_to_publish);
+        // pcl::toROSMsg(*pc_filtered_, *pc_to_publish);
+        // pc_to_publish->header.stamp = t;
+        // pc_filtered_pub_.publish(pc_to_publish);
+
+        // VIZ PUBLISH -> not publishing anything right now
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_filtered2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
+        *pointcloud_filtered2 = *pc_filtered_;
+        // timestamp is t if want to add to a queue
     }
 
     // publish global pointcloud
@@ -1185,9 +1176,14 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
             pcl::PCDWriter writer;
 
             // publish point cloud
-            pcl::toROSMsg(*pc_global_, *pc_to_publish);
-            pc_to_publish->header.stamp = t;
-            gpc_pub_.publish(pc_to_publish);
+            // pcl::toROSMsg(*pc_global_, *pc_to_publish);
+            // pc_to_publish->header.stamp = t;
+            // gpc_pub_.publish(pc_to_publish);
+
+            // VIZ PUBLISH -> not publishing anything right now
+            // Should just pass reference to pc_global_ to visualizer in the constructor and it will auto update gg
+            // timestamp is t if want to add to a queue
+
             t_last_pub_pc_ = esvo2_core::timePointToSec(t);
         }
     }
@@ -1201,8 +1197,10 @@ void esvo2_Mapping::publishImage(const cv::Mat &image, const timePoint &t, image
 
     std_msgs::Header header;
     header.stamp = t;
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, encoding.c_str(), image).toImageMsg();
-    pub.publish(msg);
+    // VIZ PUBLISH -> not being used right now, so are commenting it out. Was used to publish the inv depth map
+
+    // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, encoding.c_str(), image).toImageMsg();
+    // pub.publish(msg);
 }
 
 void esvo2_Mapping::createEdgeMask(std::vector<Event *> &vEventsPtr, PerspectiveCamera::Ptr &camPtr, cv::Mat &edgeMap,

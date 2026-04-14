@@ -158,10 +158,15 @@ bool RegProblemSolverLM::solve_numerical()
         visualizor_.DrawPoint(1.0 / z, 1.0 / z_min_, 1.0 / z_max_,
                               Eigen::Vector2d(p_img_left(0), p_img_left(1)), reprojMap_left);
       }
-      std_msgs::Header header;
-      header.stamp = numDiff_regProblemPtr_->cur_->t_;
-      sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
-      reprojMap_pub_->publish(msg);
+
+      // VIZ PUBLISH -> not publishing anything right now
+      // std_msgs::Header header;
+      // header.stamp = numDiff_regProblemPtr_->cur_->t_;
+      // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
+      // reprojMap_pub_->publish(msg);
+      std::shared_ptr<cv::Mat> reprojected_map_left = make_shared<cv::Mat>();
+      *reprojected_map_left = reprojMap_left;
+      // timestamp is numDiff_regProblemPtr_->cur_->t_;
     }
     /*************************** Visualization ************************/
     if(status == 2 || status == 3)
@@ -234,10 +239,15 @@ bool RegProblemSolverLM::solve_analytical()
       visualizor_.DrawPoint(1.0 / z, 1.0 / z_min_, 1.0 / z_max_,
                             Eigen::Vector2d(p_img_left(0), p_img_left(1)), reprojMap_left, 2);
     }
-    std_msgs::Header header;
-    header.stamp = regProblemPtr_->cur_->t_;
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
-    reprojMap_pub_->publish(msg);
+
+    // VIZ PUBLISH -> not publishing anything right now
+    // std_msgs::Header header;
+    // header.stamp = regProblemPtr_->cur_->t_;
+    // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
+    // reprojMap_pub_->publish(msg);
+    std::shared_ptr<cv::Mat> reprojected_map_left = make_shared<cv::Mat>();
+    *reprojected_map_left = reprojMap_left;
+      // timestamp is numDiff_regProblemPtr_->cur_->t_;
   }
   /*************************** Visualization ************************/
 

@@ -357,6 +357,7 @@ private:
           of size according to what the google doc says (all events in a 0.001 second interval), then sends them to 3 queues
         - update process_image_representation_left_thread and process_image_representation_right_thread to process the left/right queues
         - update process_mapping_thread() to process the left_map queue
+        - do it after data acquasition update
 
     - Comment out all IMU stuff
         - comment out all the IMU code that we aren't using that isn't already disabled by the flag not being set
@@ -364,9 +365,6 @@ private:
 
     - Update ros time stuff!
        - The main mapping/tracking thread functions use some ROS time stuff. Should update to use std::chrono stuff instead
-
-    - Get rid of any remaining cv_bridge stuff!
-       - It shouldn't be necessary anymore and can just replace with a cv::Mat
 
     - Visualization stuff
        - Figure out how to visualize PCL (point cloud library)

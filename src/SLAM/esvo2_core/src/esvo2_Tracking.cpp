@@ -463,18 +463,11 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
 {
 
     cv::Mat cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy;
-    try
-    {
-        cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
-        cv_ptr_dx = *(time_surface_dx.image); //cv_bridge::toCvCopy(time_surface_dx, sensor_msgs::image_encodings::TYPE_16SC1);
-        cv_ptr_dy = *(time_surface_dy.image); //cv_bridge::toCvCopy(time_surface_dy, sensor_msgs::image_encodings::TYPE_16SC1);
-    }
-    catch (cv_bridge::Exception &e)
-    {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-    }
+    cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_dx = *(time_surface_dx.image); //cv_bridge::toCvCopy(time_surface_dx, sensor_msgs::image_encodings::TYPE_16SC1);
+    cv_ptr_dy = *(time_surface_dy.image); //cv_bridge::toCvCopy(time_surface_dy, sensor_msgs::image_encodings::TYPE_16SC1);
+   
     std::lock_guard<std::mutex> lock(data_mutex_);
     // push back the most current TS.
     timePoint t_new_ts = time_surface_left->header_stamp;
