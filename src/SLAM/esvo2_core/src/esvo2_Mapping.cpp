@@ -158,12 +158,11 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     // TS_AA_sync_.registerCallback(boost::bind(&esvo2_Mapping::timeSurfaceCallback, this, _1, _2, _3, _4, _5, _6));
 
     // point sampling
-    if (bpoints_from_AA_)
-        // AA_frequency_sub_ = nh_.subscribe<sensor_msgs::Image>("AA_left", 0, &esvo2_Mapping::AACallback, this);
-        const int one = 1;
-    else
-        events_left_sub_ = nh_.subscribe<EventArray>(
-            "events_left", 0, boost::bind(&esvo2_Mapping::eventsCallback, this, _1, boost::ref(events_left_)));
+    // if (bpoints_from_AA_)
+    //     // AA_frequency_sub_ = nh_.subscribe<sensor_msgs::Image>("AA_left", 0, &esvo2_Mapping::AACallback, this);
+    // else
+    //     events_left_sub_ = nh_.subscribe<EventArray>(
+    //         "events_left", 0, boost::bind(&esvo2_Mapping::eventsCallback, this, _1, boost::ref(events_left_)));
 
     // IMU
     if (bUSE_IMU_)
@@ -173,13 +172,12 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     tf_ = std::make_shared<tf::Transformer>(true, ros::Duration(100.0));
 
     // result publishers
-    invDepthMap_pub_ = it_.advertise("Inverse_Depth_Map2", 1);
-    // V_ba_bg_pub_ = nh_.advertise<events_repacking_tool::V_ba_bg>("/esvo2_mapping/V_ba_bg", 1);
-    // pc_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_local2", 1);
-    pc_filtered_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_filtered2", 1);
+    // In refactoring, below two have no SUB/PUB queues set up!
+    // invDepthMap_pub_ = it_.advertise("Inverse_Depth_Map2", 1);
+    // pc_filtered_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_filtered2", 1);
     if (bVisualizeGlobalPC_)
     {
-        gpc_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_global2", 1);
+        // gpc_pub_ = nh_.advertise<PointCloud>("/esvo2_mapping/pointcloud_global2", 1);
         pc_global_->reserve(5000000);
         t_last_pub_pc_ = 0.0;
     }
@@ -205,8 +203,8 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
 esvo2_Mapping::~esvo2_Mapping()
 {
     // pc_pub_.shutdown();
-    pc_filtered_pub_.shutdown();
-    invDepthMap_pub_.shutdown();
+    // pc_filtered_pub_.shutdown();
+    // invDepthMap_pub_.shutdown();
     // V_ba_bg_pub_.shutdown();
 }
 
@@ -797,8 +795,9 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
     }
 }
 
-void esvo2_Mapping::eventsCallback(const EventArray::ConstPtr &msg, EventQueue &EQ)
+void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg)
 {
+    EventQueue &EQ = events_left_;
     std::lock_guard<std::mutex> lock(data_mutex_);
 
     static constexpr double max_time_diff_before_reset_s = 0.5;

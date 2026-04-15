@@ -28,7 +28,6 @@
 #include <vector>
 
 #include <pcl/point_types.h>
-#include <pcl_ros/point_cloud.h>
 
 #include <esvo2_core/factor/imu_integration.h>
 #include <esvo2_core/tools/types.h>
@@ -97,18 +96,20 @@ class esvo2_Tracking
 
         // subscribers and publishers
         // ros::Subscriber events_left_sub_;
-        ros::Subscriber map_sub_, map_sub_for_tracking_visualization_;
-        ros::Subscriber V_ba_bg_sub_;
-        ros::Subscriber imu_sub_;
-        ros::Subscriber gt_sub_;
 
-        message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
-        message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
-        ros::Subscriber stampedPose_sub_;
-        image_transport::Publisher reprojMap_pub_left_;
+
+        // ros::Subscriber map_sub_, map_sub_for_tracking_visualization_;
+        // ros::Subscriber V_ba_bg_sub_;
+        // ros::Subscriber imu_sub_;
+        // ros::Subscriber gt_sub_;
+
+        // message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
+        // message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
+        // ros::Subscriber stampedPose_sub_;
+        // image_transport::Publisher reprojMap_pub_left_;
 
         // publishers
-        ros::Publisher pose_pub_, path_pub_;
+        // ros::Publisher pose_pub_, path_pub_;
 
         // results
         Path path_;
@@ -116,13 +117,13 @@ class esvo2_Tracking
         std::list<std::string> lTimestamp_;
 
         // Time Surface sync policy
-        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>
-            ApproximateSyncPolicy;
-        message_filters::Synchronizer<ApproximateSyncPolicy> TS_sync_;
-        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image,
-                                                                sensor_msgs::Image, sensor_msgs::Image>
-            ApproximateSyncPolicy_negaTS;
-        message_filters::Synchronizer<ApproximateSyncPolicy_negaTS> TS_negaTS_sync_;
+        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>
+            // ApproximateSyncPolicy;
+        // message_filters::Synchronizer<ApproximateSyncPolicy> TS_sync_;
+        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image,
+                                                                // sensor_msgs::Image, sensor_msgs::Image>
+            // ApproximateSyncPolicy_negaTS;
+        // message_filters::Synchronizer<ApproximateSyncPolicy_negaTS> TS_negaTS_sync_;
 
         // offline data
         std::string dvs_frame_id_;

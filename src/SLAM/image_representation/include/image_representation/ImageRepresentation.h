@@ -3,7 +3,7 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <image_representation/TicToc.h>
-#include <image_transport/image_transport.h>
+// #include <image_transport/image_transport.h>
 #include <ros/ros.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
@@ -24,6 +24,7 @@
 #include <yaml-cpp/yaml.h>
 #include <data_passing.h>
 #include <multi_data_passing.h>
+#include "types.h"
 
 namespace image_representation
 {
@@ -91,7 +92,7 @@ class ImageRepresentation
         void GenerationLoop();
 
         // callbacks
-        void eventsCallback(const EventArray::ConstPtr &msg);
+        void eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg);
 
         // utils
         void clearEventQueue();
@@ -111,8 +112,8 @@ class ImageRepresentation
         Eigen::Matrix2Xd precomputed_rectified_points_;
 
         // sub & pub
-        ros::Subscriber event_sub_;
-        ros::Subscriber camera_info_sub_;
+        // ros::Subscriber event_sub_;
+        // ros::Subscriber camera_info_sub_;
 
         // image_transport::Publisher dx_image_pub_, dy_image_pub_;
         // image_transport::Publisher image_representation_pub_TS_;

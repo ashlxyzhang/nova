@@ -15,6 +15,7 @@
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "util/threads.hh"
+// #include "SLAM/refactor_files/slam_manager.cpp"
 
 struct Application
 {
@@ -29,6 +30,7 @@ struct Application
         std::unique_ptr<Visualizer> visualizer;
         std::unique_ptr<DigitalCodedExposure> digital_coded_exposure;
         std::unique_ptr<GUI> gui;
+        // std::unique_ptr<SlamManager> slam;
 
         // Worker threads
         std::atomic<bool> data_acquisition_running = true;
@@ -111,6 +113,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device_wrapper.get_device());
     app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, *app->error_queue, 
                                      app->window, app->gpu_device_wrapper.get_device());
+    // app->slam = std::make_unique<SlamManager>();
 
     // Spawn separate thread to manage the DataAcquisition
     app->data_acquisition_thread = std::thread(program_thread::data_acquisition_thread,
@@ -144,6 +147,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // Update all of the data sources
     app->data_acq->update();
+    
+    // Update SLAM based on its scrubbers's events
+    // app->slam->send_events();
     
     // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();

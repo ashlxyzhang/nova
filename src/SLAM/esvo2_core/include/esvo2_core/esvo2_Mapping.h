@@ -64,7 +64,7 @@ class esvo2_Mapping
 
         // callback functions
         void stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &ps_msg);
-        void eventsCallback(const EventArray::ConstPtr &msg, EventQueue &EQ);
+        void eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg);
         void timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface_left,
                                  const esvo2_core::ImagePtr &time_surface_right,
                                  const esvo2_core::ImagePtr &AA_map,
@@ -117,19 +117,19 @@ class esvo2_Mapping
         YAML::Node config_;
 
         // Subscribers
-        ros::Subscriber events_left_sub_;
+        // ros::Subscriber events_left_sub_;
         // ros::Subscriber stampedPose_sub_, AA_frequency_sub_;
         // message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
         // message_filters::Subscriber<sensor_msgs::Image> AA_map_sub_;
         // message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
 
-        ros::Subscriber imu_sub_;
+        // ros::Subscriber imu_sub_;
 
         // Publishers
         // ros::Publisher pc_pub_;
-         ros::Publisher gpc_pub_, pc_filtered_pub_;
+        //  ros::Publisher gpc_pub_, pc_filtered_pub_;
         // ros::Publisher V_ba_bg_pub_;
-        image_transport::ImageTransport it_;
+        // image_transport::ImageTransport it_;
         double t_last_pub_pc_;
 
         // Time-Surface sync policy
@@ -265,7 +265,7 @@ class esvo2_Mapping
         /**********************************************************/
         /******************** For test & debug ********************/
         /**********************************************************/
-        image_transport::Publisher invDepthMap_pub_, stdVarMap_pub_, ageMap_pub_, costMap_pub_, invDepthMap_rel_pub_;
+        // image_transport::Publisher invDepthMap_pub_, stdVarMap_pub_, ageMap_pub_, costMap_pub_, invDepthMap_rel_pub_;
         std::string resultPath_;
         // For counting the total number of fusion
         size_t TotalNumFusion_;

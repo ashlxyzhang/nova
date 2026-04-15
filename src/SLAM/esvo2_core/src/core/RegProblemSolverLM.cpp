@@ -258,11 +258,11 @@ bool RegProblemSolverLM::solve_analytical()
   return 0;
 }
 
-void RegProblemSolverLM::setRegPublisher(
-  image_transport::Publisher* reprojMap_pub)
-{
-  reprojMap_pub_ = reprojMap_pub;
-}
+// void RegProblemSolverLM::setRegPublisher(
+//   image_transport::Publisher* reprojMap_pub)
+// {
+//   reprojMap_pub_ = reprojMap_pub;
+// }
 
 }//namespace core
 }//namespace esvo2_core

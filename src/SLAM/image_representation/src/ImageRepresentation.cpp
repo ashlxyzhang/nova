@@ -6,6 +6,7 @@
 #include <std_msgs/Float32.h>
 #include <data_passing.h>
 #include <multi_data_passing.h>
+#include "types.h"
 
 #include <cmath>
 #include <vector>
@@ -25,8 +26,8 @@ ImageRepresentation::ImageRepresentation(const YAML::Node &config,
     this->AA_left_IR_to_Map = AA_left_IR_to_Map;
 
     // setup subscribers and publishers
-    event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
-    image_transport::ImageTransport it_(nh_);
+    // event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
+    // image_transport::ImageTransport it_(nh_);
     is_left_ = config_["is_left"].as<bool>(true);
     // if (is_left_)
     // {
@@ -202,7 +203,7 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     // cv_AA_frequency.image = AA_frequency.clone();
     // cv_AA_frequency.header.stamp = external_sync_time;
     // image_representation_pub_AA_frequency_.publish(cv_AA_frequency.toImageMsg());
-    std::shared_ptr<cv::Mat> AA_freq = make_shared<cv::Mat();
+    std::shared_ptr<cv::Mat> AA_freq = make_shared<cv::Mat>();
     *AA_freq = AA_frequency;
     AA_left_IR_to_Map->add(AA_freq, external_sync_time);
 
@@ -211,7 +212,7 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     // cv_AA_mat.image = representation_AA_.clone();
     // cv_AA_mat.header.stamp = external_sync_time;
     // image_representation_pub_AA_mat_.publish(cv_AA_mat.toImageMsg());
-    std::shared_ptr<cv::Mat> AA_map = make_shared<cv::Mat();
+    std::shared_ptr<cv::Mat> AA_map = make_shared<cv::Mat>();
     *AA_map = representation_AA_;
     multi_to_Map->add<2>({representation_AA_, external_sync_time});
 
@@ -303,7 +304,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // cv_TS_image.image = TS_img.clone();
             // cv_TS_image.header.stamp = external_sync_time;
             // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
-            std::shared_ptr<cv::Mat> TS_left = make_shared<cv::Mat();
+            std::shared_ptr<cv::Mat> TS_left = make_shared<cv::Mat>();
             *TS_left = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Track->add<0>({TS_left, external_sync_time});
@@ -315,7 +316,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // cv_negative_TS_image.image = negative_TS_img.clone();
             // cv_negative_TS_image.header.stamp = external_sync_time;
             // image_representation_pub_negative_TS_.publish(cv_negative_TS_image.toImageMsg());
-            std::shared_ptr<cv::Mat> TS_neg = make_shared<cv::Mat();
+            std::shared_ptr<cv::Mat> TS_neg = make_shared<cv::Mat>();
             *TS_neg = negative_TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Track->add<1>({TS_neg, external_sync_time});
@@ -359,7 +360,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // cv_TS_image.header.stamp = timePoint(external_t);
             // cv_TS_image.image = TS_img.clone();
             // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
-            std::shared_ptr<cv::Mat> TS_right = make_shared<cv::Mat();
+            std::shared_ptr<cv::Mat> TS_right = make_shared<cv::Mat>();
             *TS_right = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Map->add<1>({TS_right, external_sync_time});
@@ -377,14 +378,14 @@ void ImageRepresentation::clearEvents(int distance, std::vector<Event>::iterator
         vEvents_.clear();
 }
 
-void ImageRepresentation::eventsCallback(const EventArray::ConstPtr &msg)
+void ImageRepresentation::eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg)
 {
     TicToc t;
     std::lock_guard<std::mutex> lock(data_mutex_);
     double t1 = t.toc();
     if (!bSensorInitialized_)
         init(msg->width, msg->height);
-    for (const Event &e : msg->events)
+    for (const esvo2_core::Event &e : msg->events)
     {
         if (e.x > sensor_size_.width || e.y > sensor_size_.height)
             continue;
@@ -422,7 +423,7 @@ void ImageRepresentation::sobel(double external_t)
     // Publishing dx
     // cv_dx_image.header.stamp = timePoint(external_t);
     // dx_image_pub_.publish(cv_dx_image.toImageMsg());
-    std::shared_ptr<cv::Mat> dx_image = make_shared<cv::Mat();
+    std::shared_ptr<cv::Mat> dx_image = make_shared<cv::Mat>();
     *dx_image = std::move(dx_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
     multi_to_Track->add<2>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
@@ -432,7 +433,7 @@ void ImageRepresentation::sobel(double external_t)
     // Publishing dy
     // cv_dy_image.header.stamp = timePoint(external_t);
     // dy_image_pub_.publish(cv_dy_image.toImageMsg());
-    std::shared_ptr<cv::Mat> dy_image = make_shared<cv::Mat();
+    std::shared_ptr<cv::Mat> dy_image = make_shared<cv::Mat>();
     *dy_image = std::move(dy_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
     multi_to_Track->add<3>({dy_image, esvo2_core::secondsToTimePoint(external_t)});

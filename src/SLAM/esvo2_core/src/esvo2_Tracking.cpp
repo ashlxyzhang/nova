@@ -54,16 +54,14 @@ esvo2_Tracking::esvo2_Tracking(const YAML::Node &config,
     // TS_negaTS_sync_.registerCallback(boost::bind(&esvo2_Tracking::timeSurface_NegaTS_Callback, this, _1, _2, _3, _4));
 
     tf_ = std::make_shared<tf::Transformer>(true, ros::Duration(100.0));
-    // pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/esvo2_tracking/pose_pub", 1);
-    path_pub_ = nh_.advertise<nav_msgs::Path>("/esvo2_tracking/trajectory", 1);
-    // map_sub_ = nh_.subscribe("pointcloud", 0, &esvo2_Tracking::refMapCallback, this); // local map in the ref view.
-    // stampedPose_sub_ = nh_.subscribe("stamped_pose", 0, &esvo2_Tracking::stampedPoseCallback,
-    //                                  this); // for accessing the pose of the ref view.
-    imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Tracking::refImuCallback, this); // local map in the ref view.
-    // V_ba_bg_sub_ = nh_.subscribe("/esvo2_mapping/V_ba_bg", 0, &esvo2_Tracking::VBaBgCallback, this);
+    // In refactoring, IMU HAS NO SUB/PUB queues  set up!
+        // imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Tracking::refImuCallback, this); // local map in the ref view.
     /*** For Visualization and Test ***/
-    reprojMap_pub_left_ = it_.advertise("Reproj_Map_Left", 1);
-    rpSolver_.setRegPublisher(&reprojMap_pub_left_);
+    // In refactoring, below 2 have NO SUB/PUB queues  set up!
+        // path_pub_ = nh_.advertise<nav_msgs::Path>("/esvo2_tracking/trajectory", 1);
+        // reprojMap_pub_left_ = it_.advertise("Reproj_Map_Left", 1);
+    // In refactoring, Pub/Sub queue is inside of the RegProblemSolverLM class directly, but it is also not setup
+        // rpSolver_.setRegPublisher(&reprojMap_pub_left_);
 
     // rename the old trajectory file
     renameOldTraj();

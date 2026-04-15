@@ -1,4 +1,3 @@
-#include <memory>
 #include <thread>
 #include <atomic>
 #include <condition_variable>
@@ -10,6 +9,10 @@
 #include <opencv2/core/mat.hpp>
 #include "types.h"
 
+#include "src/util/pch.hh"
+#include "src/data/EventData.hh"
+#include "src/ui/Scrubber.hh"
+
 #include <pcl/point_types.h>
 // #include <pcl_ros/point_cloud.h>
 // #include <pcl/filters/voxel_grid.h>
@@ -18,11 +21,20 @@ class SlamManager {
 public:
     using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
-    SlamManager() {}
+    SlamManager() 
+    {
+
+    }
 
     // Spawns threads for all the modules
-    void startSlam()
+    void startSlam(Scrubber* left_scrubber, Scrubber* right_scrubber, EventData* left_eventdata, EventData* right_eventdata)
     {
+        // Setting the scrubbers
+        this->left_scrubber = left_scrubber;
+        this->right_scrubber = right_scrubber;
+        this->left_eventdata = left_eventdata;
+        this->right_eventdata = right_eventdata;
+
         // Setting up the queues
         AA_left_IR_to_Map = DataPassingDeque<cv::Mat>(1000, &mapping_cv);
         v_ba_bg_Map_to_Track = DataPassingDeque<esvo2_core::VBaBg>(1000, &tracking_cv);
@@ -72,9 +84,136 @@ public:
         image_representation_right.reset();
         mapping_thread.reset();
         tracking_thread.reset();
+
+        firstEventBatch = true;
+        this->left_scrubber = nullptr;
+        this->right_scrubber = nullptr;
+        this->left_eventdata = nullptr;
+        this->right_eventdata = nullptr;
+    }
+
+    void sendEvents()
+    {
+        // If SLAM is not running, just return
+        if(!image_representation_left_running)
+            return;
+        sendEventsPerScrubber(left_eventdata, *left_scrubber, true);
+        sendEventsPerScrubber(right_eventdata, *right_scrubber, false);
     }
 
 private:
+
+    void sendEventsPerScrubber(EventData &event_data, Scrubber &scrubber, bool is_left)
+    {
+        std::array<std::size_t, 2> frame_dims = scrubber->get_frame_dimensions();
+        std::size_t width = frame_dims[0];
+        std::size_t height = frame_dims[1];
+        std::size_t points_buffer_size = scrubber->get_points_buffer_size();
+        glm::vec4* current_data_ptr = scrubber->get_current_data_ptr();
+        // If SLAM is not running, just return
+        if(!image_representation_left_running)
+            return;
+
+        if(current_data_ptr != nullptr && points_buffer_size > 0)
+        {
+            event_data.lock_data_vectors();
+
+            if(firstEventBatch)
+            {
+                /* 
+                ESVO2 requires processing timestamps based on the current absolute clock time, 
+                i.e. std::chrono::time_point<std::chrono::steady_clock>::now().
+                Every 10ms, imageRepresentation looks at all events less than ::now() and processes those events.
+                The timestamps in the event vector are in relative time, not absolute time. In order to turn them into
+                absolute time, have to do some calcuations. Idea with below calculation is to come up with some absolute "time 0"
+                that can add to all the events's timestamps. It is based on the following rules:
+                    - The timepoint of the last event must be <= ::now() so that all events in the batch will be processed correctly in imageRepresentation
+                    - The timepoints of the events in the batch should stay in increasing order
+                To do this, we just say the last event happened at ::now(). So then "time 0" would be (now - endTime).
+                We only do this for the first event batch because other event batches can just use this already calculating starting time. 
+                This is because future events will increase in time at the same rate that real time is passing, 
+                so their time + "time 0" will never be greater than ::now(). 
+                */
+                timePoint now = std::chrono::time_point<std::chrono::steady_clock>::now();
+                // Casting end timestamp as a duration
+                // https://docs.inivation.com/software/introduction.html: "timestamp represents the time of the start of exposure of the 
+                // frame. It is represented as a Unix Timestamp in **microseconds**. Type: int64"
+                std::chrono::microseconds end_duration((current_data_ptr + (points_buffer_size - 1))->z);
+                zero_absolute_timestamp = now - end_duration;
+                firstEventBatch = false;
+            }
+
+            const double duration_threshold = 1.0/1000.0;
+            double curr_lower_bound_timestamp = current_data_ptr->z;
+            double upper_bound_timestamp = curr_lower_bound_timestamp + duration_threshold;
+
+            esvo2_core::EventArray evtArray;
+            evtArray.width = width;
+            evtArray.height = height;
+
+
+            for(std::size_t index = 0; index < points_buffer_size; index++)
+            {
+                // If no longer running, just return
+                if(!image_representation_left_running)
+                {
+                    event_data.unlock_data_vectors();
+                    return;
+                }
+
+                // If reached the upper bound timestamp, can send the event array to the queues
+                while(current_data_ptr[index].z >= upper_bound_timestamp)
+                {
+                    // Sending the Event Array to the queues
+                    if(evtArray.events.size()!=0)
+                    {
+                       sendEventsToQueues(evtArray, is_left);
+                       evtArray->events.clear();
+                    }
+                    // Updating the lower/upper bounds
+                    curr_lower_bound_timestamp = upper_bound_timestamp;
+                    upper_bound_timestamp = curr_lower_bound_timestamp + duration_threshold;
+                }
+
+                // Creating the event. Format is x->x, y->y, z->timestamp_relative, w->polarity
+                esvo2_core::Event evt;
+                evt.x = current_data_ptr[index].x;
+                evt.y = current_data_ptr[index].y;
+                evt.timestamp = std::chrono::microseconds(current_data_ptr[index].z) + zero_absolute_timestamp;
+                evt.polarity = current_data_ptr[index].w;
+                // Adding the event to the array
+                evtArray.events.push_back(evt);
+            }
+
+            // If evtArray is nonempty once finish for loop, send the events to the queues
+            if(evtArray.events.size()!=0)
+            {
+                sendEventsToQueues(evtArray, is_left);
+            }
+            event_data.unlock_data_vectors();
+        }
+    }
+
+    void sendEventsToQueues(esvo2_core::EventArray& evtArray, bool is_left)
+    {
+        std::shared_ptr<esvo2_core::EventArray> final_evt_array = make_shared<esvo2_core::EventArray>();
+        final_evt_array->width = evtArray->width;
+        final_evt_array->height = evtArray->height;
+        final_evt_array->events = std::move(evtArray->events);
+        timePoint finalEventTimestamp = final_evt_array->events.at(final_evt_array->events.size()-1).timestamp;
+        if(is_left)
+        {
+            event_left_To_IR.add(final_evt_array, finalEventTimestamp);
+            image_representation_left_cv->notify_one();
+            event_left_To_Map.add(final_evt_array, finalEventTimestamp);
+            mapping_cv->notify_one();   
+        }
+        else
+        {
+            event_right_To_IR.add(final_evt_array, finalEventTimestamp);
+            image_representation_right_cv->notify_one();
+        }
+    }
 
     void process_image_representation_left_thread(std::atomic<bool> &running, std::condition_variable& cv)
     {
@@ -82,8 +221,29 @@ private:
         unique_lock<mutex> lock(mtx);
         while(running)
         {
-            // TODO check for events here then call ImageRepresentation::eventsCallback
-            // Don't lock for each event!
+            cv.wait(lock, std::chrono::seconds(1));
+            bool gotOne = true;
+            while(gotOne)
+            {
+                if(!running)
+                    break;
+
+                gotOne=false;
+                // checking the event queue
+                event_left_To_IR.lock();
+                if(event_left_To_IR.queueEmpty())
+                {
+                    event_left_To_IR.unlock();
+                }
+                else
+                {
+                    gotOne=true;
+                    std::pair<std::shared_ptr<esvo2_core::EventArray>, timePoint> result = event_left_To_IR.getValue();
+                    event_left_To_IR.unlock();
+                    std::shared_ptr<esvo2_core::EventArray> evtArray = result.first;
+                    image_representation_left->eventsCallback(evtArray);
+                }
+            }
         }
     }
 
@@ -93,8 +253,29 @@ private:
         unique_lock<mutex> lock(mtx);
         while(running)
         {
-            // TODO check for events here then call ImageRepresentation::eventsCallback
-            // Don't lock for each event!
+            cv.wait(lock, std::chrono::seconds(1));
+            bool gotOne = true;
+            while(gotOne)
+            {
+                if(!running)
+                    break;
+
+                gotOne=false;
+                // checking the event queue
+                event_right_To_IR.lock();
+                if(event_right_To_IR.queueEmpty())
+                {
+                    event_right_To_IR.unlock();
+                }
+                else
+                {
+                    gotOne=true;
+                    std::pair<std::shared_ptr<esvo2_core::EventArray>, timePoint> result = event_right_To_IR.getValue();
+                    event_right_To_IR.unlock();
+                    std::shared_ptr<esvo2_core::EventArray> evtArray = result.first;
+                    image_representation_right->eventsCallback(evtArray);
+                }
+            }
         }
     }
 
@@ -177,6 +358,25 @@ private:
 
                         esvo2_core::ImagePtr AA_left(result);
                         mapping->AACallback(AA_left);
+                    }
+                }
+
+                // Only do so if bpoints_from_AA is false
+                if(!mapping->bpoints_from_AA_)
+                {
+                    // checking the event queue
+                    event_left_To_Map.lock();
+                    if(event_left_To_Map.queueEmpty())
+                    {
+                        event_left_To_Map.unlock();
+                    }
+                    else
+                    {
+                        gotOne=true;
+                        std::pair<std::shared_ptr<esvo2_core::EventArray>, timePoint> result = event_left_To_Map.getValue();
+                        event_left_To_Map.unlock();
+                        std::shared_ptr<esvo2_core::EventArray> evtArray = result.first;
+                        mapping->eventsCallback(evtArray);
                     }
                 }
             }
@@ -283,6 +483,14 @@ private:
     std::unique_ptr<esvo2_Mapping> mapping;
     std::unique_ptr<esvo2_Tracking> tracking;
 
+    // For sending events
+    timePoint zero_absolute_timestamp;
+    bool firstEventBatch = true;
+    Scrubber* left_scrubber = nullptr;
+    Scrubber* right_scrubber = nullptr;
+    EventData* left_eventdata = nullptr;
+    EventData* right_eventdata = nullptr;
+
     //! Worker threads run until their respective boolean flag is set false (see SDL_Quit)
     // These threads just check if their queues got new data in them, then call the corresponding callback functions
     std::atomic<bool> image_representation_left_running = false;
@@ -341,24 +549,15 @@ private:
     // DataPassingDeque<cv::Mat> reproj_map_left_Track_to_Viz;
 
     // ---From outside (EVENTS/IMU)--- 
-    //    events_left -> Mapping
-    //    /imu/data -> Mapping
+    DataPassingDeque<esvo2_core::EventArray> event_left_To_IR;
+    DataPassingDeque<esvo2_core::EventArray> event_right_To_IR;
+    DataPassingDeque<esvo2_core::EventArray> event_left_To_Map;
+    // /imu/data -> Mapping
     // /imu/data -> Tracking
-    // events/left and events/right -> image representation
-    
 };
 
 // -------TODO---------
 /* 
-    - Do event stuff!
-        - Need to check with Ryan to make sure scrubbers are ready.
-        - Also need to check with Ashley to make sure I am understanding this right
-        - maybe just make another thread that reads from the left and right camera scrubbers, assembles events into an event array 
-          of size according to what the google doc says (all events in a 0.001 second interval), then sends them to 3 queues
-        - update process_image_representation_left_thread and process_image_representation_right_thread to process the left/right queues
-        - update process_mapping_thread() to process the left_map queue
-        - do it after data acquasition update
-
     - Comment out all IMU stuff
         - comment out all the IMU code that we aren't using that isn't already disabled by the flag not being set
         - shouldn't be too bad
@@ -366,10 +565,15 @@ private:
     - Update ros time stuff!
        - The main mapping/tracking thread functions use some ROS time stuff. Should update to use std::chrono stuff instead
 
+    - Get rid of all include errors
+        - check dockerfile for additional depenedencies if needed
+            - add those dependencies
+        - delete any ROS/unused imports
+
     - Visualization stuff
        - Figure out how to visualize PCL (point cloud library)
            - Set up a class for SLAM in the visualizer
-           - Send data to that class from the Mapping pointcloud_global2 publisher??
+           - Send data to that class via a reference to pc_global_ in esvo2_Mapping.cpp
        - If have time, can add ways to visualize the other stuff 
          - All visualization queues are commented out above, so can readd them if want to 
          - visualize the other types of point clouds 
@@ -389,4 +593,6 @@ private:
     - (10,10) for multi_data_passing queue sizes might be incorrect, but it should be fine
     - I am pretty sure stuff in the subscribe callback functions treat variables as a const, 
         so I have been treating it as okay to send the same shared ptr to multiple queues
+    - Because of relative to absolute time conversion, must run SLAM on time scrub mode and in real time (no speeding up/slowing down probably)
+      Can still play from file, but must play file in real time.
 */
