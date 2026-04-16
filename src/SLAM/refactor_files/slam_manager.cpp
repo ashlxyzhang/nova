@@ -558,6 +558,14 @@ private:
 
 // -------TODO---------
 /* 
+
+    - get rid of tf:: stuff
+        - I started implementing it (types.h has new types) but ran into issue with  tf::transformTFToKindr in esvo2_Mapping.cpp
+        - Apparently there is another dependency called minkindr that is decently used
+        - It can be found at: https://github.com/ethz-asl/minkindr
+        - Next step is to add it to cmake lists somehow??? (It depends on catkin_ws, but can prob work around that)
+        - Then can write conversion function following: https://github.com/ethz-asl/minkindr_ros/blob/master/minkindr_conversions/include/minkindr_conversions/kindr_tf.h
+
     - Comment out all IMU stuff
         - comment out all the IMU code that we aren't using that isn't already disabled by the flag not being set
         - shouldn't be too bad

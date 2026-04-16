@@ -169,7 +169,7 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
         imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Mapping::refImuCallback, this);
 
     // TF
-    tf_ = std::make_shared<tf::Transformer>(true, ros::Duration(100.0));
+    tf_ = std::make_shared<esvo2_core::Transformer>(100);
 
     // result publishers
     // In refactoring, below two have no SUB/PUB queues set up!
@@ -765,16 +765,15 @@ void esvo2_Mapping::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseSt
     }
 
     // add pose to tf
-    tf::Transform tf(tf::Quaternion(ps_msg->orientation[0], ps_msg->orientation[1], ps_msg->orientation[2],
-                                    ps_msg->orientation[3]),
-                     tf::Vector3(ps_msg->position[0], ps_msg->position[1], ps_msg->position[2]));
-    tf::StampedTransform st(tf, ps_msg->timestamp, ps_msg->frame_id, dvs_frame_id_.c_str());
+    esvo2_core::Transform tf(ps_msg->orientation[0], ps_msg->orientation[1], ps_msg->orientation[2],
+                     ps_msg->orientation[3], ps_msg->position[0], ps_msg->position[1], ps_msg->position[2]);
+    esvo2_core::StampedTransform st(tf, ps_msg->timestamp, ps_msg->frame_id, dvs_frame_id_);
     tf_->setTransform(st);
 }
 
 // return the pose of the left event cam at time t.
 bool esvo2_Mapping::getPoseAt(const timePoint &t,
-                              esvo2_core::Transformation &Tr, // T_world_virtual
+                              Transformation &Tr, // T_world_virtual
                               const std::string &source_frame)
 {
     std::string *err_msg = new std::string();
@@ -788,7 +787,7 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
     }
     else
     {
-        tf::StampedTransform st;
+        esvo2_core::StampedTransform st;
         tf_->lookupTransform(world_frame_id_, source_frame, t, st);
         tf::transformTFToKindr(st, &Tr);
         return true;
@@ -809,7 +808,7 @@ void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray>
         const double dt = esvo2_core::timePointToSec(stamp_first_event) - esvo2_core::timePointToSec(EQ.back().ts);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
-            ROS_INFO("Inconsistent event timestamps detected <eventCallback> (new: %f, old %f), resetting.",
+            printf("Inconsistent event timestamps detected <eventCallback> (new: %f, old %f), resetting.",
                      esvo2_core::timePointToSec(stamp_first_event), esvo2_core::timePointToSec(events_left_.back().ts));
             reset();
         }
@@ -862,7 +861,7 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
         const double dt = esvo2_core::timePointToSec(time_surface_left.header_stamp) - esvo2_core::timePointToSec(stamp_last_image);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
-            ROS_INFO("Inconsistent frame timestamp detected <timeSurfaceCallback> (new: %f, old %f), resetting.",
+            printf("Inconsistent frame timestamp detected <timeSurfaceCallback> (new: %f, old %f), resetting.",
                      esvo2_core::timePointToSec(time_surface_left.header_stamp), esvo2_core::timePointToSec(stamp_last_image));
             reset();
         }
@@ -906,7 +905,7 @@ void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
         const double dt = esvo2_core::timePointToSec(AA_left.header_stamp) - esvo2_core::timePointToSec(stamp_last_image);
         if (std::fabs(dt) >= max_time_diff_before_reset_s)
         {
-            ROS_INFO("Inconsistent frame timestamp detected <AACallback> (new: %f, old %f), resetting.",
+            printf("Inconsistent frame timestamp detected <AACallback> (new: %f, old %f), resetting.",
                      esvo2_core::timePointToSec(AA_left.header_stamp), esvo2_core::timePointToSec(stamp_last_image));
             reset();
         }

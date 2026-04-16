@@ -4,12 +4,12 @@
 #include <ros/ros.h>
 
 #include <esvo2_core/tools/types.h>
-#include <message_filters/subscriber.h>
-#include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/sync_policies/exact_time.h>
-#include <message_filters/synchronizer.h>
+// #include <message_filters/subscriber.h>
+// #include <message_filters/sync_policies/approximate_time.h>
+// #include <message_filters/sync_policies/exact_time.h>
+// #include <message_filters/synchronizer.h>
 
-#include <tf2_ros/transform_broadcaster.h>
+// #include <tf2_ros/transform_broadcaster.h>
 
 #include <esvo2_core/container/CameraSystem.h>
 #include <esvo2_core/container/DepthMap.h>
@@ -42,6 +42,9 @@
 #include <sensor_msgs/Imu.h>
 #include <data_passing.h>
 #include <multi_data_passing.h>
+
+// from utils.h
+// using Transformation = kindr::minimal::QuatTransformation;
 
 namespace esvo2_core
 {
@@ -164,7 +167,7 @@ class esvo2_Mapping
         TimeSurfaceHistory TS_history_;
         constStampedTimeSurfaceObs *TS_obs_ptr_;
         StampTransformationMap st_map_;
-        std::shared_ptr<tf::Transformer> tf_;
+        std::shared_ptr<esvo2_core::Transformer> tf_;
         size_t TS_id_;
         timePoint tf_lastest_common_time_;
 

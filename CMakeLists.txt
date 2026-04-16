@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.26)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -75,7 +75,6 @@ if(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
 endif()
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_DISABLE_SSE)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3

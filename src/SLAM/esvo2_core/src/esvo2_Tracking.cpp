@@ -53,7 +53,7 @@ esvo2_Tracking::esvo2_Tracking(const YAML::Node &config,
 
     // TS_negaTS_sync_.registerCallback(boost::bind(&esvo2_Tracking::timeSurface_NegaTS_Callback, this, _1, _2, _3, _4));
 
-    tf_ = std::make_shared<tf::Transformer>(true, ros::Duration(100.0));
+    tf_ = std::make_shared<esvo2_core::Transformer>(100);
     // In refactoring, IMU HAS NO SUB/PUB queues  set up!
         // imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Tracking::refImuCallback, this); // local map in the ref view.
     /*** For Visualization and Test ***/

@@ -6,16 +6,19 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <set>
 
 #include "SystemStatus.h"
 #include <opencv2/core/core.hpp>
+#include "src/util/pch.hh"
+#include <glm/gtc/quaternion.hpp>
 
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 namespace esvo2_core
 {
 
-double timePointToSec(timePoint& timestamp)
+double timePointToSec(const timePoint& timestamp)
 {
      return std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();
 }
@@ -95,6 +98,168 @@ struct ImagePtr
             this->image = stuff.first;
             this->header_stamp = stuff.second;
         }    
+};
+
+
+// Replaces tf::Transform and tf::StampedTransform
+struct Transform
+{
+public:
+        Transform()
+        {
+
+        }
+        Transform(const Transform& other)
+        {
+                this->rot = other->rot;
+                this->trans = other->trans;
+        }
+        Transform(double qx, double qy, double qz, double qw, double x, double y, double z)
+        {
+                trans = glm::vec3(x,y,z);
+                rot = glm::dquat(qw, qx, qy, qz);
+        }
+        // https://docs.ros.org/en/jade/api/tf/html/c++/Transform_8h_source.html
+        // quat as a 3x3 matrix
+        // translation as a vec3
+        glm::dquat rot; // m_basis
+        glm::vec3 trans; // m_origin
+};
+
+struct StampedTransform : Transform
+{
+public:
+        StampedTransform(timePoint timestamp_)
+        : timestamp(timestamp_)
+        {}
+        StampedTransform(Transform tran, timePoint timestamp_, std::string child_frame_id_, std::string frame_id_)
+        : Transform(tran), timestamp(timestamp_), child_frame_id(child_frame_id_), frame_id(frame_id_)
+        {  
+        }
+
+        // https://docs.ros.org/en/jade/api/tf/html/c++/classtf_1_1StampedTransform.html
+        // https://docs.ros.org/en/jade/api/tf/html/c++/transform__datatypes_8h_source.html
+        // child frame, is name of this transform's frame
+        std::string child_frame_id; 
+        // parent frame, is name of frame this frame's transforms are with respect to
+        std::string frame_id;
+        // timestamp
+        timePoint timestamp;
+
+        bool operator<(const StampedTransform& rhs) const
+        {
+                return this->timestamp < rhs.timestamp;
+        }
+
+        StampedTransform& operator=(const StampedTransform& rhs)
+        {
+                this->rot = rhs.rot;
+                this->trans = rhs.trans;
+                this->child_frame_id = rhs.child_frame_id;
+                this->frame_id = rhs.frame_id;
+                this->timestamp = rhs.timestamp;
+                return *this;
+        }
+};
+
+// Replaces tf::Transformer
+// https://wiki.ros.org/tf
+// https://chat.tamu.ai/c/a112aef2-ef25-45a9-ad11-071c6dc02664
+class Transformer
+{
+public:
+        Transformer(long long max_time_seconds) 
+        : max_duration_seconds(std::chrono::seconds(max_duration_seconds))
+        {}
+
+        // Adds a transform to the set
+        void setTransform(StampedTransform tran)
+        {
+                // Adding
+                transform_buffer.insert(tran);
+
+                // Updating min/max time
+                if(transform_buffer.size() == 1)
+                {
+                        min_time = tran.timestamp;
+                        max_time = tran.timestamp;
+                }
+
+                if(min_time > tran.timestamp)
+                        min_time = tran.timestamp;
+                if(max_time < tran.timestamp)
+                        max_time = tran.timestamp;
+
+
+                // Erasing if max - min exceeds the maximum allowed duration
+                if(max_time - min_time > max_duration_seconds)
+                {
+                        std::cout<<"Are erasing in types.h/Transformer! This should only happen if have been running SLAM for >100 seconds!"<<std::endl;
+                        StampedTransform min_st(min_time);
+                        auto right = transform_buffer.upper_bound(min_st);
+                        transform_buffer.erase(transform_buffer.begin(), right);
+                        min_time = right->timestamp;
+                }
+        }
+
+        // Says if lookupTransform will be valid if called with timePoint t
+        bool canTransform(timePoint t)
+        {
+                StampedTransform test(t);
+                auto right = transform_buffer.lower_bound(test);
+                // Nothing is greater than t, so cannot lerp
+                if(right == transform_buffer.end())
+                        return false;
+                // Right exactly equals t, so can just return right
+                if(right->timestamp == t)
+                        return true;
+                // There exists another timestamp before t, so can lerp because have a left and right
+                if(right!=transform_buffer.begin())
+                        return true;
+                // Nothing is less than t, so cannot lerp
+                return false;
+        }
+
+        // Lerps betwen poses in the set to estimate the pose at t. Guaranteed to have canTransform called beforehand.
+        void lookupTransform(timePoint t, StampedTransform& st)
+        {
+
+                StampedTransform timestamp_want(t);
+                auto right = transform_buffer.lower_bound(timestamp_want);
+                // Right exactly equals t, so can just return right
+                if(right->timestamp == t)
+                {
+                        st = *right;
+                        return;
+                }
+                // There exists another timestamp before t, so can lerp because have a left and right
+                auto left = right;
+                --left;
+
+                double alpha = (timePointToSec(t) - timePointToSec(left->timestamp)) / (timePointToSec(right->timestamp) - timePointToSec(left->timestamp));
+
+                Transform tranf;
+                tranf.rot =  glm::slerp(left->rot, right->rot, alpha);
+                tranf.trans = glm::mix(left->trans, right->trans, alpha);
+                st = StampedTransform(tranf, t, left->child_frame_id, left->frame_id);
+        }
+
+        // Buffer
+        // https://docs.ros.org/en/jade/api/tf2_ros/html/c++/buffer_8cpp_source.html 
+        // sorted vector/sorted map of stamped_transform
+        std::set<StampedTransform> transform_buffer;
+        std::chrono::seconds max_duration_seconds;
+        timePoint min_time;
+        timePoint max_time;
+
+        // Transformer
+        // https://docs.ros.org/en/jade/api/tf/html/c++/classtf_1_1Transformer.html
+        // https://docs.ros.org/en/jade/api/tf/html/c++/tf_8h_source.html
+        // https://docs.ros.org/en/jade/api/tf/html/c++/tf_8cpp_source.html
+
+        // ESVO2 uses only two coordinate frames, with frame_id always being the world coords and 
+        // child_frame_id being some set string, so don't have to do any special tree traversal or whatever the links above
+        // talk about. Can just use a std::set to store based on timestamp, then query from that.
 };
 
 } // namespace esvo2_core
