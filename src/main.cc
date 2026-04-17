@@ -18,21 +18,21 @@
 
 struct Application
 {
-        // Graphics
-        GPUDevice gpu_device_wrapper;
-        SDL_Window *window = nullptr;
-        float last_frame_render_time = 0.0f;
+    // Graphics
+    GPUDevice gpu_device_wrapper;
+    SDL_Window *window = nullptr;
+    float last_frame_render_time = 0.0f;
 
-        // Modules
-        std::unique_ptr<ErrorQueue> error_queue;
-        std::unique_ptr<DataAcquisition> data_acq;
-        std::unique_ptr<Visualizer> visualizer;
-        std::unique_ptr<DigitalCodedExposure> digital_coded_exposure;
-        std::unique_ptr<GUI> gui;
+    // Modules
+    std::unique_ptr<ErrorQueue> error_queue;
+    std::unique_ptr<DataAcquisition> data_acq;
+    std::unique_ptr<Visualizer> visualizer;
+    std::unique_ptr<DigitalCodedExposure> digital_coded_exposure;
+    std::unique_ptr<GUI> gui;
 
-        // Worker threads
-        std::atomic<bool> data_acquisition_running = true;
-        std::thread data_acquisition_thread;
+    // Worker threads
+    std::atomic<bool> data_acquisition_running = true;
+    std::thread data_acquisition_thread;
 };
 
 static SDL_AppResult init_graphics(Application &app)
