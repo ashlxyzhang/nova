@@ -8,6 +8,7 @@
 #include "data/MetavisionEventReader.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
+#include "render/GPUDevice.hh"
 
 #include <mutex>
 #include <opencv2/imgproc.hpp>
@@ -51,7 +52,7 @@ class DataAcquisition
         std::vector<std::shared_ptr<DataSource>> data_sources;
 
     public:
-        DataAcquisition(SDL_GPUDevice *gpu_device);
+        DataAcquisition(GPUDevice& gpu_device);
 
         void add_camera_source(int camera_index);
         void add_file_source(const std::string &file_path);

@@ -8,6 +8,7 @@
 #include "render/Camera.hh"
 #include "render/RenderTarget.hh"
 #include "render/UploadBuffer.hh"
+#include "render/GPUDevice.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 
@@ -780,16 +781,16 @@ class Visualizer
          * @brief Constructor. Initializes pipelines only.
          * @param gpu_device SDL_GPUDevice to create texture on
          */
-        Visualizer(SDL_GPUDevice *gpu_device)
-            : gpu_device(gpu_device),
-              upload_buffer(gpu_device)
+        Visualizer(GPUDevice& gpu_device)
+            : gpu_device(gpu_device.get_SDL_device()),
+              upload_buffer(gpu_device.get_SDL_device())
         {
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
-            grid_renderer = new GridRenderer(gpu_device);
-            points_renderer = new PointsRenderer(gpu_device);
-            text_renderer = new TextRenderer(gpu_device);
-            frames_renderer = new FramesRenderer(gpu_device);
+            grid_renderer = new GridRenderer(this->gpu_device);
+            points_renderer = new PointsRenderer(this->gpu_device);
+            text_renderer = new TextRenderer(this->gpu_device);
+            frames_renderer = new FramesRenderer(this->gpu_device);
         }
 
         /**

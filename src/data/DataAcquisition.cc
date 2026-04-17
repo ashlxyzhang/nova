@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <metavision/hal/device/device_discovery.h>
 
-DataAcquisition::DataAcquisition(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device)
+DataAcquisition::DataAcquisition(GPUDevice& gpu_device) : gpu_device(gpu_device.get_SDL_device())
 {
 }
 

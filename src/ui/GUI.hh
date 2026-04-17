@@ -9,6 +9,7 @@
 #include "render/DigitalCodedExposure.hh"
 #include "render/RenderTarget.hh"
 #include "render/Visualizer.hh"
+#include "render/GPUDevice.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
@@ -993,8 +994,8 @@ class GUI
         /**
          * @brief Constructor for GUI.
          */
-        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer, ErrorQueue &error_queue, SDL_Window *window, SDL_GPUDevice *gpu_device)
-            : data_acquisition(data_acquisition), visualizer(visualizer), error_queue(error_queue), window(window), gpu_device(gpu_device), fps_history_buf(100, 0.0f), 
+        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer, ErrorQueue &error_queue, SDL_Window *window, GPUDevice& gpu_device)
+            : data_acquisition(data_acquisition), visualizer(visualizer), error_queue(error_queue), window(window), gpu_device(gpu_device.get_SDL_device()), fps_history_buf(100, 0.0f), 
               fps_buf_index(0), check_for_layout_file(true), show_quickstart(false)
         {
 
@@ -1021,9 +1022,9 @@ class GUI
 
             // Setup Platform/Renderer backends
             ImGui_ImplSDL3_InitForSDLGPU(window);
-            ImGui_ImplSDLGPU3_InitInfo init_info = {.Device = gpu_device,
+            ImGui_ImplSDLGPU3_InitInfo init_info = {.Device = this->gpu_device,
                                                     .ColorTargetFormat =
-                                                        SDL_GetGPUSwapchainTextureFormat(gpu_device, window),
+                                                        SDL_GetGPUSwapchainTextureFormat(this->gpu_device, window),
                                                     .MSAASamples = SDL_GPU_SAMPLECOUNT_1,
                                                     .SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
                                                     .PresentMode = SDL_GPU_PRESENTMODE_VSYNC};
