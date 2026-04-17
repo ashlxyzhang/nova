@@ -12,6 +12,9 @@
 #include <opencv2/core/core.hpp>
 #include "src/util/pch.hh"
 #include <glm/gtc/quaternion.hpp>
+#include <esvo2_core/tools/utils.h>
+#include <kindr/minimal/quat-transformation.h>
+#include <kindr/minimal/rotation-quaternion.h>
 
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
@@ -160,6 +163,22 @@ public:
                 this->timestamp = rhs.timestamp;
                 return *this;
         }
+
+        // Turns this Stamped Transform into a Transformation = kindr::minimal::QuatTransformation; 
+        void toKindrTransformation(Transformation& kindr_tf)
+        {
+                Eigen::Matrix<double, 3, 1> kindr_pos(trans.x, trans.y, trans.z);
+                kinder::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
+                
+                // Enforce positive w.
+                if (kindr_rot.w() < 0) {
+                        kindr_rot.setValues(kindr_rot.w()*-1, kindr_rot.x()*-1, kindr_rot.y()*-1, kindr_rot.z()*-1);
+                        // rotate.coeffs() = -rotate.coeffs();
+                }
+                kindr_rot.normalize();
+
+               kindr_tf = Transformation(kindr_rot, pos);
+        }
 };
 
 // Replaces tf::Transformer
@@ -243,7 +262,7 @@ public:
                 tranf.trans = glm::mix(left->trans, right->trans, alpha);
                 st = StampedTransform(tranf, t, left->child_frame_id, left->frame_id);
         }
-
+        
         // Buffer
         // https://docs.ros.org/en/jade/api/tf2_ros/html/c++/buffer_8cpp_source.html 
         // sorted vector/sorted map of stamped_transform

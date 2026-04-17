@@ -105,17 +105,20 @@ private:
 
     void sendEventsPerScrubber(EventData &event_data, Scrubber &scrubber, bool is_left)
     {
-        std::array<std::size_t, 2> frame_dims = scrubber->get_frame_dimensions();
-        std::size_t width = frame_dims[0];
-        std::size_t height = frame_dims[1];
-        std::size_t points_buffer_size = scrubber->get_points_buffer_size();
-        glm::vec4* current_data_ptr = scrubber->get_current_data_ptr();
         // If SLAM is not running, just return
         if(!image_representation_left_running)
             return;
 
-        if(current_data_ptr != nullptr && points_buffer_size > 0)
+        const std::array<std::size_t, 2> frame_dims = scrubber->get_frame_dimensions();
+        const std::size_t width = frame_dims[0];
+        const std::size_t height = frame_dims[1];
+        const std::size_t points_buffer_size = scrubber->get_points_buffer_size();
+        const std::size_t current_lower_index = scrubber->get_current_lower_index();
+        const auto &event_vector = event_data.get_evt_vector_ref();
+
+        if(!event_vector.empty() && points_buffer_size > 0)
         {
+            const glm::vec4* data_ptr = event_data.get_evt_vector_ref().data() + current_lower_index;
             event_data.lock_data_vectors();
 
             if(firstEventBatch)
@@ -138,13 +141,13 @@ private:
                 // Casting end timestamp as a duration
                 // https://docs.inivation.com/software/introduction.html: "timestamp represents the time of the start of exposure of the 
                 // frame. It is represented as a Unix Timestamp in **microseconds**. Type: int64"
-                std::chrono::microseconds end_duration((current_data_ptr + (points_buffer_size - 1))->z);
+                std::chrono::microseconds end_duration((data_ptr + (points_buffer_size - 1))->z);
                 zero_absolute_timestamp = now - end_duration;
                 firstEventBatch = false;
             }
 
             const double duration_threshold = 1.0/1000.0;
-            double curr_lower_bound_timestamp = current_data_ptr->z;
+            double curr_lower_bound_timestamp = data_ptr->z;
             double upper_bound_timestamp = curr_lower_bound_timestamp + duration_threshold;
 
             esvo2_core::EventArray evtArray;
@@ -162,7 +165,7 @@ private:
                 }
 
                 // If reached the upper bound timestamp, can send the event array to the queues
-                while(current_data_ptr[index].z >= upper_bound_timestamp)
+                while(data_ptr[index].z >= upper_bound_timestamp)
                 {
                     // Sending the Event Array to the queues
                     if(evtArray.events.size()!=0)
@@ -177,10 +180,10 @@ private:
 
                 // Creating the event. Format is x->x, y->y, z->timestamp_relative, w->polarity
                 esvo2_core::Event evt;
-                evt.x = current_data_ptr[index].x;
-                evt.y = current_data_ptr[index].y;
-                evt.timestamp = std::chrono::microseconds(current_data_ptr[index].z) + zero_absolute_timestamp;
-                evt.polarity = current_data_ptr[index].w;
+                evt.x = data_ptr[index].x;
+                evt.y = data_ptr[index].y;
+                evt.timestamp = std::chrono::microseconds(data_ptr[index].z) + zero_absolute_timestamp;
+                evt.polarity = data_ptr[index].w;
                 // Adding the event to the array
                 evtArray.events.push_back(evt);
             }
@@ -560,11 +563,9 @@ private:
 /* 
 
     - get rid of tf:: stuff
-        - I started implementing it (types.h has new types) but ran into issue with  tf::transformTFToKindr in esvo2_Mapping.cpp
-        - Apparently there is another dependency called minkindr that is decently used
-        - It can be found at: https://github.com/ethz-asl/minkindr
-        - Next step is to add it to cmake lists somehow??? (It depends on catkin_ws, but can prob work around that)
-        - Then can write conversion function following: https://github.com/ethz-asl/minkindr_ros/blob/master/minkindr_conversions/include/minkindr_conversions/kindr_tf.h
+        - types.h toKindrTransformation is very probably wrong. Hard to check though without compiling
+        - minkindr can be found at: https://github.com/ethz-asl/minkindr
+        - Expected conversion function at: https://github.com/ethz-asl/minkindr_ros/blob/master/minkindr_conversions/include/minkindr_conversions/kindr_tf.h
 
     - Comment out all IMU stuff
         - comment out all the IMU code that we aren't using that isn't already disabled by the flag not being set
@@ -603,4 +604,5 @@ private:
         so I have been treating it as okay to send the same shared ptr to multiple queues
     - Because of relative to absolute time conversion, must run SLAM on time scrub mode and in real time (no speeding up/slowing down probably)
       Can still play from file, but must play file in real time.
+    - types.h toKindrTransformation is very probably wrong
 */

@@ -187,7 +187,7 @@ class Scrubber
         UploadBuffer upload_buffer;
         SDL_GPUBuffer *points_buffer = nullptr;
 
-        glm::vec4 *data_ptr = nullptr;        
+        std::size_t current_lower_index = 0;       
         std::size_t points_buffer_size = 0;
         float lower_depth = 0.0f;
         float upper_depth = 0.0f;
@@ -256,7 +256,7 @@ class Scrubber
                 {
                     SDL_ReleaseGPUBuffer(gpu_device, points_buffer);
                     points_buffer = nullptr;
-                    data_ptr = nullptr;
+                    current_lower_index = 0;
                 }
                 // Nothing to draw
                 points_buffer_size = 0;
@@ -298,7 +298,6 @@ class Scrubber
             {
                 SDL_ReleaseGPUBuffer(gpu_device, points_buffer);
                 points_buffer = nullptr;
-                data_ptr = nullptr;
             }
 
             // Calculate the size needed for the buffer
@@ -314,7 +313,8 @@ class Scrubber
             SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
             SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-            data_ptr = evt_vector.data() + lower_index;
+            const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
+            current_lower_index = lower_index;
             upload_buffer.upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
 
             // Below is frame texture generation code, skip if user does not want frames
@@ -489,9 +489,9 @@ class Scrubber
         {
             return camera_resolution;
         }
-        glm::vec4* get_current_data_ptr() const
+        std::size_t get_current_lower_index() const
         {
-            return data_ptr;
+            return current_lower_index;
         }
 };
 

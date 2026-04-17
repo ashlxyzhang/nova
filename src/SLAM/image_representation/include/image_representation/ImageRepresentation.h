@@ -1,14 +1,14 @@
 #ifndef image_representation_H_
 #define image_representation_H_
 
-#include <dynamic_reconfigure/server.h>
+// #include <dynamic_reconfigure/server.h>
 #include <image_representation/TicToc.h>
 // #include <image_transport/image_transport.h>
-#include <ros/ros.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
-#include <std_msgs/Time.h>
+// #include <ros/ros.h>
+// #include <sensor_msgs/CameraInfo.h>
+// #include <sensor_msgs/Image.h>
+// #include <sensor_msgs/image_encodings.h>
+// #include <std_msgs/Time.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -24,37 +24,38 @@
 #include <yaml-cpp/yaml.h>
 #include <data_passing.h>
 #include <multi_data_passing.h>
-#include "types.h"
+#include "src/SLAM/esvo2_core/include/esvo2_core/tools/types.h"
 
 namespace image_representation
 {
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
-using EventQueue = std::deque<Event>;
+using EventQueue = std::deque<esvo2_core::Event>;
 
 struct ROSTimeCmp
 {
         bool operator()(const timePoint &a, const timePoint &b) const
         {
-            return a.toNSec() < b.toNSec();
+            // return a.toNSec() < b.toNSec();
+            return a < b;
         }
 };
-using GlobalEventQueue = std::map<timePoint, Event, ROSTimeCmp>;
+using GlobalEventQueue = std::map<timePoint, esvo2_core::Event, ROSTimeCmp>;
 
 inline static EventQueue::iterator EventBuffer_lower_bound(EventQueue &eb, timePoint &t)
 {
     return std::lower_bound(eb.begin(), eb.end(), t,
-                            [](const Event &e, const timePoint &t) { return esvo2_core::timePointToSec(e.ts) < esvo2_core::timePointToSec(t); });
+                            [](const esvo2_core::Event &e, const timePoint &t) { return esvo2_core::timePointToSec(e.ts) < esvo2_core::timePointToSec(t); });
 }
 
 inline static EventQueue::iterator EventBuffer_upper_bound(EventQueue &eb, timePoint &t)
 {
     return std::upper_bound(eb.begin(), eb.end(), t,
-                            [](const timePoint &t, const Event &e) { return esvo2_core::timePointToSec(t) < esvo2_core::timePointToSec(e.ts); });
+                            [](const timePoint &t, const esvo2_core::Event &e) { return esvo2_core::timePointToSec(t) < esvo2_core::timePointToSec(e.ts); });
 }
 
-inline static std::vector<Event>::iterator EventVector_lower_bound(std::vector<Event> &ev, double &t)
+inline static std::vector<esvo2_core::Event>::iterator EventVector_lower_bound(std::vector<esvo2_core::Event> &ev, double &t)
 {
-    return std::lower_bound(ev.begin(), ev.end(), t, [](const Event &e, const double &t) { return esvo2_core::timePointToSec(e.ts) < t; });
+    return std::lower_bound(ev.begin(), ev.end(), t, [](const esvo2_core::Event &e, const double &t) { return esvo2_core::timePointToSec(e.ts) < t; });
 }
 
 class ImageRepresentation
@@ -67,7 +68,7 @@ class ImageRepresentation
         );
         virtual ~ImageRepresentation();
 
-        static bool compare_time(const Event &e, const double reference_time)
+        static bool compare_time(const esvo2_core::Event &e, const double reference_time)
         {
             return reference_time < esvo2_core::timePointToSec(e.ts);
         }
@@ -97,9 +98,9 @@ class ImageRepresentation
         // utils
         void clearEventQueue();
         bool loadCalibInfo(const std::string &cameraSystemDir, bool &is_left);
-        void clearEvents(int distance, std::vector<Event>::iterator ptr_e);
+        void clearEvents(int distance, std::vector<esvo2_core::Event>::iterator ptr_e);
 
-        void AA_thread(std::vector<Event>::iterator &ptr_e, int distance, double external_t);
+        void AA_thread(std::vector<esvo2_core::Event>::iterator &ptr_e, int distance, double external_t);
         void sobel(double external_t);
         bool fileExists(const std::string &filename);
         // tests
@@ -144,7 +145,7 @@ class ImageRepresentation
         // containers
         EventQueue events_;
 
-        std::vector<Event> vEvents_;
+        std::vector<esvo2_core::Event> vEvents_;
 
         cv::Mat representation_TS_;
         cv::Mat representation_AA_;

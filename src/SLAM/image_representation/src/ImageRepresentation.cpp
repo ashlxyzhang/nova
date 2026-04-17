@@ -1,9 +1,9 @@
-#include <glog/logging.h>
+// #include <glog/logging.h>
 #include <image_representation/ImageRepresentation.h>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
-#include <std_msgs/Float32.h>
+// #include <std_msgs/Float32.h>
 #include <data_passing.h>
 #include <multi_data_passing.h>
 #include "types.h"
@@ -70,13 +70,13 @@ ImageRepresentation::ImageRepresentation(const YAML::Node &config,
     calibInfoDir_ = config_["calibInfoDir"].as<std::string>("path is not given");
     if (!loadCalibInfo(calibInfoDir_, is_left_))
     {
-        ROS_ERROR("Load Calib Info Error!!!  Given path is: %s", calibInfoDir_.c_str());
+        std::cerr<<("Load Calib Info Error!!!  Given path is: %s", calibInfoDir_.c_str())<<std::endl;
     }
 
     if (is_left_)
-        LOG(INFO) << "\33[32m" << "Left event representation node is up " << "\33[0m";
+        std::cout << "\33[32m" << "Left event representation node is up " << "\33[0m"<<std::endl;
     else
-        LOG(INFO) << "\33[32m" << "Right event representation node is up " << "\33[0m";
+        std::cout << "\33[32m" << "Right event representation node is up " << "\33[0m"<<std::endl;
 
     // start generation
     std::thread GenerationThread(&ImageRepresentation::GenerationLoop, this);
@@ -97,7 +97,7 @@ void ImageRepresentation::init(int width, int height)
 {
     sensor_size_ = cv::Size(width, height);
     bSensorInitialized_ = true;
-    ROS_INFO("Sensor size: (%d x %d)", sensor_size_.width, sensor_size_.height);
+    printf("Sensor size: (%d x %d) /n", sensor_size_.width, sensor_size_.height);
 
     representation_TS_ = cv::Mat::zeros(sensor_size_, CV_32F);
     representation_AA_ = cv::Mat::zeros(sensor_size_, CV_8U);
@@ -121,9 +121,9 @@ void ImageRepresentation::GenerationLoop()
     }
 }
 
-void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int distance, double external_t)
+void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &ptr_e, int distance, double external_t)
 {
-    timePoint external_sync_time(external_t);
+    timePoint external_sync_time(esvo2_core::secondsToTimePoint(external_t));
 
     representation_AA_ = cv::Mat::zeros(sensor_size_, CV_8U);   // for temporal stereo matching
     cv::Mat AA_frequency = cv::Mat::zeros(sensor_size_, CV_8U); // for point sampling
@@ -142,15 +142,15 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     // calculate the final activity by all events, also can be estimated by eq. 3 in the paper
     for (auto it = vEvents_.begin(); it != ptr_e; it++)
     {
-        Event e = *it;
+        esvo2_core::Event e = *it;
         int y = e.y / (int)ceil((double)sensor_size_.height / (double)y_patches_);
         int x = e.x / (int)ceil((double)sensor_size_.width / (double)x_patches_);
         beta[y * x_patches_ + x] = 1 / (1 + final_activity[y * x_patches_ + x] *
-                                                abs(esvo2_core::timePointToSec(e.ts) - last_event_time[y * x_patches_ + x])); // eq. 2
+                                                abs(esvo2_core::timePointToSec(e.timestamp) - last_event_time[y * x_patches_ + x])); // eq. 2
         if (y * x_patches_ + x >= x_patches_ * y_patches_)
             exit(-1);
         final_activity[y * x_patches_ + x] = beta[y * x_patches_ + x] * final_activity[y * x_patches_ + x] + 1; // eq. 1
-        last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.ts);
+        last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.timestamp);
         // nums_temp[y * x_patches_ + x]++;
     }
     // for(int i = 0; i < x_patches_ * y_patches_; i++)
@@ -160,15 +160,15 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     std::fill(last_event_time.begin(), last_event_time.end(), 0);
     for (auto it = ptr_e; it != vEvents_.begin(); it--) // traverse events in reverse to accumulate the latest events
     {
-        Event e = *it;
+        esvo2_core::Event e = *it;
         int y = e.y / (int)ceil((double)sensor_size_.height / (double)y_patches_);
         int x = e.x / (int)ceil((double)sensor_size_.width / (double)x_patches_);
         if (flag[y * x_patches_ + x] != true)
             continue;
         beta[y * x_patches_ + x] = 1 / (1 + event_activity[y * x_patches_ + x] *
-                                                abs(esvo2_core::timePointToSec(e.ts) - last_event_time[y * x_patches_ + x]));       // eq. 2
+                                                abs(esvo2_core::timePointToSec(e.timestamp) - last_event_time[y * x_patches_ + x]));       // eq. 2
         event_activity[y * x_patches_ + x] = beta[y * x_patches_ + x] * event_activity[y * x_patches_ + x] + 1; // eq. 1
-        last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.ts);
+        last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.timestamp);
         AA_frequency.at<uchar>(e.y, e.x)++;
         num[y * x_patches_ + x]++;
         if (AA_frequency.at<uchar>(e.y, e.x) >= 1)
@@ -193,7 +193,7 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     }
 
     // distortion correction
-    cv::remap(representation_AA_, representation_AA_, undistort_map1_, undistort_map2_, CV_INTER_LINEAR);
+    cv::remap(representation_AA_, representation_AA_, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
 
     // cv_bridge::CvImage cv_AA_frequency, cv_AA_mat;
 
@@ -203,7 +203,7 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     // cv_AA_frequency.image = AA_frequency.clone();
     // cv_AA_frequency.header.stamp = external_sync_time;
     // image_representation_pub_AA_frequency_.publish(cv_AA_frequency.toImageMsg());
-    std::shared_ptr<cv::Mat> AA_freq = make_shared<cv::Mat>();
+    std::shared_ptr<cv::Mat> AA_freq = std::make_shared<cv::Mat>();
     *AA_freq = AA_frequency;
     AA_left_IR_to_Map->add(AA_freq, external_sync_time);
 
@@ -212,9 +212,9 @@ void ImageRepresentation::AA_thread(std::vector<Event>::iterator &ptr_e, int dis
     // cv_AA_mat.image = representation_AA_.clone();
     // cv_AA_mat.header.stamp = external_sync_time;
     // image_representation_pub_AA_mat_.publish(cv_AA_mat.toImageMsg());
-    std::shared_ptr<cv::Mat> AA_map = make_shared<cv::Mat>();
+    std::shared_ptr<cv::Mat> AA_map = std::make_shared<cv::Mat>();
     *AA_map = representation_AA_;
-    multi_to_Map->add<2>({representation_AA_, external_sync_time});
+    multi_to_Map->add<2>({AA_map, external_sync_time});
 
 }
 
@@ -238,7 +238,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
         if (vEvents_.size() == 0)
             return;
         double external_t = esvo2_core::timePointToSec(external_sync_time);
-        std::vector<Event>::iterator ptr_e = EventVector_lower_bound(vEvents_, external_t);
+        std::vector<esvo2_core::Event>::iterator ptr_e = EventVector_lower_bound(vEvents_, external_t);
         int distance = std::distance(vEvents_.begin(), ptr_e);
 
         if (is_left_) // generate AA and TS in parallel, just for left camera
@@ -252,7 +252,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // double step = static_cast<double>(distance) / 90000.0;
 
             double step = 1;
-            std::vector<Event>::iterator it = vEvents_.begin();
+            std::vector<esvo2_core::Event>::iterator it = vEvents_.begin();
 
             // generate TS map
             for (int i = 0; i < distance; i++)
@@ -260,8 +260,8 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
                 int index = static_cast<int>(i * step);
                 if (index > distance - 2)
                     break;
-                Event e = *(it + index);
-                TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.ts) / decay_sec_;
+                esvo2_core::Event e = *(it + index);
+                TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.timestamp) / decay_sec_;
             }
 
             cv::eigen2cv(TS_temp_map, representation_TS_);
@@ -272,7 +272,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             TS_img.convertTo(TS_img, CV_8U);
 
             // distortion correction
-            cv::remap(TS_img, TS_img, undistort_map1_, undistort_map2_, CV_INTER_LINEAR);
+            cv::remap(TS_img, TS_img, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
 
             // generate OS-TS
             cv::Mat TS_img_blur;
@@ -304,7 +304,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // cv_TS_image.image = TS_img.clone();
             // cv_TS_image.header.stamp = external_sync_time;
             // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
-            std::shared_ptr<cv::Mat> TS_left = make_shared<cv::Mat>();
+            std::shared_ptr<cv::Mat> TS_left = std::make_shared<cv::Mat>();
             *TS_left = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Track->add<0>({TS_left, external_sync_time});
@@ -316,7 +316,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // cv_negative_TS_image.image = negative_TS_img.clone();
             // cv_negative_TS_image.header.stamp = external_sync_time;
             // image_representation_pub_negative_TS_.publish(cv_negative_TS_image.toImageMsg());
-            std::shared_ptr<cv::Mat> TS_neg = make_shared<cv::Mat>();
+            std::shared_ptr<cv::Mat> TS_neg = std::make_shared<cv::Mat>();
             *TS_neg = negative_TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Track->add<1>({TS_neg, external_sync_time});
@@ -332,14 +332,14 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // double step = static_cast<double>(distance) / 90000.0;
             // if (step < 1)
             double step = 1;
-            std::vector<Event>::iterator it = vEvents_.begin();
+            std::vector<esvo2_core::Event>::iterator it = vEvents_.begin();
             for (int i = 0; i < distance; i++)
             {
                 int index = static_cast<int>(i * step);
                 if (index > distance - 2)
                     break;
-                Event e = *(it + index);
-                TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.ts) / decay_sec_;
+                esvo2_core::Event e = *(it + index);
+                TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.timestamp) / decay_sec_;
             }
             cv::eigen2cv(TS_temp_map, representation_TS_);
 
@@ -348,7 +348,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             TS_img = representation_TS_ * 255.0;
             TS_img.convertTo(TS_img, CV_8U);
 
-            cv::remap(TS_img, TS_img, undistort_map1_, undistort_map2_, CV_INTER_LINEAR);
+            cv::remap(TS_img, TS_img, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
 
             cv::medianBlur(TS_img, TS_img, 2 * median_blur_kernel_size_ + 1);
 
@@ -360,7 +360,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // cv_TS_image.header.stamp = timePoint(external_t);
             // cv_TS_image.image = TS_img.clone();
             // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
-            std::shared_ptr<cv::Mat> TS_right = make_shared<cv::Mat>();
+            std::shared_ptr<cv::Mat> TS_right = std::make_shared<cv::Mat>();
             *TS_right = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Map->add<1>({TS_right, external_sync_time});
@@ -370,7 +370,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
     }
 }
 
-void ImageRepresentation::clearEvents(int distance, std::vector<Event>::iterator ptr_e)
+void ImageRepresentation::clearEvents(int distance, std::vector<esvo2_core::Event>::iterator ptr_e)
 {
     if (vEvents_.size() > distance + 2)
         vEvents_.erase(vEvents_.begin(), ptr_e);
@@ -392,7 +392,7 @@ void ImageRepresentation::eventsCallback(const std::shared_ptr<esvo2_core::Event
         vEvents_.push_back(e);
 
         int i = vEvents_.size() - 2;
-        while (i >= 0 && vEvents_[i].ts > e.ts)
+        while (i >= 0 && vEvents_[i].timestamp > e.timestamp)
         {
             vEvents_[i + 1] = vEvents_[i];
             i--;
@@ -423,7 +423,7 @@ void ImageRepresentation::sobel(double external_t)
     // Publishing dx
     // cv_dx_image.header.stamp = timePoint(external_t);
     // dx_image_pub_.publish(cv_dx_image.toImageMsg());
-    std::shared_ptr<cv::Mat> dx_image = make_shared<cv::Mat>();
+    std::shared_ptr<cv::Mat> dx_image = std::make_shared<cv::Mat>();
     *dx_image = std::move(dx_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
     multi_to_Track->add<2>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
@@ -433,7 +433,7 @@ void ImageRepresentation::sobel(double external_t)
     // Publishing dy
     // cv_dy_image.header.stamp = timePoint(external_t);
     // dy_image_pub_.publish(cv_dy_image.toImageMsg());
-    std::shared_ptr<cv::Mat> dy_image = make_shared<cv::Mat>();
+    std::shared_ptr<cv::Mat> dy_image = std::make_shared<cv::Mat>();
     *dy_image = std::move(dy_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
     multi_to_Track->add<3>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
@@ -498,18 +498,18 @@ bool ImageRepresentation::loadCalibInfo(const std::string &cameraSystemDir, bool
                                                  projection_matrix_, sensor_size, CV_32FC1, undistort_map1_,
                                                  undistort_map2_);
             bCamInfoAvailable_ = true;
-            ROS_INFO("Camera information is loaded (Distortion model %s).", distortion_model_.c_str());
+            printf("Camera information is loaded (Distortion model %s \n).", distortion_model_.c_str());
         }
         else if (distortion_model_ == "plumb_bob")
         {
             cv::initUndistortRectifyMap(camera_matrix_, dist_coeffs_, rectification_matrix_, projection_matrix_,
                                         sensor_size, CV_32FC1, undistort_map1_, undistort_map2_);
             bCamInfoAvailable_ = true;
-            ROS_INFO("Camera information is loaded (Distortion model %s).", distortion_model_.c_str());
+            printf("Camera information is loaded (Distortion model %s \n).", distortion_model_.c_str());
         }
         else
         {
-            ROS_ERROR_ONCE("Distortion model %s is not supported.", distortion_model_.c_str());
+            std::cerr<<"Distortion model <<"<<distortion_model_.c_str()<<"is not supported."<<std::endl;
 
             return bCamInfoAvailable_;
         }
@@ -532,17 +532,17 @@ bool ImageRepresentation::loadCalibInfo(const std::string &cameraSystemDir, bool
         {
             cv::undistortPoints(RawCoordinates, RectCoordinates, camera_matrix_, dist_coeffs_, rectification_matrix_,
                                 projection_matrix_);
-            ROS_INFO("Undistorted-Rectified Look-Up Table with Distortion model: %s", distortion_model_.c_str());
+            printf("Undistorted-Rectified Look-Up Table with Distortion model: %s \n", distortion_model_.c_str());
         }
         else if (distortion_model_ == "equidistant")
         {
             cv::fisheye::undistortPoints(RawCoordinates, RectCoordinates, camera_matrix_, dist_coeffs_,
                                          rectification_matrix_, projection_matrix_);
-            ROS_INFO("Undistorted-Rectified Look-Up Table with Distortion model: %s", distortion_model_.c_str());
+            printf("Undistorted-Rectified Look-Up Table with Distortion model: %s \n", distortion_model_.c_str());
         }
         else
         {
-            ROS_INFO("Unknown distortion model is provided.");
+            printf("Unknown distortion model is provided.\n");
             return bCamInfoAvailable_;
         }
         // load look-up table
@@ -551,7 +551,7 @@ bool ImageRepresentation::loadCalibInfo(const std::string &cameraSystemDir, bool
             precomputed_rectified_points_.col(i) =
                 Eigen::Matrix<double, 2, 1>(RectCoordinates(i).x, RectCoordinates(i).y);
         }
-        ROS_INFO("Undistorted-Rectified Look-Up Table has been computed.");
+        printf("Undistorted-Rectified Look-Up Table has been computed.\n");
     }
     else
     {

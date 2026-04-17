@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.26)
+include(FetchContent)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -15,7 +16,14 @@ find_package(dv-processing REQUIRED)
 find_package(Boost COMPONENTS iostreams REQUIRED)
 find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
 find_package(MetavisionHAL REQUIRED)
+# SLAM
 find_package(PCL 1.11 COMPONENTS common REQUIRED)
+FetchContent_Declare(
+  yaml-cpp
+  GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+  GIT_TAG yaml-cpp-0.9.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
 
 # --- Shader compilation ---
 find_program(GLSLANG glslang REQUIRED)
@@ -75,6 +83,7 @@ if(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
 endif()
 
+target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_DISABLE_SSE)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3
@@ -87,6 +96,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MetavisionSDK::stream
     Metavision::HAL
     ${PCL_LIBRARIES}
+    yaml-cpp::yaml-cpp
 )
 option(NOVA_BUILD_TESTS "Build NOVA test suite" ON)
 if(NOVA_BUILD_TESTS)

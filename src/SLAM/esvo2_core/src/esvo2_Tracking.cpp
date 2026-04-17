@@ -485,14 +485,15 @@ void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseS
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
     // add pose to tf
-    tf::Transform tf(tf::Quaternion(msg->orientation[0], msg->orientation[1], msg->pose.orientation[2],
-                                    msg->pose.orientation[3]),
-                     tf::Vector3(msg->position[0], msg->position[1], msg->position[2]));
-    tf::StampedTransform st(tf, msg.head, msg->frame_id, dvs_frame_id_.c_str());
+    esvo2_core::Transform tf(msg->orientation[0], msg->orientation[1], msg->pose.orientation[2],
+                                    msg->pose.orientation[3], msg->position[0], msg->position[1], msg->position[2]);
+    esvo2_core::StampedTransform st(tf, msg.head, msg->frame_id, dvs_frame_id_);
     tf_->setTransform(st);
+
+    // VIZ PUBLISH -> not publishing anything right now
     // broadcast the tf such that the nav_path messages can find the valid fixed frame "map".
-    static tf::TransformBroadcaster br;
-    br.sendTransform(st);
+    // static tf::TransformBroadcaster br;
+    // br.sendTransform(st);
 }
 
 bool esvo2_Tracking::getPoseAt(const timePoint &t, esvo2_core::Transformation &Tr, const std::string &source_frame)
@@ -506,9 +507,10 @@ bool esvo2_Tracking::getPoseAt(const timePoint &t, esvo2_core::Transformation &T
     }
     else
     {
-        tf::StampedTransform st;
+        esvo2_core::StampedTransform st;
         tf_->lookupTransform(world_frame_id_, source_frame, t, st);
-        tf::transformTFToKindr(st, &Tr);
+        st.toKindrTransformation(Tr);
+        // tf::transformTFToKindr(st, &Tr);
         return true;
     }
 }

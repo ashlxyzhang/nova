@@ -789,7 +789,8 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
     {
         esvo2_core::StampedTransform st;
         tf_->lookupTransform(world_frame_id_, source_frame, t, st);
-        tf::transformTFToKindr(st, &Tr);
+        st.toKindrTransformation(Tr);
+        // tf::transformTFToKindr(st, &Tr);
         return true;
     }
 }
@@ -1060,6 +1061,7 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
     visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
                          stdVar_vis_threshold_, age_vis_threshold_);
 
+    // VIZ PUBLISH -> not publishing anything right now
     // Skip publishing the inv depth map for now
     // publishImage(invDepthImage, t, invDepthMap_pub_);
 
