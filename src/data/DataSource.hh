@@ -8,6 +8,7 @@
 #include "data/IEventReader.hh"
 #include "data/MetavisionEventReader.hh"
 #include "render/DigitalCodedExposure.hh"
+#include "render/GPUDevice.hh"
 #include "render/Visualizer.hh"
 
 #include <string>
@@ -37,17 +38,24 @@ struct DataSource {
 	Visualizer::Parameters visualizer_parameters;
 	Visualizer::RenderTargets visualizer_render_targets;
     
-
+	// Used internally
 	DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);
 	DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
 	DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera);
+
+	// Used externally by API (so that user doesn't have to know about SDL_GPUDevice)
+	DataSource(GPUDevice& gpu_device, const std::string& file_path);
+	DataSource(GPUDevice& gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
+	DataSource(GPUDevice& gpu_device, const MetavisionEventReader::LiveCamera& camera);
+	
 	~DataSource();
 
 	void init_render_targets();
-	void get_batch_event_data();
-	void get_batch_frame_data();
-	void update();
+	size_t get_batch_event_data();
+	size_t get_batch_frame_data();
+	void update_scrubber();
 	bool is_open();
+	void read_all();
 };
 
 

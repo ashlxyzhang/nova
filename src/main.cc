@@ -1,15 +1,17 @@
 #include "util/pch.hh"
 
 // DO NOT MOVE THIS TO PCH.HH, IT WILL NOT COMPILE 😊
-#define SDL_MAIN_USE_CALLBACKS 1
-#include <SDL3/SDL_main.h>
+// #define SDL_MAIN_USE_CALLBACKS 1
+// #include <SDL3/SDL_main.h>
 
 #include "data/DataAcquisition.hh"
+#include "data/DataSource.hh"
 #include "render/DigitalCodedExposure.hh"
 #include "render/GPUDevice.hh"
 #include "render/RenderTarget.hh"
 #include "render/SpinningCube.hh"
 #include "render/UploadBuffer.hh"
+#include "ui/Windows.hh"
 #include "render/Visualizer.hh"
 #include "ui/GUI.hh"
 #include "ui/Scrubber.hh"
@@ -36,7 +38,7 @@ struct Application
 
     // Initializes graphics of entire application
     SDL_AppResult init() {
-        if (!gpu_device.is_valid()) {
+        if (!gpu_device.is_open()) {
             return SDL_APP_FAILURE;
         }
 
@@ -111,6 +113,36 @@ struct Application
     }
 };
 
+
+//! TESTING PURPOSES ONLY, uncomment '#define SDL_MAIN_USE_CALLBACKS 1' and 
+//! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
+int main() {
+    
+    // Initialize a gpu device
+    GPUDevice gpu;
+    if (!gpu.is_open()) return 1;
+
+    // Initialize a DCE filter and window for drawing the DCE output
+    DigitalCodedExposure dce(gpu);
+    DCEDisplay dce_display(gpu, 1280, 720, "Fidget Spinner DCE");    
+    if (!dce_display.is_open()) return 1;
+
+    // Initialize and read all data from a file
+    DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
+    ds.read_all();
+
+    // Scrub event data (choose subsequence of data to upload to GPU for visualization)
+    ds.scrubber.state.current_time = 1000000.0; // 1s in 
+    ds.scrubber.state.time_window = 10000.0; // 10ms
+    ds.update_scrubber();
+
+    // Apply filter to scrubbed data and render
+    dce.render(ds);
+    dce_display.render(ds);
+
+    // Wait for user to close window
+    dce_display.wait_for_close();
+}
 
 
 //////////////////////////////////////

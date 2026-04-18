@@ -72,7 +72,6 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
 	init_render_targets();
 }
 
-
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera)
 	: gpu_device(gpu_device), name(camera.serial.empty() ? std::string("Prophesee (first available)") : camera.serial),
 	  type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
@@ -145,6 +144,15 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevic
 	init_render_targets();
 }
 
+DataSource::DataSource(GPUDevice& gpu_device, const std::string& file_path): 
+    DataSource(gpu_device.get_SDL_device(), file_path) {}
+
+DataSource::DataSource(GPUDevice& gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera): 
+    DataSource(gpu_device.get_SDL_device(), camera) {}
+
+DataSource::DataSource(GPUDevice& gpu_device, const MetavisionEventReader::LiveCamera& camera): 
+    DataSource(gpu_device.get_SDL_device(), camera) {}
+
 void DataSource::init_render_targets()
 {
     // Read resolution
@@ -164,7 +172,7 @@ DataSource::~DataSource()
     event_data.clear();
 }
 
-void DataSource::update()
+void DataSource::update_scrubber()
 {
     scrubber.update(event_data);
 }
@@ -175,13 +183,13 @@ bool DataSource::is_open()
     return state != State::FAILED_TO_OPEN;
 }
 
-void DataSource::get_batch_event_data()
+size_t DataSource::get_batch_event_data()
 {
     // reader is being changed here but it could possibility be switched to a shared_lock if it's too slow
     std::unique_lock read_write_lock(mutex);
 
     // Ensure a reader has been initialized
-    if (!reader) return;
+    if (!reader) return 0;
 
     // event_discard_odds is the per-event discard probability in [0, 1]
     const bool discard_enabled = event_discard_odds > 0.0f;
@@ -190,6 +198,8 @@ void DataSource::get_batch_event_data()
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
     // Attempt to read data
+    size_t events_read = 0;
+
     try
     {
         if (reader->isEventStreamAvailable() && reader->isEventsRunning())
@@ -202,6 +212,7 @@ void DataSource::get_batch_event_data()
                         continue;
 
                     event_data.write_evt_data(evt);
+                    events_read++;
                 }
             }
         }
@@ -209,18 +220,22 @@ void DataSource::get_batch_event_data()
     catch (const std::exception &e)
     {
         std::cerr << "Event read error: " + std::string(e.what()) << std::endl;
-        return;
+        return events_read; 
     }
+
+    return events_read;
 }
 
-void DataSource::get_batch_frame_data()
+size_t DataSource::get_batch_frame_data()
 {
     std::unique_lock da_read_write_lock(mutex);
 
     // Ensure a reader has been initialized
-    if (!reader) return;
+    if (!reader) return 0;
 
     // Attempt to read data
+    size_t frames_read = 0;
+
     try
     {
         if (reader->isFrameStreamAvailable() && reader->isFramesRunning())
@@ -232,13 +247,22 @@ void DataSource::get_batch_frame_data()
                 cv::cvtColor(frame->frameData, rgb, cv::COLOR_BGR2RGB);
                 EventData::FrameDatum display_frame{.frameData = rgb.clone(), .timestamp = frame->timestamp};
                 event_data.write_frame_data(display_frame);
+                
+                frames_read++;
             }
         }
     }
     catch (const std::exception &e)
     {
         std::cerr << "Frame read error: " + std::string(e.what()) << std::endl;
-        return;
+        return frames_read;
     }
+
+    return frames_read;
 }
 
+void DataSource::read_all() {
+    while (get_batch_event_data() > 0 || get_batch_frame_data() > 0) {
+        // Keep reading until no more data is available
+    }
+}

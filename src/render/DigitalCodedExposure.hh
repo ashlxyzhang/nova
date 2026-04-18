@@ -186,6 +186,7 @@ class DigitalCodedExposure
          * @param command_buffer GPU command buffer.
          */
         void render(std::shared_ptr<DataSource> data_source);
+        void render(DataSource& data_source);
 };
 
 #endif

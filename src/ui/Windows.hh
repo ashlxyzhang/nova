@@ -13,36 +13,30 @@ class Window {
 	public:
 		Window(GPUDevice& gpu_device, int width, int height, std::string title="");
 		~Window();
-
-		// virtual void render(std::shared_ptr<DataSource> data_source);
-		// virtual void render(const DataSource& data_source);
-		
 		void close();
+		bool is_open();
+		void wait_for_close();
+		void render(DataSource& data_source);
 
 	private:
 		GPUDevice& gpu_device;
 		SDL_Window* window;
 		std::string title;
+		bool open_flag = false;
+
+		void init_imgui();
+		virtual void draw(DataSource& data_source) = 0;
 };
 
 
-// class DCEDisplay : public Window {
-// 	public:
-// 		void render(std::shared_ptr<DataSource> data_source) override;
-// 		void render(const DataSource& data_source) override;
-	
-// 	private:
-// };
+class DCEDisplay : public Window {
+	public:
+		DCEDisplay(GPUDevice& gpu_device, int width, int height, std::string title="");
 
+	private:
+		void draw(DataSource& data_source) override;
 
-// class VisualizerDisplay : public Window {
-// 	public:
-// 		void render(std::shared_ptr<DataSource> data_source) override;
-// 		void render(const DataSource& data_source) override;
-
-// 	private:
-// };
-
+};
 
 
 #endif

@@ -216,6 +216,6 @@ void DataAcquisition::update()
     // Each data source does a full update
     for (const auto &data_source : data_sources)
     {
-        data_source->update();
+        data_source->update_scrubber();
     }
 }

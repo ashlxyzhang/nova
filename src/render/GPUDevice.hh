@@ -77,7 +77,7 @@ class GPUDevice
 
 
 
-        bool is_valid() const {
+        bool is_open() const {
             return gpu_device != nullptr;
         }
 
