@@ -167,6 +167,7 @@ void DataSource::init_render_targets()
 
 DataSource::~DataSource()
 {   
+    stop_reading_thread();
     dce_render_targets.delete_textures(gpu_device);
     visualizer_render_targets.delete_textures(gpu_device);
     event_data.clear();
@@ -264,5 +265,25 @@ size_t DataSource::get_batch_frame_data()
 void DataSource::read_all() {
     while (reader->isEventsRunning()) {
         get_batch_event_data();
+        get_batch_frame_data();
+    }
+}
+
+void DataSource::start_reading_thread() {
+    if (reading_thread_running) return; 
+
+    reading_thread_running = true;
+    reading_thread = std::thread([this]() {
+        while (reading_thread_running) {
+            get_batch_event_data();
+            get_batch_frame_data();
+        }
+    });
+}
+
+void DataSource::stop_reading_thread() {
+    reading_thread_running = false;
+    if (reading_thread.joinable()) {
+        reading_thread.join();
     }
 }

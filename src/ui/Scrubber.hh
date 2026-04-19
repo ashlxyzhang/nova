@@ -61,8 +61,9 @@ class Scrubber
             std::size_t lower_index = 0;
             // --------------------------
 
-            // Currently UNUSED
-            bool show_frame_data = false;
+            // Flags
+            bool show_frame_data = false; // Currently unused
+            bool loop = false;  
 
             // Resets every value except for TYPE and MODE
             void clear()
@@ -80,6 +81,7 @@ class Scrubber
                 min_time = 0.0f;
                 max_time = 0.0f;
                 show_frame_data = false;
+                loop = false;
             }
 
             // Update min and max indices based on event_data
@@ -150,6 +152,8 @@ class Scrubber
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                             lower_time = (std::max)(min_time, current_time - time_window);
                         }
+
+                        if (loop && current_time >= max_time) current_time = min_time;
                     }
 
                     // Event-based Updates
@@ -177,6 +181,8 @@ class Scrubber
                             index_step = std::clamp(index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
+
+                        if (loop && current_index >= max_index) current_index = 0;
                     }
                 }
         };

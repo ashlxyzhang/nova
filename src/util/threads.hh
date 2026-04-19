@@ -31,7 +31,7 @@ inline void data_acquisition_thread(std::atomic<bool> &running, DataAcquisition 
         // Get copy of all DataSource's
         std::vector<std::shared_ptr<DataSource>> data_sources = data_acq.get_data_sources();
         for (const auto& data_source: data_sources)
-        {
+        {   
             data_source->get_batch_event_data();
             data_source->get_batch_frame_data();
         }

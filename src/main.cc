@@ -125,72 +125,29 @@ int main() {
     if (!gpu.is_open()) return 1;
     
     // Initialize data source
-    DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
-    DataSource ds2(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/pedestrians.raw");
-
+    DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/pedestrians.raw");
     if (!ds.is_open()) return 1;
-    if (!ds2.is_open()) return 1;
     
-    // Read all data from file first
-    std::cout << "Loading files..." << std::endl;
-    ds.read_all();
-    ds2.read_all();
-    std::cout << "Loaded " << ds.event_data.size() + ds2.event_data.size() << " events" << std::endl;
+    // Read all data from files first
+    ds.start_reading_thread();
     
-    // Initialize DCE and display window
-    DigitalCodedExposure dce(gpu);
-    DCEDisplay dce_display(gpu, 1280, 720, "Fidget Spinner DCE");    
-    DCEDisplay dce_display2(gpu, 1280, 720, "Pedestrians DCE");
-
+    // Initialize displays
+    DCEDisplay dce_display(gpu, 1280, 720, "API Demo");    
     if (!dce_display.is_open()) return 1;
 
-    // Configure scrubber (times in MICROSECONDS!)
-    ds.scrubber.state.type = Scrubber::Type::TIME;
-    ds.scrubber.state.mode = Scrubber::Mode::PLAYING;  // Auto-advance
-    ds.scrubber.state.time_window = 10000.0f;  // 10ms window
-    ds.scrubber.state.time_step = 33333.0f;    // ~30fps step
+    // Configure scrubber 
+    Scrubber::State& s = ds.scrubber.state;
+    s.type = Scrubber::Type::TIME;
+    s.mode = Scrubber::Mode::PLAYING;  // Auto-advance
+    s.time_window = 10000.0f;  // 10ms window
+    s.time_step = 10000.0f;    // ~30fps 
+    s.loop = true;
 
-    ds2.scrubber.state.type = Scrubber::Type::TIME;
-    ds2.scrubber.state.mode = Scrubber::Mode::PLAYING;  // Auto-advance
-    ds2.scrubber.state.time_window = 10000.0f;  // 10ms window
-    ds2.scrubber.state.time_step = 33333.0f;    // ~30fps step
+    // ImGui is non thread safe so this is a blocking operation
+    dce_display.play(ds);
+
     
 
-    // Main loop
-    bool running = true;
-    while (running) {
-        // Process SDL events
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT || 
-                event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
-                running = false;
-            }
-        }
-    
-        // Update scrubber (uploads current window to GPU)
-        ds.update_scrubber();
-        ds2.update_scrubber();
-
-        // Render DCE
-        dce.render(ds);
-        dce.render(ds2);
-
-        // Display result
-        dce_display.render(ds);
-        dce_display2.render(ds2);
-        
-        // Frame limiting
-        SDL_Delay(16);  // ~60fps
-        
-        // Loop back to start
-        if (ds.scrubber.state.current_time >= ds.scrubber.state.max_time) {
-            ds.scrubber.state.current_time = 0;
-        }
-        if (ds2.scrubber.state.current_time >= ds2.scrubber.state.max_time) {
-            ds2.scrubber.state.current_time = 0;
-        }
-    }
     return 0;
 }
 

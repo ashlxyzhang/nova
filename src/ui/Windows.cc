@@ -80,25 +80,19 @@ void Window::close() {
 		window = nullptr;
 		SDL_Quit();
 	}
+
+	open_flag = false;
 }
 
 bool Window::is_open() {
 	return open_flag;
 }
 
-void Window::wait_for_close() {
-	while (is_open()) {
-		SDL_Event event;
-		while (SDL_PollEvent(&event)) {
-			if (event.type == SDL_EVENT_QUIT) {
-				close();
-			}
-		}
-		SDL_Delay(100);
-	}
-}
-
 void Window::render(DataSource& data_source) {
+	if (!is_open()) {
+		std::cout << "render() called on closed window: \'" << title << "\'" << std::endl;
+		return;
+	}
 
 	// Set current ImGui context to this window's context
 	ImGui::SetCurrentContext(imgui_context);
@@ -137,12 +131,43 @@ void Window::render(DataSource& data_source) {
 	SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
+void Window::play(DataSource& data_source) {
+	if (!is_open()) {
+		std::cout << "play() called on closed window: \'" << title << "\'" << std::endl;
+		return;
+	}
+	
+	bool running = true;
+	while (running) {
+		// Process SDL events
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+				running = false;
+            }
+        }
+
+		data_source.update_scrubber();
+		render(data_source);
+		SDL_Delay(16); // 16ms delay ~ 60fps
+	}
+}
+
+
+
+
+
+
+
 
 
 DCEDisplay::DCEDisplay(GPUDevice& gpu_device, int width, int height, std::string title)
-	: Window(gpu_device, width, height, title) {}
+	: Window(gpu_device, width, height, title), dce(std::make_unique<DigitalCodedExposure>(gpu_device)) {}
 
 void DCEDisplay::draw(DataSource& data_source) {
+
+	// Render the new DCE output
+	dce->render(data_source);
 	RenderTarget& output = data_source.dce_render_targets.output;
 
 	ImGui::Begin("Frame");

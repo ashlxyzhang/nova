@@ -13,22 +13,26 @@ class Window {
 	public:
 		Window(GPUDevice& gpu_device, int width, int height, std::string title="");
 		~Window();
-		void close();
 		bool is_open();
-		void wait_for_close();
-		void render(DataSource& data_source);
 
-	private:
+		void render(DataSource& data_source);	// Renders a single frame 
+		void play(DataSource& data_source);		// Blocking rendering loop 
+		void close();							// Shutsdown and cleans up
+
+	protected:
 		GPUDevice& gpu_device;
 		SDL_Window* window;
-		std::string title;
-		bool open_flag = false;
-
 		ImGuiContext* imgui_context = nullptr;
 
+		std::string title;
+		bool open_flag = false;
+		
 		void init_imgui();
+		
 		virtual void draw(DataSource& data_source) = 0;
 };
+
+
 
 
 class DCEDisplay : public Window {
@@ -36,6 +40,8 @@ class DCEDisplay : public Window {
 		DCEDisplay(GPUDevice& gpu_device, int width, int height, std::string title="");
 
 	private:
+		std::unique_ptr<DigitalCodedExposure> dce;
+
 		void draw(DataSource& data_source) override;
 
 };

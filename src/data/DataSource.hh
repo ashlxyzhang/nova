@@ -23,13 +23,16 @@ struct DataSource {
     std::string name; 
     enum Type { CAMERA, FILE } type;
     enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state = State::PAUSED; 
+	cv::Size resolution;
 
 	// Data acquisition and storage
-    float event_discard_odds = 0.0f;
-	cv::Size resolution;
 	std::unique_ptr<IEventReader> reader;
     EventData event_data;
 	Scrubber scrubber;
+    float event_discard_odds = 0.0f;
+	
+	std::atomic<bool> reading_thread_running = false;
+	std::thread reading_thread;
 
 	// Rendering parameters and outputs
 	SDL_GPUDevice* gpu_device;
@@ -55,7 +58,10 @@ struct DataSource {
 	size_t get_batch_frame_data();
 	void update_scrubber();
 	bool is_open();
-	void read_all();
+
+	void read_all(); 				// Blocking
+	void start_reading_thread();	// Non-blocking
+	void stop_reading_thread();		// Non-blocking
 };
 
 
