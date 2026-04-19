@@ -1,7 +1,7 @@
 #include <vector>
 #include <iostream>
-#include "../data_passing.h"
-#include "../multi_data_passing.h"
+#include "data_passing.hh"
+#include "multi_data_passing.hh"
 #include <condition_variable>
 #include <chrono>
 #include <thread>

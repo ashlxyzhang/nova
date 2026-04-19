@@ -25,6 +25,7 @@
 #define SOPHUS_SE3_HPP
 
 #include "so3.hpp"
+#include <Eigen/Dense>
 
 ////////////////////////////////////////////////////////////////////////////
 // Forward Declarations / typedefs
@@ -34,7 +35,7 @@ namespace Sophus {
     template<typename _Scalar, int _Options = 0>
     class SE3Group;
 
-    typedef SE3Group<double> SE3 EIGEN_DEPRECATED;
+    typedef EIGEN_DEPRECATED SE3Group<double> SE3;
     typedef SE3Group<double> SE3d; /**< double precision SE3 */
     typedef SE3Group<float> SE3f;  /**< single precision SE3 */
     typedef Matrix<double, 6, 1> Vector6d;

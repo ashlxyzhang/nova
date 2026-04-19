@@ -41,8 +41,8 @@
 #include <esvo2_core/core/BackendOptimization.h>
 #include <esvo2_core/factor/imu_integration.h>
 // #include <sensor_msgs/Imu.h>
-#include <data_passing.h>
-#include <multi_data_passing.h>
+#include <data_passing.hh>
+#include <multi_data_passing.hh>
 #include <Eigen/Dense>
 // from utils.h
 // using Transformation = kindr::minimal::QuatTransformation;
@@ -50,6 +50,7 @@
 namespace esvo2_core
 {
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
+using EventQueue = std::deque<esvo2_core::Event>;
 using namespace core;
 
 class esvo2_Mapping

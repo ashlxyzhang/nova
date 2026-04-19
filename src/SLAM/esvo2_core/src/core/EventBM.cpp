@@ -227,7 +227,7 @@ bool esvo2_core::core::EventBM::match_an_event2(const Event *pEvent, std::pair<s
         emPair.x_left_raw_ = Eigen::Vector2d((double)pEvent->x, (double)pEvent->y);
         emPair.x_left_ = x_rect;
         emPair.x_right_ = Eigen::Vector2d((double)bestMatch(0), (double)bestMatch(1));
-        emPair.t_ = pEvent->ts;
+        emPair.t_ = pEvent->timestamp;
         double disparity;
         if (bUpDownConfiguration_)
             disparity = x1(1) - bestMatch(1);
@@ -305,7 +305,7 @@ bool esvo2_core::core::EventBM::match_an_event(Event *pEvent, std::pair<size_t, 
         emPair.x_left_raw_ = Eigen::Vector2d((double)pEvent->x, (double)pEvent->y);
         emPair.x_left_ = x_rect;
         emPair.x_right_ = Eigen::Vector2d((double)bestMatch(0), (double)bestMatch(1));
-        emPair.t_ = pEvent->ts;
+        emPair.t_ = pEvent->timestamp;
         double disparity;
         if (bUpDownConfiguration_)
             disparity = x1(1) - bestMatch(1);

@@ -2,7 +2,7 @@
 #define ESVO2_CORE_CONTAINER_CAMERASYSTEM_H
 
 #include <string>
-#include <Eigen/Eigen>
+#include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
 #include <boost/shared_ptr.hpp>
 #include <yaml-cpp/yaml.h>

@@ -25,6 +25,7 @@
 #define SOPHUS_SO3_HPP
 
 #include "sophus.hpp"
+#include <Eigen/Dense>
 
 ////////////////////////////////////////////////////////////////////////////
 // Forward Declarations / typedefs
@@ -852,7 +853,7 @@ namespace Eigen {
          * No direct write access is given to ensure the quaternion stays normalized.
          */
         EIGEN_STRONG_INLINE
-        const ConstQuaternionReference unit_quaternion() const {
+        ConstQuaternionReference unit_quaternion() const {
             return unit_quaternion_;
         }
 

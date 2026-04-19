@@ -11,8 +11,14 @@ endif()
 
 project(NOVA LANGUAGES C CXX)
 
-file(GLOB_RECURSE SOURCES "src/*.cc")
-file(GLOB_RECURSE HEADERS "src/*.hh")
+file(GLOB_RECURSE SOURCES 
+    "src/*.cc"
+    "src/SLAM/*.cpp"
+)
+file(GLOB_RECURSE HEADERS 
+    "src/*.hh"
+    "src/SLAM/*.h"
+)
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED)
@@ -32,6 +38,7 @@ FetchContent_Declare( # For camera/parameter configurations
   GIT_TAG yaml-cpp-0.9.0
 )
 FetchContent_MakeAvailable(yaml-cpp)
+find_package(TBB REQUIRED) # For hyperthreading to speed up some computations
 
 # --- Shader compilation ---
 find_program(GLSLANG glslang REQUIRED)
@@ -86,6 +93,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
 target_include_directories(${PROJECT_NAME} PRIVATE "src/")
+target_include_directories(${PROJECT_NAME} PRIVATE "src/SLAM/esvo2_core/include/")
+target_include_directories(${PROJECT_NAME} PRIVATE "src/SLAM/image_representation/include/")
+target_include_directories(${PROJECT_NAME} PRIVATE "src/SLAM/minkindr/minkindr/include/")
+target_include_directories(${PROJECT_NAME} PRIVATE "src/SLAM/refactor_files/include/")
 
 if(APPLE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
@@ -107,6 +118,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${PCL_LIBRARIES}
     yaml-cpp::yaml-cpp
     ${CERES_LIBRARIES}
+    TBB::tbb
 )
 option(NOVA_BUILD_TESTS "Build NOVA test suite" ON)
 if(NOVA_BUILD_TESTS)

@@ -2,25 +2,23 @@
 #define ESVO2_CORE_CORE_BACKEND_H
 
 // #include <esvo2_core/esvo2_Mapping.h>
-#include <esvo2_core/container/CameraSystem.h>
-#include <esvo2_core/container/DepthMap.h>
-#include <esvo2_core/container/DepthPoint.h>
-#include <esvo2_core/container/TimeSurfaceObservation.h>
-#include <esvo2_core/factor/OptimizationFunctor.h>
+#include "esvo2_core/container/CameraSystem.h"
+#include "esvo2_core/container/DepthMap.h"
+#include "esvo2_core/container/DepthPoint.h"
+#include "esvo2_core/container/TimeSurfaceObservation.h"
+#include "esvo2_core/factor/OptimizationFunctor.h"
 // #include <esvo2_core/factor/imu_factor.h>
 // #include <esvo2_core/factor/pose_local_parameterization.h>
 #include <esvo2_core/tools/Visualization.h>
 #include <esvo2_core/tools/utils.h>
 #include <esvo2_core/factor/imu_integration.h>
-// #include <functional>
 #include <opencv4/opencv2/core.hpp>
 #include <opencv4/opencv2/imgproc.hpp>
-#include <esvo2_core/tools/types.h>
+#include "esvo2_core/tools/types.h"
 #include <Eigen/Dense>
-
-#include "data_passing.h"
 #include <chrono>
-#include "types.h"
+
+#include "data_passing.hh"
 
 namespace esvo2_core
 {

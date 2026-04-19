@@ -1,6 +1,6 @@
 #include <esvo2_core/core/DepthProblemSolver.h>
 #include <tbb/parallel_for.h>
-// #include <tbb/global_control.h>
+#include <tbb/global_control.h>
 #include <thread>
 #include <functional>
 #include <fstream>
@@ -151,7 +151,7 @@ void DepthProblemSolver::solve_multiple_problems(Job & job)
     }
     else
     {
-      LOG(ERROR) << "Wrong Depth Problem Type is assigned!!!";
+      std::cerr << "Wrong Depth Problem Type is assigned!!!" << std::endl;
       exit(-1);
     }
 
@@ -274,7 +274,7 @@ bool DepthProblemSolver::solve_single_problem_numerical(
 
   if(lm.minimizeInit(x) == Eigen::LevenbergMarquardtSpace::ImproperInputParameters)
   {
-    LOG(ERROR) << "ImproperInputParameters for LM (Mapping)." << std::endl;
+    std::cerr << "ImproperInputParameters for LM (Mapping)." << std::endl;
     return false;
   }
 
@@ -354,7 +354,7 @@ bool DepthProblemSolver::solve_single_problem_analytical(
 
   if(lm.minimizeInit(x) == Eigen::LevenbergMarquardtSpace::ImproperInputParameters)
   {
-    LOG(ERROR) << "ImproperInputParameters for LM Analytical(Mapping)." << std::endl;
+    std::cerr << "ImproperInputParameters for LM Analytical(Mapping)." << std::endl;
     return false;
   }
 

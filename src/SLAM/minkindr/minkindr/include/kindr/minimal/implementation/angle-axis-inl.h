@@ -27,6 +27,7 @@
 #include <kindr/minimal/angle-axis.h>
 #include <kindr/minimal/rotation-quaternion.h>
 // #include <glog/logging.h>
+# define M_PI           3.14159265358979323846
 
 namespace kindr {
 namespace minimal {

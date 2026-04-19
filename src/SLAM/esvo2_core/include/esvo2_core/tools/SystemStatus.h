@@ -35,7 +35,7 @@ inline void setSystemStatus(SystemStatus status)
     getStatusInstance().store(static_cast<int>(status));
 }
 
-inline string systemStatusToString()
+inline std::string systemStatusToString()
 {
     switch (getSystemStatus())
     {

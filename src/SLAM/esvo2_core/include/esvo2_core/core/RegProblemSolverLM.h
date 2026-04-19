@@ -41,7 +41,7 @@ class RegProblemSolverLM
   virtual ~RegProblemSolverLM();
 
   bool resetRegProblem(RefFrame* ref, CurFrame* cur);
-  bool resetRegProblem(shared_ptr<RegProblemConfig> &rpConfigPtr, CameraSystem::Ptr& camSysPtr, RefFrame* ref, CurFrame* cur);
+  bool resetRegProblem(std::shared_ptr<RegProblemConfig> &rpConfigPtr, CameraSystem::Ptr& camSysPtr, RefFrame* ref, CurFrame* cur);
   bool solve_numerical();// relatively slower
   bool solve_analytical();// faster
 

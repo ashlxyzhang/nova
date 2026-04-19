@@ -20,7 +20,7 @@ void Visualization::plot_map(DepthMap::Ptr &depthMapPtr, VisMapType vmType, cv::
     size_t width = depthMapPtr->cols();
     // if(vmType != InvDepthMap)
     img = cv::Mat(cv::Size(width, height), CV_8UC1, cv::Scalar(255));
-    cv::cvtColor(img, img, CV_GRAY2BGR);
+    cv::cvtColor(img, img, cv::COLOR_GRAY2BGR);
 
     switch (vmType)
     {

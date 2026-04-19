@@ -18,8 +18,8 @@
 #include <thread>
 #include <utility>
 
-#include <data_passing.h>
-#include <multi_data_passing.h>
+#include <data_passing.hh>
+#include <multi_data_passing.hh>
 #include <esvo2_core/tools/utils.h>
 #include <esvo2_core/tools/types.h>
 
@@ -769,7 +769,7 @@ bool esvo2_Mapping::dataTransferring()
         vEventsPtr_left_SGM_.reserve(MAX_NUM_Event_INVOLVED);
         while (ev_begin_it != ev_end_it && vEventsPtr_left_SGM_.size() <= PROCESS_EVENT_NUM_)
         {
-            vEventsPtr_left_SGM_.push_back(ev_begin_it._M_cur);
+            vEventsPtr_left_SGM_.push_back(&(*ev_begin_it));
             ev_begin_it++;
         }
     }
@@ -801,8 +801,8 @@ bool esvo2_Mapping::dataTransferring()
         vCloseEventsPtr_left_.reserve(MAX_NUM_Event_INVOLVED);
         while (ev_end_it != ev_begin_it && vALLEventsPtr_left_.size() < MAX_NUM_Event_INVOLVED)
         {
-            vALLEventsPtr_left_.push_back(ev_end_it._M_cur);
-            vCloseEventsPtr_left_.push_back(ev_end_it._M_cur);
+            vALLEventsPtr_left_.push_back(&(*ev_end_it));
+            vCloseEventsPtr_left_.push_back(&(*ev_end_it));
             ev_end_it--;
         }
         totalNumCount_ = vCloseEventsPtr_left_.size();
@@ -904,7 +904,7 @@ void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray>
             continue;
         EQ.push_back(e);
         int i = EQ.size() - 2;
-        while (i >= 0 && EQ[i].ts > e.timestamp) // we may have to sort the queue, just in case the raw event messages do not
+        while (i >= 0 && EQ[i].timestamp > e.timestamp) // we may have to sort the queue, just in case the raw event messages do not
                                           // come in a chronological order.
         {
             EQ[i + 1] = EQ[i];
@@ -1429,7 +1429,7 @@ bool esvo2_Mapping::getIMUInterval(double t0, double t1, vector<pair<double, Eig
 {
     if (accBuf.empty())
     {
-        LOG(ERROR) << "not receive imu data";
+        std::cerr << "not receive imu data"<<std::endl;
         return false;
     }
     if (t1 <= accBuf.back().first)

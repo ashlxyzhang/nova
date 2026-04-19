@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cstring>
 #include <eigen3/Eigen/Dense>
+
+# define M_PI           3.14159265358979323846
 namespace esvo2_core
 {
 namespace factor

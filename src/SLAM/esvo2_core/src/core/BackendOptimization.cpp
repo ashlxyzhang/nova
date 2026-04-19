@@ -1,7 +1,7 @@
-#include <esvo2_core/core/BackendOptimization.h>
-#include "data_passing.h"
-#include "ceres/ceres.h"
-#include <esvo2_core/tools/TicToc.h>
+#include "esvo2_core/core/BackendOptimization.h"
+#include "data_passing.hh"
+#include <ceres/ceres.h>
+#include "esvo2_core/tools/TicToc.h"
 #include <Eigen/Dense>
 #include <esvo2_core/factor/imu_factor.h>
 #include <esvo2_core/factor/pose_local_parameterization.h>

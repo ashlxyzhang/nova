@@ -7,19 +7,22 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <deque>
+#include <iostream>
 
 #include "SystemStatus.h"
 #include <opencv2/core/core.hpp>
-#include "src/util/pch.hh"
+// #include <src/util/pch.hh>
 #include <glm/gtc/quaternion.hpp>
-#include <esvo2_core/tools/utils.h>
+// #include "esvo2_core/tools/utils.h"
 #include <kindr/minimal/quat-transformation.h>
 #include <kindr/minimal/rotation-quaternion.h>
 
-using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
+
 
 namespace esvo2_core
 {
+using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 double timePointToSec(const timePoint& timestamp)
 {
@@ -41,6 +44,8 @@ struct Event
         timePoint timestamp;
         bool polarity;
 };
+
+using EventQueue = std::deque<Event>;
 
 // Replaces EventArray
 struct EventArray
@@ -176,7 +181,7 @@ public:
         }
 
         // Turns this Stamped Transform into a Transformation = kindr::minimal::QuatTransformation; 
-        void toKindrTransformation(Transformation& kindr_tf)
+        void toKindrTransformation(kindr::minimal::QuatTransformation& kindr_tf)
         {
                 Eigen::Matrix<double, 3, 1> kindr_pos(trans.x, trans.y, trans.z);
                 kindr::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
@@ -188,7 +193,7 @@ public:
                 }
                 kindr_rot.normalize();
 
-               kindr_tf = Transformation(kindr_rot, kindr_pos);
+               kindr_tf = kindr::minimal::QuatTransformation(kindr_rot, kindr_pos);
         }
 };
 
@@ -199,7 +204,7 @@ class Transformer
 {
 public:
         Transformer(long long max_time_seconds) 
-        : max_duration_seconds(std::chrono::seconds(max_duration_seconds))
+        : max_duration_seconds(std::chrono::seconds(max_time_seconds))
         {}
 
         void clear()

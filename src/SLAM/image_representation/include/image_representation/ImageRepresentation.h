@@ -2,7 +2,7 @@
 #define image_representation_H_
 
 // #include <dynamic_reconfigure/server.h>
-#include <image_representation/TicToc.h>
+#include "image_representation/TicToc.h"
 // #include <image_transport/image_transport.h>
 // #include <ros/ros.h>
 // #include <sensor_msgs/CameraInfo.h>
@@ -22,9 +22,9 @@
 #include <chrono>
 
 #include <yaml-cpp/yaml.h>
-#include <data_passing.h>
-#include <multi_data_passing.h>
-#include "src/SLAM/esvo2_core/include/esvo2_core/tools/types.h"
+#include "data_passing.hh"
+#include "multi_data_passing.hh"
+#include "esvo2_core/tools/types.h"
 
 namespace image_representation
 {
@@ -73,6 +73,9 @@ class ImageRepresentation
             return reference_time < esvo2_core::timePointToSec(e.timestamp);
         }
 
+        // callbacks
+        void eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg);
+
     private:
         // message passing stuff
         // TSleft, TSnegative, dx, dy; All left only
@@ -93,8 +96,7 @@ class ImageRepresentation
         void createImageRepresentationAtTime(const timePoint &external_sync_time);
         void GenerationLoop();
 
-        // callbacks
-        void eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg);
+       
 
         // utils
         void clearEventQueue();

@@ -169,7 +169,7 @@ DepthFusion::fusion(
           exit(-1);
 
         dm->get(row, col).age()++;
-        dm->get(row, col).residual() = min(dm->get(row, col).residual(), dp_prop.residual());
+        dm->get(row, col).residual() = std::min(dm->get(row, col).residual(), dp_prop.residual());
         Eigen::Vector3d p_update;
         camSysPtr_->cam_left_ptr_->cam2World(dm->get(row, col).x(), dp_prop.invDepth(), p_update);
         dm->get(row, col).update_p_cam(p_update);

@@ -1,13 +1,13 @@
 // #include <glog/logging.h>
-#include <image_representation/ImageRepresentation.h>
+#include "image_representation/ImageRepresentation.h"
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
-// #include <std_msgs/Float32.h>
-#include <data_passing.h>
-#include <multi_data_passing.h>
-#include "types.h"
+#include "data_passing.hh"
+#include "multi_data_passing.hh"
+#include "esvo2_core/tools/types.h"
 
+#include <fstream>
 #include <cmath>
 #include <vector>
 
@@ -70,7 +70,7 @@ ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const Y
     calibInfoDir_ = config_["calibInfoDir"].as<std::string>("path is not given");
     if (!loadCalibInfo(calibInfoDir_, is_left_))
     {
-        std::cerr<<("Load Calib Info Error!!!  Given path is: %s", calibInfoDir_.c_str())<<std::endl;
+        printf("Load Calib Info Error!!!  Given path is: %s \n", calibInfoDir_.c_str());
     }
 
     if (is_left_)

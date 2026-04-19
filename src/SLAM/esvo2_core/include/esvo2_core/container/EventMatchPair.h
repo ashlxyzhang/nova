@@ -45,7 +45,7 @@ struct EventMatchPair
         double lr_depth;
         double ln_cost;
         double ln_depth;
-        vector<double> costs_;
+        std::vector<double> costs_;
 };
 } // namespace core
 } // namespace esvo2_core

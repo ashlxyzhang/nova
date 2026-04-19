@@ -11,11 +11,11 @@
 
 // #include <tf2_ros/transform_broadcaster.h>
 
-#include <esvo2_core/container/CameraSystem.h>
-#include <esvo2_core/core/RegProblemLM.h>
-#include <esvo2_core/core/RegProblemSolverLM.h>
-#include <esvo2_core/tools/Visualization.h>
-#include <esvo2_core/tools/utils.h>
+#include "esvo2_core/container/CameraSystem.h"
+#include "esvo2_core/core/RegProblemLM.h"
+#include "esvo2_core/core/RegProblemSolverLM.h"
+#include "esvo2_core/tools/Visualization.h"
+#include "esvo2_core/tools/utils.h"
 
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/core.hpp>
@@ -30,11 +30,12 @@
 #include <pcl/point_types.h>
 
 #include <yaml-cpp/yaml.h>
-#include <esvo2_core/factor/imu_integration.h>
-#include <esvo2_core/tools/types.h>
+#include <Eigen/Dense>
 
-#include <data_passing.h>
-#include <multi_data_passing.h>
+#include "esvo2_core/factor/imu_integration.h"
+#include "esvo2_core/tools/types.h"
+#include "data_passing.hh"
+#include "multi_data_passing.hh"
 
 namespace esvo2_core
 {
@@ -48,6 +49,8 @@ enum TrackingStatus
 
 class esvo2_Tracking
 {
+    using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
+    using EventQueue = std::deque<esvo2_core::Event>;
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node &config,

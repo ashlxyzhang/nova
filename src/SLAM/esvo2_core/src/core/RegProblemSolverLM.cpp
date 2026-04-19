@@ -7,7 +7,7 @@ namespace core
 {
 RegProblemSolverLM::RegProblemSolverLM(
   esvo2_core::CameraSystem::Ptr &camSysPtr,
-  shared_ptr<RegProblemConfig> &rpConfigPtr,
+  std::shared_ptr<RegProblemConfig> &rpConfigPtr,
   esvo2_core::core::RegProblemType rpType,
   size_t numThread):
   camSysPtr_(camSysPtr),
@@ -28,7 +28,7 @@ RegProblemSolverLM::RegProblemSolverLM(
   }
   else
   {
-    LOG(ERROR) << "Wrong Registration Problem Type is assigned!!!";
+    std::cerr << "Wrong Registration Problem Type is assigned!!!"<<std::endl;
     exit(-1);
   }
   z_min_ = 1.0 / rpConfigPtr_->invDepth_max_range_;
@@ -69,7 +69,7 @@ bool RegProblemSolverLM::resetRegProblem(RefFrame* ref, CurFrame* cur)
 }
 
 
-bool RegProblemSolverLM::resetRegProblem(shared_ptr<RegProblemConfig> &rpConfigPtr, CameraSystem::Ptr& camSysPtr, RefFrame* ref, CurFrame* cur)
+bool RegProblemSolverLM::resetRegProblem(std::shared_ptr<RegProblemConfig> &rpConfigPtr, CameraSystem::Ptr& camSysPtr, RefFrame* ref, CurFrame* cur)
 {
   rpConfigPtr_ = rpConfigPtr;
   camSysPtr_ = camSysPtr;
@@ -123,7 +123,7 @@ bool RegProblemSolverLM::solve_numerical()
     x.fill(0.0);
     if(lm.minimizeInit(x) == Eigen::LevenbergMarquardtSpace::ImproperInputParameters)
     {
-      LOG(ERROR) << "ImproperInputParameters for LM (Tracking)." << std::endl;
+      std::cerr << "ImproperInputParameters for LM (Tracking)." << std::endl;
       return false;
     }
 
@@ -141,7 +141,7 @@ bool RegProblemSolverLM::solve_numerical()
       cv::Mat reprojMap_left = cv::Mat(cv::Size(width, height), CV_8UC1, cv::Scalar(0));
       cv::eigen2cv(numDiff_regProblemPtr_->cur_->pTsObs_->TS_negative_left_, reprojMap_left);
       reprojMap_left.convertTo(reprojMap_left, CV_8UC1);
-      cv::cvtColor(reprojMap_left, reprojMap_left, CV_GRAY2BGR);
+      cv::cvtColor(reprojMap_left, reprojMap_left, cv::COLOR_GRAY2BGR);
 
       // project 3D points to current frame
       Eigen::Matrix3d R_cur_ref =  numDiff_regProblemPtr_->R_.transpose();
@@ -164,7 +164,7 @@ bool RegProblemSolverLM::solve_numerical()
       // header.stamp = numDiff_regProblemPtr_->cur_->t_;
       // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
       // reprojMap_pub_->publish(msg);
-      std::shared_ptr<cv::Mat> reprojected_map_left = make_shared<cv::Mat>();
+      std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
       *reprojected_map_left = reprojMap_left;
       // timestamp is numDiff_regProblemPtr_->cur_->t_;
     }
@@ -200,7 +200,7 @@ bool RegProblemSolverLM::solve_analytical()
     x.fill(0.0);
     if(lm.minimizeInit(x) == Eigen::LevenbergMarquardtSpace::ImproperInputParameters)
     {
-      LOG(ERROR) << "ImproperInputParameters for LM (Tracking)." << std::endl;
+      std::cerr << "ImproperInputParameters for LM (Tracking)." << std::endl;
       return false;
     }
     Eigen::LevenbergMarquardtSpace::Status status = lm.minimizeOneStep(x);
@@ -220,7 +220,7 @@ bool RegProblemSolverLM::solve_analytical()
     cv::Mat reprojMap_left = cv::Mat(cv::Size(width, height), CV_8UC1, cv::Scalar(0));
     cv::eigen2cv(regProblemPtr_->cur_->pTsObs_->TS_negative_left_, reprojMap_left);
     reprojMap_left.convertTo(reprojMap_left, CV_8UC1);
-    cv::cvtColor(reprojMap_left, reprojMap_left, CV_GRAY2BGR);
+    cv::cvtColor(reprojMap_left, reprojMap_left, cv::COLOR_GRAY2BGR);
 
     // project 3D points to current frame
     Eigen::Matrix3d R_cur_ref =  regProblemPtr_->R_.transpose();
@@ -245,7 +245,7 @@ bool RegProblemSolverLM::solve_analytical()
     // header.stamp = regProblemPtr_->cur_->t_;
     // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
     // reprojMap_pub_->publish(msg);
-    std::shared_ptr<cv::Mat> reprojected_map_left = make_shared<cv::Mat>();
+    std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
     *reprojected_map_left = reprojMap_left;
       // timestamp is numDiff_regProblemPtr_->cur_->t_;
   }

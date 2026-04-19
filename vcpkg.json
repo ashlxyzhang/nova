@@ -14,7 +14,8 @@
     "gtest",
     "eigen3",
     "pcl",
-    "ceres"
+    "ceres",
+    "tbb"
   ],
   "overrides": [
     { "name": "ceres", "version": "1.14.0", "port-version":10 },

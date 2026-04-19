@@ -6,15 +6,15 @@
 
 #include <kindr/minimal/quat-transformation.h>
 
-#include "src/SLAM/esvo2_core/include/esvo2_core/tools/types.h"
+#include "esvo2_core/tools/types.h"
 
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-#include <esvo2_core/container/DepthPoint.h>
-#include <esvo2_core/container/SmartGrid.h>
-#include <esvo2_core/tools/TicToc.h>
+#include "esvo2_core/container/DepthPoint.h"
+#include "esvo2_core/container/SmartGrid.h"
+#include "esvo2_core/tools/TicToc.h"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
