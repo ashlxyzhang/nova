@@ -85,10 +85,15 @@ class EventData
                 ~MappedEventBuffer()
                 {
                     mapped_file_.close();
+
                     if (!file_path_.empty())
                     {
                         std::error_code ec;
                         std::filesystem::remove(file_path_, ec);
+
+                        if (ec) {
+                            std::cerr << "Error deleting mapped file: " << ec.message() << std::endl;
+                        }
                     }
                 }
 

@@ -21,34 +21,33 @@ Window::Window(GPUDevice& gpu_device, int width, int height, std::string title)
 
 	init_imgui();
 
-	// Allow rendering during window operations
-    SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
-
 	open_flag = true;
 }
 
 Window::~Window() {
-	ImGui_ImplSDLGPU3_Shutdown();
-	ImGui_ImplSDL3_Shutdown();
-	ImGui::DestroyContext();
 	close();
 }
 
 void Window::init_imgui() {
-	// Setup Dear ImGui context
+
+	// Setup this window's own ImGui context
 	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
+	imgui_context = ImGui::CreateContext();
+	ImGui::SetCurrentContext(imgui_context);
+
+	// Configure context IO
 	ImGuiIO &io = ImGui::GetIO();
 	(void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigWindowsMoveFromTitleBarOnly = true;
 
+	// Configure context font
 	void *font_memory = malloc(sizeof CascadiaCode_ttf);
 	std::memcpy(font_memory, CascadiaCode_ttf, sizeof CascadiaCode_ttf);
 	io.Fonts->AddFontFromMemoryTTF(font_memory, sizeof CascadiaCode_ttf, 16.0f);
 
-	// Setup scaling
+	// Configure context style
 	float scaling_factor = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
 	ImGuiStyle &style = ImGui::GetStyle();
 	style.ScaleAllSizes(scaling_factor);
@@ -68,6 +67,14 @@ void Window::init_imgui() {
 }
 
 void Window::close() {
+	if (imgui_context) {
+		ImGui::SetCurrentContext(imgui_context);
+		ImGui_ImplSDLGPU3_Shutdown();
+		ImGui_ImplSDL3_Shutdown();
+		ImGui::DestroyContext(imgui_context);
+		imgui_context = nullptr;
+	}
+
 	if (window) {
 		gpu_device.free_window(window);
 		window = nullptr;
@@ -92,6 +99,9 @@ void Window::wait_for_close() {
 }
 
 void Window::render(DataSource& data_source) {
+
+	// Set current ImGui context to this window's context
+	ImGui::SetCurrentContext(imgui_context);
 
 	// Acquire swapchain texture
 	SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device.get_SDL_device());

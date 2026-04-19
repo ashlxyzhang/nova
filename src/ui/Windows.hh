@@ -24,6 +24,8 @@ class Window {
 		std::string title;
 		bool open_flag = false;
 
+		ImGuiContext* imgui_context = nullptr;
+
 		void init_imgui();
 		virtual void draw(DataSource& data_source) = 0;
 };

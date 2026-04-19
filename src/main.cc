@@ -117,6 +117,9 @@ struct Application
 //! TESTING PURPOSES ONLY, uncomment '#define SDL_MAIN_USE_CALLBACKS 1' and 
 //! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
 int main() {
+
+    SDL_SetHint(SDL_HINT_RENDER_GPU_DEBUG, "1");
+
     // Initialize GPU device
     GPUDevice gpu;
     if (!gpu.is_open()) return 1;
@@ -182,10 +185,12 @@ int main() {
         
         // Loop back to start
         if (ds.scrubber.state.current_time >= ds.scrubber.state.max_time) {
-            ds.scrubber.state.current_time = ds.scrubber.state.min_time + ds.scrubber.state.time_window;
+            ds.scrubber.state.current_time = 0;
+        }
+        if (ds2.scrubber.state.current_time >= ds2.scrubber.state.max_time) {
+            ds2.scrubber.state.current_time = 0;
         }
     }
-    
     return 0;
 }
 
