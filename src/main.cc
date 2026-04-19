@@ -117,33 +117,77 @@ struct Application
 //! TESTING PURPOSES ONLY, uncomment '#define SDL_MAIN_USE_CALLBACKS 1' and 
 //! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
 int main() {
-    
-    // Initialize a gpu device
+    // Initialize GPU device
     GPUDevice gpu;
     if (!gpu.is_open()) return 1;
+    
+    // Initialize data source
+    DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
+    DataSource ds2(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/pedestrians.raw");
 
-    // Initialize a DCE filter and window for drawing the DCE output
+    if (!ds.is_open()) return 1;
+    if (!ds2.is_open()) return 1;
+    
+    // Read all data from file first
+    std::cout << "Loading files..." << std::endl;
+    ds.read_all();
+    ds2.read_all();
+    std::cout << "Loaded " << ds.event_data.size() + ds2.event_data.size() << " events" << std::endl;
+    
+    // Initialize DCE and display window
     DigitalCodedExposure dce(gpu);
     DCEDisplay dce_display(gpu, 1280, 720, "Fidget Spinner DCE");    
+    DCEDisplay dce_display2(gpu, 1280, 720, "Pedestrians DCE");
+
     if (!dce_display.is_open()) return 1;
 
-    // Initialize and read all data from a file
-    DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
-    ds.read_all();
+    // Configure scrubber (times in MICROSECONDS!)
+    ds.scrubber.state.type = Scrubber::Type::TIME;
+    ds.scrubber.state.mode = Scrubber::Mode::PLAYING;  // Auto-advance
+    ds.scrubber.state.time_window = 10000.0f;  // 10ms window
+    ds.scrubber.state.time_step = 33333.0f;    // ~30fps step
 
-    // Scrub event data (choose subsequence of data to upload to GPU for visualization)
-    ds.scrubber.state.current_time = 1000000.0; // 1s in 
-    ds.scrubber.state.time_window = 10000.0; // 10ms
-    ds.update_scrubber();
+    ds2.scrubber.state.type = Scrubber::Type::TIME;
+    ds2.scrubber.state.mode = Scrubber::Mode::PLAYING;  // Auto-advance
+    ds2.scrubber.state.time_window = 10000.0f;  // 10ms window
+    ds2.scrubber.state.time_step = 33333.0f;    // ~30fps step
+    
 
-    // Apply filter to scrubbed data and render
-    dce.render(ds);
-    dce_display.render(ds);
+    // Main loop
+    bool running = true;
+    while (running) {
+        // Process SDL events
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_EVENT_QUIT || 
+                event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+                running = false;
+            }
+        }
+    
+        // Update scrubber (uploads current window to GPU)
+        ds.update_scrubber();
+        ds2.update_scrubber();
 
-    // Wait for user to close window
-    dce_display.wait_for_close();
+        // Render DCE
+        dce.render(ds);
+        dce.render(ds2);
+
+        // Display result
+        dce_display.render(ds);
+        dce_display2.render(ds2);
+        
+        // Frame limiting
+        SDL_Delay(16);  // ~60fps
+        
+        // Loop back to start
+        if (ds.scrubber.state.current_time >= ds.scrubber.state.max_time) {
+            ds.scrubber.state.current_time = ds.scrubber.state.min_time + ds.scrubber.state.time_window;
+        }
+    }
+    
+    return 0;
 }
-
 
 //////////////////////////////////////
 /**

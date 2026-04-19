@@ -262,7 +262,7 @@ size_t DataSource::get_batch_frame_data()
 }
 
 void DataSource::read_all() {
-    while (get_batch_event_data() > 0 || get_batch_frame_data() > 0) {
-        // Keep reading until no more data is available
+    while (reader->isEventsRunning()) {
+        get_batch_event_data();
     }
 }

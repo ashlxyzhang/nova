@@ -21,6 +21,9 @@ Window::Window(GPUDevice& gpu_device, int width, int height, std::string title)
 
 	init_imgui();
 
+	// Allow rendering during window operations
+    SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+
 	open_flag = true;
 }
 
@@ -98,7 +101,6 @@ void Window::render(DataSource& data_source) {
 	// If valid, continue with rendering
 	if (swapchain_texture != nullptr)
 	{	
-
 		// Prepare the draw data
 		ImGui_ImplSDLGPU3_NewFrame();
 		ImGui_ImplSDL3_NewFrame();
@@ -133,9 +135,9 @@ DCEDisplay::DCEDisplay(GPUDevice& gpu_device, int width, int height, std::string
 void DCEDisplay::draw(DataSource& data_source) {
 	RenderTarget& output = data_source.dce_render_targets.output;
 
+	ImGui::Begin("Frame");
 	if (output.texture)
 	{
-		ImGui::Begin("Frame");
         ImGui::Text("Digital Coded Exposure");
 
 		ImVec2 pane_size = ImGui::GetContentRegionAvail();
@@ -155,6 +157,7 @@ void DCEDisplay::draw(DataSource& data_source) {
 		float y_pad = (pane_size.y - display_size.y) * 0.5f;
 		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+
 
 		// Draw image
 		ImGui::Image((ImTextureID) output.texture, display_size);
