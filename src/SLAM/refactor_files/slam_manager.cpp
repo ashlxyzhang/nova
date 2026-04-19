@@ -47,9 +47,9 @@ public:
         
         // Updating bools because we are currently running
         image_representation_left_running = true;
-        image_representation_right_thread = true;
-        mapping_thread = true;
-        tracking_thread = true;
+        image_representation_right_running = true;
+        mapping_running = true;
+        tracking_running = true;
 
         // The module's constructors create and detach a new thread that manages their respective processes
         image_representation_left = std::make_unique<ImageRepresentation>();
@@ -82,8 +82,8 @@ public:
         // Reset (deleting) all of the modules
         image_representation_left.reset();
         image_representation_right.reset();
-        mapping_thread.reset();
-        tracking_thread.reset();
+        mapping.reset();
+        tracking.reset();
 
         firstEventBatch = true;
         this->left_scrubber = nullptr;
@@ -97,8 +97,8 @@ public:
         // If SLAM is not running, just return
         if(!image_representation_left_running)
             return;
-        sendEventsPerScrubber(left_eventdata, *left_scrubber, true);
-        sendEventsPerScrubber(right_eventdata, *right_scrubber, false);
+        sendEventsPerScrubber(*left_eventdata, *left_scrubber, true);
+        sendEventsPerScrubber(*right_eventdata, *right_scrubber, false);
     }
 
 private:
@@ -109,11 +109,11 @@ private:
         if(!image_representation_left_running)
             return;
 
-        const std::array<std::size_t, 2> frame_dims = scrubber->get_frame_dimensions();
+        const std::array<std::size_t, 2> frame_dims = scrubber.get_frame_dimensions();
         const std::size_t width = frame_dims[0];
         const std::size_t height = frame_dims[1];
-        const std::size_t points_buffer_size = scrubber->get_points_buffer_size();
-        const std::size_t current_lower_index = scrubber->get_current_lower_index();
+        const std::size_t points_buffer_size = scrubber.get_points_buffer_size();
+        const std::size_t current_lower_index = scrubber.get_current_lower_index();
         const auto &event_vector = event_data.get_evt_vector_ref();
 
         if(!event_vector.empty() && points_buffer_size > 0)
@@ -137,7 +137,7 @@ private:
                 This is because future events will increase in time at the same rate that real time is passing, 
                 so their time + "time 0" will never be greater than ::now(). 
                 */
-                timePoint now = std::chrono::time_point<std::chrono::steady_clock>::now();
+                timePoint now = std::chrono::steady_clock::now();
                 // Casting end timestamp as a duration
                 // https://docs.inivation.com/software/introduction.html: "timestamp represents the time of the start of exposure of the 
                 // frame. It is represented as a Unix Timestamp in **microseconds**. Type: int64"
@@ -171,7 +171,7 @@ private:
                     if(evtArray.events.size()!=0)
                     {
                        sendEventsToQueues(evtArray, is_left);
-                       evtArray->events.clear();
+                       evtArray.events.clear();
                     }
                     // Updating the lower/upper bounds
                     curr_lower_bound_timestamp = upper_bound_timestamp;
@@ -200,21 +200,21 @@ private:
     void sendEventsToQueues(esvo2_core::EventArray& evtArray, bool is_left)
     {
         std::shared_ptr<esvo2_core::EventArray> final_evt_array = make_shared<esvo2_core::EventArray>();
-        final_evt_array->width = evtArray->width;
-        final_evt_array->height = evtArray->height;
-        final_evt_array->events = std::move(evtArray->events);
+        final_evt_array->width = evtArray.width;
+        final_evt_array->height = evtArray.height;
+        final_evt_array->events = std::move(evtArray.events);
         timePoint finalEventTimestamp = final_evt_array->events.at(final_evt_array->events.size()-1).timestamp;
         if(is_left)
         {
             event_left_To_IR.add(final_evt_array, finalEventTimestamp);
-            image_representation_left_cv->notify_one();
+            image_representation_left_cv.notify_one();
             event_left_To_Map.add(final_evt_array, finalEventTimestamp);
-            mapping_cv->notify_one();   
+            mapping_cv.notify_one();   
         }
         else
         {
             event_right_To_IR.add(final_evt_array, finalEventTimestamp);
-            image_representation_right_cv->notify_one();
+            image_representation_right_cv.notify_one();
         }
     }
 
@@ -562,6 +562,10 @@ private:
 // -------TODO---------
 /* 
 
+    - delete imu_factor.h b/c gnu?
+    - ceres?
+
+
     - get rid of tf:: stuff
         - types.h toKindrTransformation is very probably wrong. Hard to check though without compiling
         - minkindr can be found at: https://github.com/ethz-asl/minkindr
@@ -605,4 +609,7 @@ private:
     - Because of relative to absolute time conversion, must run SLAM on time scrub mode and in real time (no speeding up/slowing down probably)
       Can still play from file, but must play file in real time.
     - types.h toKindrTransformation is very probably wrong
+    -#include <esvo2_core/DVS_MappingStereoConfig.h> in Mapping.h may be necessary
+    - ref_.vPointXYZPtr_.push_back(&(*PointXYZ_begin_it)); // Copy the pointer of the pointXYZ in Tracking.cpp is very sus
+      but I think it is correct
 */

@@ -68,7 +68,7 @@ void DepthProblemSolver::solve(
 
     jobs[i].vdpPtr_ = std::make_shared<std::vector<DepthPoint> >();
   }
-//  LOG(INFO) << "(DepthProblemSolver) distribute the loads: " << tt.toc() << " ms.";
+//  std::cout << "(DepthProblemSolver) distribute the loads: " << tt.toc() << " ms.";
 // //  tt.tic();
 //   //
   std::vector<std::thread> threads;
@@ -95,14 +95,14 @@ void DepthProblemSolver::solve(
   for(size_t i = 0;i < NUM_THREAD_;i++)
   {
 #ifdef DEPTH_PROBLEM_SOLVER_LOG
-    LOG(INFO) << "The " << i << " thread reconstructs " << jobs[i].vdpPtr_->size() << " points";
+    std::cout << "The " << i << " thread reconstructs " << jobs[i].vdpPtr_->size() << " points";
 #endif
     numPoints += jobs[i].vdpPtr_->size();
   }
   vdp.reserve(numPoints);
   for(size_t i = 0;i < NUM_THREAD_;i++)
     vdp.insert(vdp.end(), jobs[i].vdpPtr_->begin(), jobs[i].vdpPtr_->end());
-//  LOG(INFO) << "(DepthProblemSolver) copy results: " << tt.toc() << " ms.";
+//  std::cout << "(DepthProblemSolver) copy results: " << tt.toc() << " ms.";
 
   // vdp.clear();
   // vdp.reserve(pvEMP->size());
@@ -444,7 +444,7 @@ DepthProblemSolver::pointCulling(
   }
   vdp = vdp_culled;
 #ifdef DEPTH_PROBLEM_SOLVER_LOG
-  LOG(INFO) << "(culling) max depth: " << *std::max_element(vDepth.begin(), vDepth.end());
+  std::cout << "(culling) max depth: " << *std::max_element(vDepth.begin(), vDepth.end());
 #endif
 }
 

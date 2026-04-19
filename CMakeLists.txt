@@ -3,6 +3,12 @@ include(FetchContent)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Ceres adds a compile flag "/Zc:__cplusplus" that clang++ cannot handle, so need to do clang-cl for Windows
+if(WIN32)
+    set(CMAKE_CXX_COMPILER "clang-cl")
+    set(CMAKE_C_COMPILER "clang-cl")
+endif()
+
 project(NOVA LANGUAGES C CXX)
 
 file(GLOB_RECURSE SOURCES "src/*.cc")
@@ -17,8 +23,10 @@ find_package(Boost COMPONENTS iostreams REQUIRED)
 find_package(MetavisionSDK REQUIRED COMPONENTS base core stream)
 find_package(MetavisionHAL REQUIRED)
 # SLAM
-find_package(PCL 1.11 COMPONENTS common REQUIRED)
-FetchContent_Declare(
+find_package(Eigen3 3.4.1 EXACT REQUIRED)
+find_package(Ceres 1.14.0 EXACT REQUIRED) # For solving the optimization problems
+find_package(PCL 1.11 COMPONENTS common REQUIRED) # For visualization + storing the 3D poing cloud
+FetchContent_Declare( # For camera/parameter configurations
   yaml-cpp
   GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
   GIT_TAG yaml-cpp-0.9.0
@@ -95,8 +103,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MetavisionSDK::core
     MetavisionSDK::stream
     Metavision::HAL
+    Eigen3::Eigen
     ${PCL_LIBRARIES}
     yaml-cpp::yaml-cpp
+    ${CERES_LIBRARIES}
 )
 option(NOVA_BUILD_TESTS "Build NOVA test suite" ON)
 if(NOVA_BUILD_TESTS)

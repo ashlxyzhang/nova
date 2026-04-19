@@ -1,7 +1,7 @@
 #ifndef ESVO2_CORE_MAPPING_H
 #define ESVO2_CORE_MAPPING_H
 
-#include <ros/ros.h>
+// #include <ros/ros.h>
 
 #include <esvo2_core/tools/types.h>
 // #include <message_filters/subscriber.h>
@@ -22,8 +22,8 @@
 #include <esvo2_core/tools/Visualization.h>
 #include <esvo2_core/tools/utils.h>
 
-#include <dynamic_reconfigure/server.h>
-#include <esvo2_core/DVS_MappingStereoConfig.h>
+// #include <dynamic_reconfigure/server.h>
+// #include <esvo2_core/DVS_MappingStereoConfig.h> // TODO -> I think this might set param stuff, may have to implement something for it
 
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/core.hpp>
@@ -35,26 +35,28 @@
 #include <mutex>
 
 #include <pcl/point_types.h>
-#include <pcl_ros/point_cloud.h>
+// #include <pcl_ros/point_cloud.h>
 
+#include <yaml-cpp/yaml.h>
 #include <esvo2_core/core/BackendOptimization.h>
 #include <esvo2_core/factor/imu_integration.h>
-#include <sensor_msgs/Imu.h>
+// #include <sensor_msgs/Imu.h>
 #include <data_passing.h>
 #include <multi_data_passing.h>
-
+#include <Eigen/Dense>
 // from utils.h
 // using Transformation = kindr::minimal::QuatTransformation;
 
 namespace esvo2_core
 {
+using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 using namespace core;
 
 class esvo2_Mapping
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        esvo2_Mapping(const YAML::Node &config, 
+        esvo2_Mapping(std::atomic<bool> &is_running_, const YAML::Node &config, 
             DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track,
             DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track);
         virtual ~esvo2_Mapping();
@@ -86,22 +88,21 @@ class esvo2_Mapping
         /*** publish results ***/
         void publishMappingResults(DepthMap::Ptr depthMapPtr, Transformation tr, timePoint t);
         void publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation &tr, timePoint &t);
-        void publishImage(const cv::Mat &image, const timePoint &t, image_transport::Publisher &pub,
-                          std::string encoding = "bgr8");
+        void publishImage(const cv::Mat &image, const timePoint &t, std::string encoding = "bgr8");
 
         /*** event processing ***/
-        void createEdgeMask(std::vector<Event *> &vEventsPtr, PerspectiveCamera::Ptr &camPtr, cv::Mat &edgeMap,
-                            std::vector<std::pair<size_t, size_t>> &vEdgeletCoordinates, bool bUndistortEvents = true,
-                            size_t radius = 0);
+        void createEdgeMask(std::vector<esvo2_core::Event *> &vEventsPtr, PerspectiveCamera::Ptr &camPtr, cv::Mat &edgeMap,
+                            std::vector<std::pair<std::size_t, std::size_t>> &vEdgeletCoordinates, bool bUndistortEvents = true,
+                            std::size_t radius = 0);
 
-        void createDenoisingMask(std::vector<Event *> &vAllEventsPtr, cv::Mat &mask, size_t row,
-                                 size_t col); // reserve in this file
+        void createDenoisingMask(std::vector<esvo2_core::Event *> &vAllEventsPtr, cv::Mat &mask, std::size_t row,
+                                 std::size_t col); // reserve in this file
 
-        void extractDenoisedEvents(std::vector<Event *> &vCloseEventsPtr, std::vector<Event *> &vEdgeEventsPtr,
-                                   cv::Mat &mask, size_t maxNum = 5000);
+        void extractDenoisedEvents(std::vector<esvo2_core::Event *> &vCloseEventsPtr, std::vector<esvo2_core::Event *> &vEdgeEventsPtr,
+                                   cv::Mat &mask, std::size_t maxNum = 5000);
 
         void getReprojection(std::vector<EventMatchPair> &vEMP, Eigen::Matrix4d T_last_now,
-                             std::vector<Event *> &vDenoisedEventsPtr_left_dy_);
+                             std::vector<esvo2_core::Event *> &vDenoisedEventsPtr_left_dy_);
         void selectPoint();
         bool getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
                             vector<pair<double, Eigen::Vector3d>> &gyrVector);
@@ -115,6 +116,9 @@ class esvo2_Mapping
         //queues
         // DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track; MOVED TO BACKEND_OPTIMIZATION.h
         DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track;
+
+        // Running variable
+        std::atomic<bool> &is_running;
 
         // configuration variables struct
         YAML::Node config_;
@@ -168,7 +172,7 @@ class esvo2_Mapping
         constStampedTimeSurfaceObs *TS_obs_ptr_;
         StampTransformationMap st_map_;
         std::shared_ptr<esvo2_core::Transformer> tf_;
-        size_t TS_id_;
+        std::size_t TS_id_;
         timePoint tf_lastest_common_time_;
 
         // system
@@ -180,14 +184,14 @@ class esvo2_Mapping
         EventBM ebm_;
 
         // data transfer
-        std::vector<Event *> vALLEventsPtr_left_;          // for BM
-        std::vector<Event *> vCloseEventsPtr_left_;        // for BM
-        std::vector<Event *> vDenoisedEventsPtr_left_;     // for BM
-        std::vector<Event *> vDenoisedEventsPtr_left_dx_;  // for BM
-        std::vector<Event *> vDenoisedEventsPtr_left_dx2_; // for BM
-        std::vector<Event *> vDenoisedEventsPtr_left_dy_;  // for BM
-        size_t totalNumCount_;                             // count the number of events involved
-        std::vector<Event *> vEventsPtr_left_SGM_;         // for SGM
+        std::vector<esvo2_core::Event *> vALLEventsPtr_left_;          // for BM
+        std::vector<esvo2_core::Event *> vCloseEventsPtr_left_;        // for BM
+        std::vector<esvo2_core::Event *> vDenoisedEventsPtr_left_;     // for BM
+        std::vector<esvo2_core::Event *> vDenoisedEventsPtr_left_dx_;  // for BM
+        std::vector<esvo2_core::Event *> vDenoisedEventsPtr_left_dx2_; // for BM
+        std::vector<esvo2_core::Event *> vDenoisedEventsPtr_left_dy_;  // for BM
+        std::size_t totalNumCount_;                             // count the number of events involved
+        std::vector<esvo2_core::Event *> vEventsPtr_left_SGM_;         // for SGM
 
         // result
         PointCloud::Ptr pc_near_, pc_global_;
@@ -209,21 +213,21 @@ class esvo2_Mapping
         double invDepth_min_range_;
         double invDepth_max_range_;
         double cost_vis_threshold_, cost_vis_threshold_ln_;
-        size_t patch_area_;
+        std::size_t patch_area_;
         double residual_vis_threshold_, residual_vis_threshold_ln_;
         double stdVar_vis_threshold_, stdVar_vis_threshold_ln_;
-        size_t age_max_range_;
-        size_t age_vis_threshold_;
+        std::size_t age_max_range_;
+        std::size_t age_vis_threshold_;
         int fusion_radius_;
         std::string FusionStrategy_;
         int maxNumFusionFrames_, maxNumFusionFrames_ln_;
         int maxNumFusionPoints_;
-        size_t INIT_SGM_DP_NUM_Threshold_;
+        std::size_t INIT_SGM_DP_NUM_Threshold_;
         // module parameters
-        size_t PROCESS_EVENT_NUM_;
-        size_t PROCESS_EVENT_NUM_AA_;
-        size_t TS_HISTORY_LENGTH_;
-        size_t mapping_rate_hz_;
+        std::size_t PROCESS_EVENT_NUM_;
+        std::size_t PROCESS_EVENT_NUM_AA_;
+        std::size_t TS_HISTORY_LENGTH_;
+        std::size_t mapping_rate_hz_;
         // options
         bool changed_frame_rate_;
         bool bRegularization_;
@@ -233,14 +237,14 @@ class esvo2_Mapping
         // visualization parameters
         double visualizeGPC_interval_;
         double visualize_range_;
-        size_t numAddedPC_threshold_;
+        std::size_t numAddedPC_threshold_;
         // Event Block Matching (BM) parameters
         double BM_half_slice_thickness_, eta_for_select_points_;
-        size_t BM_patch_size_X_, BM_patch_size_X_2_;
-        size_t BM_patch_size_Y_, BM_patch_size_Y_2_;
-        size_t BM_min_disparity_;
-        size_t BM_max_disparity_;
-        size_t BM_step_;
+        std::size_t BM_patch_size_X_, BM_patch_size_X_2_;
+        std::size_t BM_patch_size_Y_, BM_patch_size_Y_2_;
+        std::size_t BM_min_disparity_;
+        std::size_t BM_max_disparity_;
+        std::size_t BM_step_;
         double BM_ZNCC_Threshold_;
         bool BM_bUpDownConfiguration_;
         bool bUSE_IMU_;
@@ -271,7 +275,7 @@ class esvo2_Mapping
         // image_transport::Publisher invDepthMap_pub_, stdVarMap_pub_, ageMap_pub_, costMap_pub_, invDepthMap_rel_pub_;
         std::string resultPath_;
         // For counting the total number of fusion
-        size_t TotalNumFusion_;
+        std::size_t TotalNumFusion_;
         double data_trans_time;
 };
 } // namespace esvo2_core

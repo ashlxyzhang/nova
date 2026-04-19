@@ -1,4 +1,11 @@
 #include <esvo2_core/core/BackendOptimization.h>
+#include "data_passing.h"
+#include "ceres/ceres.h"
+#include <esvo2_core/tools/TicToc.h>
+#include <Eigen/Dense>
+#include <esvo2_core/factor/imu_factor.h>
+#include <esvo2_core/factor/pose_local_parameterization.h>
+#include <vector>
 
 #define ESVO2_CORE_BACKEND_DEBUG
 
@@ -25,13 +32,12 @@ BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr, Dat
     g_optimal << 0, 9.8, 0;
 }
 
-void BackendOptimization::setProblem(std::deque<DepthPointFrame> *pDepthPoints, TimeSurfaceHistory *pTS_history,
-                                     ros::Publisher *pV_ba_bg_pub, bool bUSE_IMU)
+void BackendOptimization::setProblem(std::deque<DepthPointFrame> *pDepthPoints, TimeSurfaceHistory *pTS_history, bool bUSE_IMU)
 {
     pDepthPoints_ = pDepthPoints;
     pTS_history_ = pTS_history;
-    pV_ba_bg_pub_ = pV_ba_bg_pub;
     bUSE_IMU_ = bUSE_IMU;
+    // pV_ba_bg_pub_ = pV_ba_bg_pub;
 }
 
 void BackendOptimization::sloveProblem()
@@ -58,10 +64,19 @@ void BackendOptimization::sloveProblem()
         auto ts_obs = (*pTS_history_).find(tt);
         // convert vector to double for ceres
         vector2Double(ts_obs, last_obs, para_Pose, para_SpeedBias, i);
+        
         ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
         problem.AddParameterBlock(para_Pose[i], 7, local_parameterization);
         if (initVsFlag)
             problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
+
+        // Change because using Ceres 2.2.0 instead of 1.14.0
+        // auto* pose_manifold = new ceres::ProductManifold<ceres::EuclideanManifold<3>, ceres::QuaternionManifold>();
+        // problem.AddParameterBlock(para_Pose[i], 7);
+        // if (initVsFlag)
+        //     problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
+        // problem.SetManifold(para_Pose[i], pose_manifold);
+
         last_obs = ts_obs;
     }
 
@@ -99,9 +114,9 @@ void BackendOptimization::sloveProblem()
 #ifdef ESVO2_CORE_BACKEND_DEBUG
     if (!(Bgs[WINDOW_SIZE].norm() > 1 || Bas[WINDOW_SIZE].norm() > 1))
     {
-        LOG(INFO) << summary.BriefReport();
-        LOG(INFO) << "Ba = " << Bas[WINDOW_SIZE].transpose();
-        LOG(INFO) << "Bg = " << Bgs[WINDOW_SIZE].transpose();
+        std::cout << summary.BriefReport()<<std::endl;
+        std::cout << "Ba = " << Bas[WINDOW_SIZE].transpose()<<std::endl;
+        std::cout << "Bg = " << Bgs[WINDOW_SIZE].transpose()<<std::endl;
     }
 
 #endif
@@ -110,7 +125,7 @@ void BackendOptimization::sloveProblem()
     double2Vector(para_Pose, para_SpeedBias);
 
     // if the solver not converged, update the Vs, Bas, Bgs from the last iteration
-    if (summary.termination_type != ceres::CONVERGENCE)
+    if (summary.termination_type != ceres::TerminationType::CONVERGENCE)
     {
         for (int i = 1; i < WINDOW_SIZE + 1; i++)
         {
@@ -121,7 +136,7 @@ void BackendOptimization::sloveProblem()
     }
 
     // Check if the solver converged
-    if (initVsFlag && summary.termination_type == ceres::CONVERGENCE)
+    if (initVsFlag && summary.termination_type == ceres::TerminationType::CONVERGENCE)
         publishVBaBg(esvo2_core::timePointToSec((*pDepthPoints_)[(*pDepthPoints_).size() - 1].timestamp_));
 
     // stereo + IMU initilization
@@ -273,16 +288,17 @@ void BackendOptimization::publishVBaBg(double time_v)
         msg.bg.push_back(Bgs[WINDOW_SIZE](i));
         msg.g.push_back(g_optimal(i));
     }
+
     // Publishing the pv_ba_bg
     // (*pV_ba_bg_pub_).publish(msg);
-    std::shared_ptr<V_ba_bg> bag = make_shared<V_ba_bg>();
+    std::shared_ptr<esvo2_core::VBaBg> bag = std::make_shared<esvo2_core::VBaBg>();
     *bag = msg;
-    v_ba_bg_Map_to_Track.add(bag, esvo2_core::secondsToTimePoint(time_v));
+    v_ba_bg_Map_to_Track->add(bag, esvo2_core::secondsToTimePoint(time_v));
 }
 
 bool BackendOptimization::CalibrationExRotation(Eigen::Matrix3d &calib_ric_result)
 {
-    vector<Eigen::Matrix3d> Rc, Rc_g, Rimu;
+    std::vector<Eigen::Matrix3d> Rc, Rc_g, Rimu;
     for (int i = 0; i < WINDOW_SIZE; i++)
     {
         Rc.push_back(Rs[i].transpose() * Rs[i + 1]);
@@ -299,7 +315,7 @@ bool BackendOptimization::CalibrationExRotation(Eigen::Matrix3d &calib_ric_resul
         Eigen::Quaterniond r2(Rc_g[i]);
 
         double angular_distance = 180 / M_PI * r1.angularDistance(r2);
-        ROS_DEBUG("%d %f", i, angular_distance);
+        printf("%d %f \n", i, angular_distance);
 
         double huber = angular_distance > 5.0 ? 5.0 / angular_distance : 1.0;
         ++sum_ok;
@@ -349,7 +365,7 @@ void BackendOptimization::solveGyroscopeBias(Eigen::Vector3d &Bgs)
         b += tmp_A.transpose() * tmp_b;
     }
     Bgs = A.ldlt().solve(b);
-    ROS_WARN_STREAM("gyroscope bias initial calibration " << Bgs.transpose());
+    // std::cerr<<("gyroscope bias initial calibration " << Bgs.transpose())<<std::endl;
 }
 
 bool BackendOptimization::LinearAlignment(Eigen::Vector3d &g, Eigen::VectorXd &x)

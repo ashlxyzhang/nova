@@ -274,7 +274,7 @@ bool esvo2_core::core::EventBM::match_an_event(Event *pEvent, std::pair<size_t, 
         return false;
     }
 
-    // LOG(INFO) << "patch_src is extracted";
+    // std::cout << "patch_src is extracted";
 
     // searching along the epipolar line (heading to the left direction)
     double min_cost = ZNCC_MAX_;
@@ -324,7 +324,7 @@ bool esvo2_core::core::EventBM::match_an_event(Event *pEvent, std::pair<size_t, 
     }
     else
     {
-        // LOG(INFO) << "BM fails because: " << min_cost << " > " << ZNCC_Threshold_;
+        // std::cout << "BM fails because: " << min_cost << " > " << ZNCC_Threshold_;
         return false;
     }
 }
@@ -747,12 +747,12 @@ void esvo2_core::core::EventBM::match_all_SingleThread(std::vector<EventMatchPai
         if (match_an_event2(vEventsPtr_[i], pDisparityBound, emp))
             vEMP.emplace_back(emp);
     }
-    // LOG(INFO) << "vEMP size is: " << vEMP.size();
-    // LOG(INFO) << "Total number of events: " << vEventsPtr_.size();
-    // LOG(INFO) << "Info-noise ratio low # " << infoNoiseRatioLowNum_;
-    // LOG(INFO) << "outsideNum_ # " << outsideNum_;
-    // LOG(INFO) << "coarse searching fails # " << coarseSearchingFailNum_;
-    // LOG(INFO) << "fine searching fails # " << fineSearchingFailNum_;
+    // std::cout << "vEMP size is: " << vEMP.size();
+    // std::cout << "Total number of events: " << vEventsPtr_.size();
+    // std::cout << "Info-noise ratio low # " << infoNoiseRatioLowNum_;
+    // std::cout << "outsideNum_ # " << outsideNum_;
+    // std::cout << "coarse searching fails # " << coarseSearchingFailNum_;
+    // std::cout << "fine searching fails # " << fineSearchingFailNum_;
 }
 
 void esvo2_core::core::EventBM::match_all_HyperThread(vector<EventMatchPair> &vEMP)

@@ -72,10 +72,10 @@ void PerspectiveCamera::preComputeRectifiedCoordinate()
     cv::threshold(cvDstMask, cvDstMask, 0.999, 255, cv::THRESH_BINARY);
     cvDstMask.convertTo(cvDstMask, CV_8U);
     cv::cv2eigen(cvDstMask, UndistortRectify_mask_);
-//    LOG(INFO) << "#################### UndistortRectify_mask_.size: " << UndistortRectify_mask_.size();
+//    std::cout << "#################### UndistortRectify_mask_.size: " << UndistortRectify_mask_.size();
 #else
-    ROS_ERROR_ONCE("You need OpenCV >= 3.0 to use the equidistant camera model.");
-    ROS_ERROR_ONCE("Will not publish rectified images.");
+    std::cerr<<("You need OpenCV >= 3.0 to use the equidistant camera model.")<<std::endl;
+    std::cerr<<("Will not publish rectified images.")<<std::endl;
 #endif
   }
   else if (distortion_model_ == "equidistant")
@@ -93,15 +93,15 @@ void PerspectiveCamera::preComputeRectifiedCoordinate()
     cvDstMask.convertTo(cvDstMask, CV_8U);
     cv::cv2eigen(cvDstMask, UndistortRectify_mask_);
 
-//    LOG(INFO) << "#################### UndistortRectify_mask_.size: " << UndistortRectify_mask_.size();
+//    std::cout << "#################### UndistortRectify_mask_.size: " << UndistortRectify_mask_.size();
 #else
-    ROS_ERROR_ONCE("You need OpenCV >= 3.0 to use the equidistant camera model.");
-    ROS_ERROR_ONCE("Will not publish rectified images.");
+    std::cerr<<("You need OpenCV >= 3.0 to use the equidistant camera model.")<<std::endl;
+    std::cerr("Will not publish rectified images.")<<std::endl;
 #endif
   }
   else
   {
-    LOG(INFO) << "wrong distortion model is provided.";
+    std::cout << "wrong distortion model is provided.";
     exit(-1);
   }
 
@@ -165,7 +165,7 @@ void CameraSystem::computeBaseline()
   Eigen::Vector3d temp = cam_right_ptr_->P_.block<3,3>(0,0).inverse() *
     cam_right_ptr_->P_.block<3,1>(0,3);
   baseline_ = temp.norm();
-  LOG(INFO) << "Baseline: " << baseline_;
+  std::cout << "Baseline: " << baseline_;
 }
 
 void CameraSystem::loadCalibInfo(const std::string &cameraSystemDir, bool bPrintCalibInfo)
@@ -217,25 +217,25 @@ void CameraSystem::loadCalibInfo(const std::string &cameraSystemDir, bool bPrint
 
 void CameraSystem::printCalibInfo()
 {
-  LOG(INFO) << "============================================" << std::endl;
-  LOG(INFO) << "Left Camera" << std::endl;
-  LOG(INFO) << "--image_width: " << cam_left_ptr_->width_;
-  LOG(INFO) << "--image_height: " << cam_left_ptr_->height_;
-  LOG(INFO) << "--distortion model: " << cam_left_ptr_->distortion_model_;
-  LOG(INFO) << "--distortion_coefficients:\n" << cam_left_ptr_->D_;
-  LOG(INFO) << "--rectification_matrix:\n" <<  cam_left_ptr_->RectMat_;
-  LOG(INFO) << "--projection_matrix:\n" <<  cam_left_ptr_->P_;
-  LOG(INFO) << "--T_right_left:\n" <<  T_right_left_;
+  std::cout << "============================================" << std::endl;
+  std::cout << "Left Camera" << std::endl;
+  std::cout << "--image_width: " << cam_left_ptr_->width_;
+  std::cout << "--image_height: " << cam_left_ptr_->height_;
+  std::cout << "--distortion model: " << cam_left_ptr_->distortion_model_;
+  std::cout << "--distortion_coefficients:\n" << cam_left_ptr_->D_;
+  std::cout << "--rectification_matrix:\n" <<  cam_left_ptr_->RectMat_;
+  std::cout << "--projection_matrix:\n" <<  cam_left_ptr_->P_;
+  std::cout << "--T_right_left:\n" <<  T_right_left_;
 
-  LOG(INFO) << "============================================" << std::endl;
-  LOG(INFO) << "Right Camera:" << std::endl;
-  LOG(INFO) << "--image_width: " << cam_right_ptr_->width_;
-  LOG(INFO) << "--image_height: " << cam_right_ptr_->height_;
-  LOG(INFO) << "--distortion model:" << cam_right_ptr_->distortion_model_;
-  LOG(INFO) << "--distortion_coefficients:\n" << cam_right_ptr_->D_;
-  LOG(INFO) << "--rectification_matrix:\n" <<  cam_right_ptr_->RectMat_;
-  LOG(INFO) << "--projection_matrix:\n" <<  cam_right_ptr_->P_;
-  LOG(INFO) << "============================================" << std::endl;
+  std::cout << "============================================" << std::endl;
+  std::cout << "Right Camera:" << std::endl;
+  std::cout << "--image_width: " << cam_right_ptr_->width_;
+  std::cout << "--image_height: " << cam_right_ptr_->height_;
+  std::cout << "--distortion model:" << cam_right_ptr_->distortion_model_;
+  std::cout << "--distortion_coefficients:\n" << cam_right_ptr_->D_;
+  std::cout << "--rectification_matrix:\n" <<  cam_right_ptr_->RectMat_;
+  std::cout << "--projection_matrix:\n" <<  cam_right_ptr_->P_;
+  std::cout << "============================================" << std::endl;
 }
 
 } // container

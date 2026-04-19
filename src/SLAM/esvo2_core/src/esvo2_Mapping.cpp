@@ -1,9 +1,9 @@
 #include <esvo2_core/esvo2_Mapping.h>
 #include <esvo2_core/factor/pose_local_parameterization.h>
 #include <esvo2_core/factor/utility.h>
-#include <minkindr_conversions/kindr_tf.h>
+// #include <minkindr_conversions/kindr_tf.h>
 
-#include <geometry_msgs/TransformStamped.h>
+// #include <geometry_msgs/TransformStamped.h>
 
 #include <opencv2/imgproc.hpp>
 
@@ -20,16 +20,18 @@
 
 #include <data_passing.h>
 #include <multi_data_passing.h>
+#include <esvo2_core/tools/utils.h>
+#include <esvo2_core/tools/types.h>
 
 // #define ESVO2_CORE_MAPPING_DEBUG
 // #define ESVO2_CORE_MAPPING_LOG
 
 namespace esvo2_core
 {
-esvo2_Mapping::esvo2_Mapping(const YAML::Node &config, 
+esvo2_Mapping::esvo2_Mapping(std::atomic<bool> &is_running_, const YAML::Node &config, 
             DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track,
             DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track)
-    : config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
+    : is_running(is_running_), config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
       camSysPtr_(new CameraSystem(calibInfoDir_, false)),
       dpConfigPtr_(new DepthProblemConfig(
           config_["patch_size_X"].as<int>(5), config_["patch_size_Y"].as<int>(5),
@@ -55,7 +57,6 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     //queues
     // this->v_ba_bg_Map_to_Track = v_ba_bg_Map_to_Track;
     this->pointcloud_Map_to_Track = pointcloud_Map_to_Track;
-
     // frame id
     dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
     world_frame_id_ = config_["world_frame_id"].as<std::string>("world");
@@ -84,7 +85,7 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     maxNumFusionFrames_ln_ = config_["maxNumFusionFrames_ln"].as<int>(10);
     FusionStrategy_ = config_["FUSION_STRATEGY"].as<std::string>("CONST_FRAMES");
     maxNumFusionPoints_ = config_["maxNumFusionPoints"].as<int>(2000);
-    INIT_SGM_DP_NUM_Threshold_ = config_["INIT_SGM_DP_NUM_THRESHOLD"].as<int>(500);
+    INIT_SGM_DP_NUM_Threshold_ = config_["INIT_SGM_DP_NUM_THRESHOLD"].as<std::size_t>(500);
 
     // options
     bDenoising_ = config_["Denoising"].as<bool>(false);
@@ -135,14 +136,14 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     // calcualte the min,max disparity of static block matching
     double f = (camSysPtr_->cam_left_ptr_->P_(0, 0) + camSysPtr_->cam_left_ptr_->P_(1, 1)) / 2;
     double b = camSysPtr_->baseline_;
-    size_t minDisparity = max(size_t(std::floor(f * b * invDepth_min_range_)), (size_t)0);
-    size_t maxDisparity = size_t(std::ceil(f * b * invDepth_max_range_));
-    minDisparity = max(minDisparity, BM_min_disparity_);
-    maxDisparity = min(maxDisparity, BM_max_disparity_);
+    std::size_t minDisparity = std::max(std::size_t(std::floor(f * b * invDepth_min_range_)), (std::size_t)0);
+    std::size_t maxDisparity = std::size_t(std::ceil(f * b * invDepth_max_range_));
+    minDisparity = std::max(minDisparity, BM_min_disparity_);
+    maxDisparity = std::min(maxDisparity, BM_max_disparity_);
 
     // Backend parameters
     initFirstPoseFlag = false;
-    prevTime = 0;
+    prevTime = 0; //\Users\jackm\Desktop\nova\vcpkg\buildtrees\openeb\src\5.2.0-b808f57c67.clean\sdk\modules\stream\cpp\samples\metavision_file_to_dat\build\build>
     first_imu = false;
 
     // initialize Event Batch Matcher
@@ -165,8 +166,8 @@ esvo2_Mapping::esvo2_Mapping(const YAML::Node &config,
     //         "events_left", 0, boost::bind(&esvo2_Mapping::eventsCallback, this, _1, boost::ref(events_left_)));
 
     // IMU
-    if (bUSE_IMU_)
-        imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Mapping::refImuCallback, this);
+    // if (bUSE_IMU_)
+        // imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Mapping::refImuCallback, this);
 
     // TF
     tf_ = std::make_shared<esvo2_core::Transformer>(100);
@@ -210,20 +211,96 @@ esvo2_Mapping::~esvo2_Mapping()
 
 void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<void> future_reset)
 {
-    ros::Rate r(mapping_rate_hz_);
-    while (ros::ok())
+    // ros::Rate r(mapping_rate_hz_);
+    // while (ros::ok())
+    // {
+    //     // reset mapping rate
+    //     if (changed_frame_rate_)
+    //     {
+    //         r = ros::Rate(mapping_rate_hz_);
+    //         changed_frame_rate_ = false;
+    //     }
+
+    //     // check system status
+    //     if (getSystemStatus() == SystemStatus::TERMINATE)
+    //     {
+    //         std::cout << "The Mapping node is terminated manually...";
+    //         break;
+    //     }
+
+    //     // To assure the esvo2_time_surface node has been working
+    //     if (TS_history_.size() >= 10)
+    //     {
+    //         TicToc total_mapping;
+    //         while (true)
+    //         {
+    //             if (data_mutex_.try_lock())
+    //             {
+    //                 dataTransferring();
+    //                 data_mutex_.unlock();
+    //                 break;
+    //             }
+    //             else
+    //             {
+    //                 if (future_reset.wait_for(std::chrono::nanoseconds(1)) == std::future_status::ready)
+    //                 {
+    //                     prom_mapping.set_value();
+    //                     return;
+    //                 }
+    //             }
+    //         }
+
+    //         // To check if the most current TS observation has been loaded by dataTransferring()
+    //         if (TS_obs_ptr_->second.isEmpty())
+    //         {
+    //             r.sleep();
+    //             continue;
+    //         }
+
+    //         // Do initialization (State Machine)
+    //         if (getSystemStatus() == SystemStatus::INITIALIZATION || getSystemStatus() == SystemStatus::RESET)
+    //         {
+    //             if (InitializationAtTime(TS_obs_ptr_->first))
+    //             {
+    //                 std::cout << "Initialization is successfully done!"; //(" << INITIALIZATION_COUNTER_ << ").";
+    //             }
+    //             else
+    //                 std::cout << "Initialization fails once.";
+    //         }
+    //         double Data_transfer = total_mapping.toc();
+
+    //         // Do mapping
+    //         if (getSystemStatus() == SystemStatus::WORKING)
+    //             MappingAtTime(TS_obs_ptr_->first);
+
+    //         BackendOpt_.slideWindow();
+    //     }
+    //     else
+    //     {
+    //         if (future_reset.wait_for(std::chrono::nanoseconds(1)) == std::future_status::ready)
+    //         {
+    //             prom_mapping.set_value();
+    //             return;
+    //         }
+    //     }
+    //     r.sleep();
+    // }
+
+    std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/mapping_rate_hz_));
+    timePoint next_wake_up_time = std::chrono::steady_clock::now();
+    while (is_running)
     {
         // reset mapping rate
         if (changed_frame_rate_)
         {
-            r = ros::Rate(mapping_rate_hz_);
+            interval = std::chrono::nanoseconds(static_cast<long long>(1e9/mapping_rate_hz_));
             changed_frame_rate_ = false;
         }
 
         // check system status
         if (getSystemStatus() == SystemStatus::TERMINATE)
         {
-            LOG(INFO) << "The Mapping node is terminated manually...";
+            std::cout << "The Mapping node is terminated manually..." << std::endl;
             break;
         }
 
@@ -252,7 +329,8 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             // To check if the most current TS observation has been loaded by dataTransferring()
             if (TS_obs_ptr_->second.isEmpty())
             {
-                r.sleep();
+                next_wake_up_time += interval;
+                std::this_thread::sleep_until(next_wake_up_time);
                 continue;
             }
 
@@ -261,10 +339,10 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             {
                 if (InitializationAtTime(TS_obs_ptr_->first))
                 {
-                    LOG(INFO) << "Initialization is successfully done!"; //(" << INITIALIZATION_COUNTER_ << ").";
+                    std::cout << "Initialization is successfully done!"<<std::endl;
                 }
                 else
-                    LOG(INFO) << "Initialization fails once.";
+                    std::cout << "Initialization fails once."<<std::endl;
             }
             double Data_transfer = total_mapping.toc();
 
@@ -282,7 +360,8 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
                 return;
             }
         }
-        r.sleep();
+        next_wake_up_time += interval;
+        std::this_thread::sleep_until(next_wake_up_time);
     }
 }
 
@@ -383,7 +462,7 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
     double t_optimization = 0;
     double t_solve, t_fusion, t_regularization;
     t_solve = t_fusion = t_regularization = 0;
-    size_t numFusionCount = 0, numFusionCount_ln = 0; // To count the total number of fusion (in terms of fusion between
+    std::size_t numFusionCount = 0, numFusionCount_ln = 0; // To count the total number of fusion (in terms of fusion between
                                                       // two estimates, i.e. a priori and a propagated one).
     tt_mapping.tic();
 
@@ -404,16 +483,16 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
 
     if (FusionStrategy_ == "CONST_POINTS") // Fusion (strategy 1: const number of point)
     {
-        size_t numFusionPoints = 0;
+        std::size_t numFusionPoints = 0;
         DepthPointFrame vdpf(t, vdp);
         dqvDepthPoints_.push_back(vdpf);
-        for (size_t n = 0; n < dqvDepthPoints_.size(); n++)
+        for (std::size_t n = 0; n < dqvDepthPoints_.size(); n++)
             numFusionPoints += dqvDepthPoints_[n].size();
         while (numFusionPoints > 1.5 * maxNumFusionPoints_)
         {
             dqvDepthPoints_.pop_front();
             numFusionPoints = 0;
-            for (size_t n = 0; n < dqvDepthPoints_.size(); n++)
+            for (std::size_t n = 0; n < dqvDepthPoints_.size(); n++)
                 numFusionPoints += dqvDepthPoints_[n].size();
         }
     }
@@ -428,7 +507,7 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
             dqvDepthPoints_ln_.pop_front();
     }
     else
-        LOG(INFO) << "Invalid FusionStrategy is assigned.";
+        std::cout << "Invalid FusionStrategy is assigned.";
 
     // apply fusion and count the total number of fusion.
     numFusionCount = 0;
@@ -474,7 +553,7 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
     TicToc t_optimize;
     if (dqvDepthPoints_.size() >= WINDOW_SIZE + 1 && bUSE_IMU_ == true)
     {
-        BackendOpt_.setProblem(&dqvDepthPoints_, &TS_history_, &V_ba_bg_pub_, bUSE_IMU_);
+        BackendOpt_.setProblem(&dqvDepthPoints_, &TS_history_, bUSE_IMU_);
         BackendOpt_.sloveProblem();
     }
     double time_optimize = t_optimize.toc();
@@ -484,32 +563,32 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
                                       depthFramePtr_->T_world_frame_, t);
     tPublishMappingResult.detach();
 #ifdef ESVO2_CORE_MAPPING_LOG
-    LOG(INFO) << "\n";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "--------------Computation Cost (Mapping)---------------------";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "Denoising: " << t_BM_denoising << " ms, (" << t_BM_denoising / t_overall_count * 100 << "%).";
-    LOG(INFO) << "Point Selection (BM): " << t_BM_select << " ms, (" << t_BM_select / t_overall_count * 100 << "%).";
-    LOG(INFO) << "Block Matching (BM): " << t_BM << " ms, (" << t_BM / t_overall_count * 100 << "%).";
-    LOG(INFO) << "BM success ratio: " << vEMP.size() + vEMP_last.size() << "/" << totalNumCount_
+    std::cout << "\n";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "--------------Computation Cost (Mapping)---------------------";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "Denoising: " << t_BM_denoising << " ms, (" << t_BM_denoising / t_overall_count * 100 << "%).";
+    std::cout << "Point Selection (BM): " << t_BM_select << " ms, (" << t_BM_select / t_overall_count * 100 << "%).";
+    std::cout << "Block Matching (BM): " << t_BM << " ms, (" << t_BM / t_overall_count * 100 << "%).";
+    std::cout << "BM success ratio: " << vEMP.size() + vEMP_last.size() << "/" << totalNumCount_
               << "(Successes/Total).";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "Update: " << t_optimization << " ms, (" << t_optimization / t_overall_count * 100 << "%).";
-    LOG(INFO) << "-- compute variance: " << t_solve << " ms, (" << t_solve / t_overall_count * 100 << "%).";
-    LOG(INFO) << "-- fusion (" << numFusionCount << ", " << TotalNumFusion_ << "): " << t_fusion << " ms, ("
+    std::cout << "------------------------------------------------------------";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "Update: " << t_optimization << " ms, (" << t_optimization / t_overall_count * 100 << "%).";
+    std::cout << "-- compute variance: " << t_solve << " ms, (" << t_solve / t_overall_count * 100 << "%).";
+    std::cout << "-- fusion (" << numFusionCount << ", " << TotalNumFusion_ << "): " << t_fusion << " ms, ("
               << t_fusion / t_overall_count * 100 << "%).";
-    LOG(INFO) << "-- regularization: " << t_regularization << " ms, (" << t_regularization / t_overall_count * 100
+    std::cout << "-- regularization: " << t_regularization << " ms, (" << t_regularization / t_overall_count * 100
               << "%).";
-    LOG(INFO) << "-- time_optimize: " << time_optimize << " ms, (" << time_optimize / t_overall_count * 100 << "%).";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "Total Computation (" << depthFramePtr_->dMap_->size() << "): " << t_overall_count << " ms. ----"
+    std::cout << "-- time_optimize: " << time_optimize << " ms, (" << time_optimize / t_overall_count * 100 << "%).";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "Total Computation (" << depthFramePtr_->dMap_->size() << "): " << t_overall_count << " ms. ----"
               << mapping_cost.toc() << " ms";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "------------------------------END---------------------------";
-    LOG(INFO) << "------------------------------------------------------------";
-    LOG(INFO) << "\n";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "------------------------------END---------------------------";
+    std::cout << "------------------------------------------------------------";
+    std::cout << "\n";
 #endif
 }
 
@@ -529,17 +608,17 @@ bool esvo2_Mapping::InitializationAtTime(const timePoint &t)
 
     // get the event map (binary mask)
     cv::Mat edgeMap;
-    std::vector<std::pair<size_t, size_t>> vEdgeletCoordinates;
+    std::vector<std::pair<std::size_t, std::size_t>> vEdgeletCoordinates;
     createEdgeMask(vEventsPtr_left_SGM_, camSysPtr_->cam_left_ptr_, edgeMap, vEdgeletCoordinates, true, 0);
 
     // Apply logical "AND" operation and transfer "disparity" to "invDepth".
     std::vector<DepthPoint> vdp_sgm;
     vdp_sgm.reserve(vEdgeletCoordinates.size());
     double var_SGM = pow(0.001, 2);
-    for (size_t i = 0; i < vEdgeletCoordinates.size(); i++)
+    for (std::size_t i = 0; i < vEdgeletCoordinates.size(); i++)
     {
-        size_t x = vEdgeletCoordinates[i].first;
-        size_t y = vEdgeletCoordinates[i].second;
+        std::size_t x = vEdgeletCoordinates[i].first;
+        std::size_t y = vEdgeletCoordinates[i].second;
 
         double disp = dispMap.at<short>(y, x) / 16.0;
         if (disp < 0)
@@ -560,7 +639,7 @@ bool esvo2_Mapping::InitializationAtTime(const timePoint &t)
         dp.updatePose(T_world_cam);
         vdp_sgm.push_back(dp);
     }
-    LOG(INFO) << vEventsPtr_left_SGM_.size() << "********** Initialization (SGM) returns " << vdp_sgm.size()
+    std::cout << vEventsPtr_left_SGM_.size() << "********** Initialization (SGM) returns " << vdp_sgm.size()
               << " points.";
     if (vdp_sgm.size() < INIT_SGM_DP_NUM_Threshold_)
         return false;
@@ -686,7 +765,7 @@ bool esvo2_Mapping::dataTransferring()
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
-        const size_t MAX_NUM_Event_INVOLVED = 30000;
+        const std::size_t MAX_NUM_Event_INVOLVED = 30000;
         vEventsPtr_left_SGM_.reserve(MAX_NUM_Event_INVOLVED);
         while (ev_begin_it != ev_end_it && vEventsPtr_left_SGM_.size() <= PROCESS_EVENT_NUM_)
         {
@@ -707,8 +786,8 @@ bool esvo2_Mapping::dataTransferring()
         timePoint t_end, t_begin;
         if (bpoints_from_AA_)
         {
-            t_end = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) + 0.005);
-            t_begin = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) - 0.005);
+            t_end = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) + 0.005);
+            t_begin = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(TS_obs_ptr_->first) - 0.005);
         }
         else
         {
@@ -717,7 +796,7 @@ bool esvo2_Mapping::dataTransferring()
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
-        const size_t MAX_NUM_Event_INVOLVED = PROCESS_EVENT_NUM_;
+        const std::size_t MAX_NUM_Event_INVOLVED = PROCESS_EVENT_NUM_;
         vALLEventsPtr_left_.reserve(MAX_NUM_Event_INVOLVED);
         vCloseEventsPtr_left_.reserve(MAX_NUM_Event_INVOLVED);
         while (ev_end_it != ev_begin_it && vALLEventsPtr_left_.size() < MAX_NUM_Event_INVOLVED)
@@ -728,9 +807,9 @@ bool esvo2_Mapping::dataTransferring()
         }
         totalNumCount_ = vCloseEventsPtr_left_.size();
 #ifdef ESVO2_CORE_MAPPING_DEBUG
-        LOG(INFO) << "Data Transferring (events_left_): " << events_left_.size();
-        LOG(INFO) << "Data Transferring (vALLEventsPtr_left_): " << vALLEventsPtr_left_.size();
-        LOG(INFO) << "Data Transforming (vCloseEventsPtr_left_): " << vCloseEventsPtr_left_.size();
+        std::cout << "Data Transferring (events_left_): " << events_left_.size();
+        std::cout << "Data Transferring (vALLEventsPtr_left_): " << vALLEventsPtr_left_.size();
+        std::cout << "Data Transforming (vCloseEventsPtr_left_): " << vCloseEventsPtr_left_.size();
 #endif
         if (vCloseEventsPtr_left_.size() < 100)
         {
@@ -738,7 +817,7 @@ bool esvo2_Mapping::dataTransferring()
         }
 
 #ifdef ESVO2_CORE_MAPPING_DEBUG
-        LOG(INFO) << "Data Transferring (stampTransformation map): " << st_map_.size();
+        std::cout << "Data Transferring (stampTransformation map): " << st_map_.size();
 #endif
     }
     return true;
@@ -758,7 +837,7 @@ void esvo2_Mapping::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseSt
         const double dt = esvo2_core::timePointToSec(stamp_first_event) - esvo2_core::timePointToSec(tf_lastest_common_time_);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
-            ROS_INFO("Inconsistent event timestamps detected <stampedPoseCallback> (new: %f, old %f), resetting.",
+            printf("Inconsistent event timestamps detected <stampedPoseCallback> (new: %f, old %f), resetting. \n",
                      esvo2_core::timePointToSec(stamp_first_event), esvo2_core::timePointToSec(tf_lastest_common_time_));
             reset();
         }
@@ -780,7 +859,7 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
     if (!tf_->canTransform(world_frame_id_, source_frame, t, err_msg))
     {
 #ifdef ESVO2_CORE_MAPPING_LOG
-        LOG(WARNING) << t.toNSec() << " : " << *err_msg;
+        std::cout<<"WARNING:" << t.toNSec() << " : " << *err_msg<<std::endl;
 #endif
         delete err_msg;
         return false;
@@ -801,16 +880,16 @@ void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray>
     std::lock_guard<std::mutex> lock(data_mutex_);
 
     static constexpr double max_time_diff_before_reset_s = 0.5;
-    const timePoint stamp_first_event = msg->events[0].ts;
+    const timePoint stamp_first_event = msg->events[0].timestamp;
 
     // check timestamp consistency
     if (!msg->events.empty() && !EQ.empty())
     {
-        const double dt = esvo2_core::timePointToSec(stamp_first_event) - esvo2_core::timePointToSec(EQ.back().ts);
+        const double dt = esvo2_core::timePointToSec(stamp_first_event) - esvo2_core::timePointToSec(EQ.back().timestamp);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
         {
             printf("Inconsistent event timestamps detected <eventCallback> (new: %f, old %f), resetting.",
-                     esvo2_core::timePointToSec(stamp_first_event), esvo2_core::timePointToSec(events_left_.back().ts));
+                     esvo2_core::timePointToSec(stamp_first_event), esvo2_core::timePointToSec(events_left_.back().timestamp));
             reset();
         }
     }
@@ -825,7 +904,7 @@ void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray>
             continue;
         EQ.push_back(e);
         int i = EQ.size() - 2;
-        while (i >= 0 && EQ[i].ts > e.ts) // we may have to sort the queue, just in case the raw event messages do not
+        while (i >= 0 && EQ[i].ts > e.timestamp) // we may have to sort the queue, just in case the raw event messages do not
                                           // come in a chronological order.
         {
             EQ[i + 1] = EQ[i];
@@ -838,10 +917,10 @@ void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray>
 
 void esvo2_Mapping::clearEventQueue(EventQueue &EQ)
 {
-    static constexpr size_t MAX_EVENT_QUEUE_LENGTH = 3000000;
+    static constexpr std::size_t MAX_EVENT_QUEUE_LENGTH = 3000000;
     if (EQ.size() > MAX_EVENT_QUEUE_LENGTH)
     {
-        size_t NUM_EVENTS_TO_REMOVE = EQ.size() - MAX_EVENT_QUEUE_LENGTH;
+        std::size_t NUM_EVENTS_TO_REMOVE = EQ.size() - MAX_EVENT_QUEUE_LENGTH;
         EQ.erase(EQ.begin(), EQ.begin() + NUM_EVENTS_TO_REMOVE);
     }
 }
@@ -912,14 +991,14 @@ void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
         }
     }
 
-    cv::Mat cv_ptr_left;//, cv_ptr_right; ptr_right is unused
-    cv_ptr_left = *(AA_left.image); //cv_bridge::toCvCopy(AA_left, sensor_msgs::image_encodings::MONO8);
+    esvo2_core::ImagePtr cv_ptr_left;//, cv_ptr_right; ptr_right is unused
+    cv_ptr_left = AA_left; //cv_bridge::toCvCopy(AA_left, sensor_msgs::image_encodings::MONO8);
 
     // select the pixels with high event frequency
     int num_of_resultImg = 0, drift_t = 0;
     double persent_of_point = 1;
     EventQueue EQ_tmp;
-    cv::Mat resultImg = cv_ptr_left->image.clone();
+    cv::Mat resultImg = cv_ptr_left.image->clone();
 
     std::vector<std::vector<std::pair<int, cv::Point>>> roi_events(x_patches_ * y_patches_);
     std::vector<int> num_of_roi(x_patches_ * y_patches_, 0);
@@ -940,21 +1019,24 @@ void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
         }
     }
     std::vector<double> ratios(x_patches_ * y_patches_, 0);
-    cv::Mat events_map = cv::Mat::zeros(cv_ptr_left->image.size(), cv_ptr_left->image.type());
+    cv::Mat events_map = cv::Mat::zeros(cv_ptr_left.image->size(), cv_ptr_left.image->type());
     cv::cvtColor(events_map, events_map, cv::COLOR_GRAY2BGR);
+    // Source - https://stackoverflow.com/a/6926473
+    auto rd = std::random_device {}; 
+    auto rng = std::default_random_engine { rd() };
     for (int i = 0; i < (x_patches_ * y_patches_); i++)
     {
         // shuffle and sort the event points to ensure sampling uniformity as much as possible
-        random_shuffle(roi_events[i].begin(), roi_events[i].end());
+        std::shuffle(roi_events[i].begin(), roi_events[i].end(), rng);
         sort(roi_events[i].begin(), roi_events[i].end(),
              [](std::pair<double, cv::Point> a, std::pair<double, cv::Point> b) { return (a.first > b.first); });
         ratios[i] = (double)num_of_roi[i] / (double)num_of_resultImg * 0.75;
-        for (int j = 0; j < std::min((size_t)(PROCESS_EVENT_NUM_AA_ * ratios[i]), roi_events[i].size() / 2); j++)
+        for (int j = 0; j < std::min((std::size_t)(PROCESS_EVENT_NUM_AA_ * ratios[i]), roi_events[i].size() / 2); j++)
         {
             Event e;
             e.x = roi_events[i][j].second.x;
             e.y = roi_events[i][j].second.y;
-            e.ts = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(AA_left.header_stamp) + 0.0000001);
+            e.timestamp = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(AA_left.header_stamp) + 0.0000001);
             EQ_tmp.push_back(e);
             drift_t++;
             AA.at<uchar>(e.y, e.x) = 255;
@@ -969,14 +1051,14 @@ void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
         {
             persent_of_point = std::min(((double)empty_num) / x_patches_ * y_patches_, 1.);
             for (int j = num_processed[i];
-                 j < std::min((size_t)(PROCESS_EVENT_NUM_AA_ * ratios[i]) + empty_num / (x_patches_ * y_patches_),
+                 j < std::min((std::size_t)(PROCESS_EVENT_NUM_AA_ * ratios[i]) + empty_num / (x_patches_ * y_patches_),
                               roi_events[i].size() / 2);
                  j++)
             {
                 Event e;
                 e.x = roi_events[i][j].second.x;
                 e.y = roi_events[i][j].second.y;
-                e.ts = esvo2_core::secondToTimePoint(esvo2_core::timePointToSec(AA_left->header.stamp) + 0.0000001);
+                e.timestamp = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(AA_left.header_stamp) + 0.0000001);
                 EQ_tmp.push_back(e);
                 drift_t++;
                 AA.at<uchar>(e.y, e.x) = 255;
@@ -1010,11 +1092,11 @@ void esvo2_Mapping::refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &ms
 void esvo2_Mapping::reset()
 {
     // mutual-thread communication with MappingThread.
-    LOG(INFO) << "Coming into reset()";
+    std::cout << "Coming into reset()";
     reset_promise_.set_value();
-    LOG(INFO) << "(reset) The mapping thread future is waiting for the value.";
+    std::cout << "(reset) The mapping thread future is waiting for the value.";
     mapping_thread_future_.get();
-    LOG(INFO) << "(reset) The mapping thread future receives the value.";
+    std::cout << "(reset) The mapping thread future receives the value.";
 
     // clear all maintained data
     events_left_.clear();
@@ -1033,10 +1115,10 @@ void esvo2_Mapping::reset()
                          BM_ZNCC_Threshold_, BM_bUpDownConfiguration_, BM_patch_size_X_2_, BM_patch_size_Y_2_);
 
     for (int i = 0; i < 2; i++)
-        LOG(INFO) << "****************************************************";
-    LOG(INFO) << "****************** RESET THE SYSTEM *********************";
+        std::cout << "****************************************************";
+    std::cout << "****************** RESET THE SYSTEM *********************";
     for (int i = 0; i < 2; i++)
-        LOG(INFO) << "****************************************************\n\n";
+        std::cout << "****************************************************\n\n";
 
     // restart the mapping thread
     reset_promise_ = std::promise<void>();
@@ -1076,8 +1158,8 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
         }
         if (FusionStrategy_ == "CONST_POINTS")
         {
-            size_t numFusionPoints = 0;
-            for (size_t n = 0; n < dqvDepthPoints_.size(); n++)
+            std::size_t numFusionPoints = 0;
+            for (std::size_t n = 0; n < dqvDepthPoints_.size(); n++)
                 numFusionPoints += dqvDepthPoints_[n].size();
             if (numFusionPoints > 0.5 * maxNumFusionPoints_)
                 publishPointCloud(depthMapPtr, tr, t);
@@ -1141,7 +1223,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         // pc_pub_.publish(pc_to_publish);
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_local_2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
         *pointcloud_local_2 = *pc_color_;
-        pointcloud_Map_to_Track.add(pointcloud_local_2, t);
+        pointcloud_Map_to_Track->add(pointcloud_local_2, t);
     }
     if (!pc_filtered_->empty())
     {
@@ -1170,10 +1252,10 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
             sor.filter(*pc_filtered);
 
             // copy the most current pc tp pc_global
-            size_t pc_length = pc_filtered->size();
-            size_t numAddedPC = min(pc_length, numAddedPC_threshold_) - 1;
+            std::size_t pc_length = pc_filtered->size();
+            std::size_t numAddedPC = min(pc_length, numAddedPC_threshold_) - 1;
             pc_global_->insert(pc_global_->end(), pc_filtered->end() - numAddedPC, pc_filtered->end());
-            pcl::PCDWriter writer;
+            // pcl::PCDWriter writer; // This was unused
 
             // publish point cloud
             // pcl::toROSMsg(*pc_global_, *pc_to_publish);
@@ -1189,14 +1271,13 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
     }
 }
 
-void esvo2_Mapping::publishImage(const cv::Mat &image, const timePoint &t, image_transport::Publisher &pub,
-                                 std::string encoding)
+void esvo2_Mapping::publishImage(const cv::Mat &image, const timePoint &t, std::string encoding)
 {
-    if (pub.getNumSubscribers() == 0)
-        return;
+    // if (pub.getNumSubscribers() == 0)
+        // return;
 
-    std_msgs::Header header;
-    header.stamp = t;
+    // std_msgs::Header header;
+    // header.stamp = t;
     // VIZ PUBLISH -> not being used right now, so are commenting it out. Was used to publish the inv depth map
 
     // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, encoding.c_str(), image).toImageMsg();
@@ -1204,11 +1285,11 @@ void esvo2_Mapping::publishImage(const cv::Mat &image, const timePoint &t, image
 }
 
 void esvo2_Mapping::createEdgeMask(std::vector<Event *> &vEventsPtr, PerspectiveCamera::Ptr &camPtr, cv::Mat &edgeMap,
-                                   std::vector<std::pair<size_t, size_t>> &vEdgeletCoordinates, bool bUndistortEvents,
-                                   size_t radius)
+                                   std::vector<std::pair<std::size_t, std::size_t>> &vEdgeletCoordinates, bool bUndistortEvents,
+                                   std::size_t radius)
 {
-    size_t col = camPtr->width_;
-    size_t row = camPtr->height_;
+    std::size_t col = camPtr->width_;
+    std::size_t row = camPtr->height_;
     int dilate_radius = (int)radius;
     edgeMap = cv::Mat(cv::Size(col, row), CV_8UC1, cv::Scalar(0));
     vEdgeletCoordinates.reserve(col * row);
@@ -1239,14 +1320,14 @@ void esvo2_Mapping::createEdgeMask(std::vector<Event *> &vEventsPtr, Perspective
                 else
                 {
                     edgeMap.at<uchar>(y, x) = 255;
-                    vEdgeletCoordinates.emplace_back((size_t)x, (size_t)y);
+                    vEdgeletCoordinates.emplace_back((std::size_t)x, (std::size_t)y);
                 }
             }
         it_tmp++;
     }
 }
 
-void esvo2_Mapping::createDenoisingMask(std::vector<Event *> &vAllEventsPtr, cv::Mat &mask, size_t row, size_t col)
+void esvo2_Mapping::createDenoisingMask(std::vector<Event *> &vAllEventsPtr, cv::Mat &mask, std::size_t row, std::size_t col)
 {
     cv::Mat eventMap;
     visualizor_.plot_eventMap(vAllEventsPtr, eventMap, row, col);
@@ -1254,18 +1335,18 @@ void esvo2_Mapping::createDenoisingMask(std::vector<Event *> &vAllEventsPtr, cv:
 }
 
 void esvo2_Mapping::extractDenoisedEvents(std::vector<Event *> &vCloseEventsPtr, std::vector<Event *> &vEdgeEventsPtr,
-                                          cv::Mat &mask, size_t maxNum)
+                                          cv::Mat &mask, std::size_t maxNum)
 {
     vEdgeEventsPtr.reserve(vCloseEventsPtr.size());
-    for (size_t i = 0; i < vCloseEventsPtr.size(); i++)
+    for (std::size_t i = 0; i < vCloseEventsPtr.size(); i++)
     {
         if (vEdgeEventsPtr.size() >= maxNum)
             break;
         if (vCloseEventsPtr[i]->x > mask.cols || vCloseEventsPtr[i]->y > mask.rows || vCloseEventsPtr[i]->x < 0 ||
             vCloseEventsPtr[i]->y < 0)
             continue;
-        size_t x = vCloseEventsPtr[i]->x;
-        size_t y = vCloseEventsPtr[i]->y;
+        std::size_t x = vCloseEventsPtr[i]->x;
+        std::size_t y = vCloseEventsPtr[i]->y;
         if (mask.at<uchar>(y, x) == 255)
             vEdgeEventsPtr.push_back(vCloseEventsPtr[i]);
     }
@@ -1375,12 +1456,12 @@ bool esvo2_Mapping::getIMUInterval(double t0, double t1, vector<pair<double, Eig
 
 void esvo2_Mapping::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector)
 {
-    LOG(INFO) << "init first imu pose";
+    std::cout << "init first imu pose";
     initFirstPoseFlag = true;
     // return;
     Eigen::Vector3d averAcc(0, 0, 0);
     int n = (int)accVector.size();
-    for (size_t i = 0; i < accVector.size(); i++)
+    for (std::size_t i = 0; i < accVector.size(); i++)
     {
         averAcc = averAcc + accVector[i].second;
     }

@@ -91,6 +91,16 @@ struct ImagePtr
     timePoint header_stamp;
     std::shared_ptr<cv::Mat> image;
     public:
+        ImagePtr() {}
+        ImagePtr& operator=(const ImagePtr& other)
+        {
+                if(this == &other)
+                        return *this;
+                this->header_stamp = other.header_stamp;
+                this->image = std::make_shared<cv::Mat>();
+                *(this->image) = other.image->clone();
+                return *this;
+        }
         ImagePtr(std::shared_ptr<cv::Mat> image, std::chrono::time_point<std::chrono::steady_clock> time)
         {
             this->image = image;
@@ -114,8 +124,8 @@ public:
         }
         Transform(const Transform& other)
         {
-                this->rot = other->rot;
-                this->trans = other->trans;
+                this->rot = other.rot;
+                this->trans = other.trans;
         }
         Transform(double qx, double qy, double qz, double qw, double x, double y, double z)
         {
@@ -132,6 +142,7 @@ public:
 struct StampedTransform : Transform
 {
 public:
+        StampedTransform() {}
         StampedTransform(timePoint timestamp_)
         : timestamp(timestamp_)
         {}
@@ -168,7 +179,7 @@ public:
         void toKindrTransformation(Transformation& kindr_tf)
         {
                 Eigen::Matrix<double, 3, 1> kindr_pos(trans.x, trans.y, trans.z);
-                kinder::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
+                kindr::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
                 
                 // Enforce positive w.
                 if (kindr_rot.w() < 0) {
@@ -177,7 +188,7 @@ public:
                 }
                 kindr_rot.normalize();
 
-               kindr_tf = Transformation(kindr_rot, pos);
+               kindr_tf = Transformation(kindr_rot, kindr_pos);
         }
 };
 
@@ -190,6 +201,11 @@ public:
         Transformer(long long max_time_seconds) 
         : max_duration_seconds(std::chrono::seconds(max_duration_seconds))
         {}
+
+        void clear()
+        {
+                transform_buffer.clear();
+        }
 
         // Adds a transform to the set
         void setTransform(StampedTransform tran)
@@ -222,13 +238,16 @@ public:
         }
 
         // Says if lookupTransform will be valid if called with timePoint t
-        bool canTransform(timePoint t)
+        bool canTransform(std::string from, std::string to, timePoint t, std::string* err)
         {
                 StampedTransform test(t);
                 auto right = transform_buffer.lower_bound(test);
                 // Nothing is greater than t, so cannot lerp
                 if(right == transform_buffer.end())
+                {
+                        *err = "nothing greater than timestamp";
                         return false;
+                }
                 // Right exactly equals t, so can just return right
                 if(right->timestamp == t)
                         return true;
@@ -236,11 +255,12 @@ public:
                 if(right!=transform_buffer.begin())
                         return true;
                 // Nothing is less than t, so cannot lerp
+                *err = "Nothing less than timestamp";
                 return false;
         }
 
         // Lerps betwen poses in the set to estimate the pose at t. Guaranteed to have canTransform called beforehand.
-        void lookupTransform(timePoint t, StampedTransform& st)
+        void lookupTransform(std::string from, std::string to, timePoint t, StampedTransform& st)
         {
 
                 StampedTransform timestamp_want(t);

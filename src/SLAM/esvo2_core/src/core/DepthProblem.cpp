@@ -308,7 +308,7 @@ bool DepthProblem::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 1: " << SrcPatch_UpLeft.transpose();
+      std::cout << "patchInterpolation 1: " << SrcPatch_UpLeft.transpose();
     }
     return false;
   }
@@ -316,7 +316,7 @@ bool DepthProblem::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 2: " << SrcPatch_DownRight.transpose();
+      std::cout << "patchInterpolation 2: " << SrcPatch_DownRight.transpose();
     }
     return false;
   }
@@ -340,7 +340,7 @@ bool DepthProblem::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 3: " << SrcPatch_UpLeft.transpose()
+      std::cout << "patchInterpolation 3: " << SrcPatch_UpLeft.transpose()
                 << ", location: " << location.transpose()
                 << ", floor(location[0]): " << floor(location[0])
                 << ", (wx - 1) / 2: " << (wx - 1) / 2
@@ -381,7 +381,7 @@ bool DepthProblem::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 1: " << SrcPatch_UpLeft.transpose();
+      std::cout << "patchInterpolation 1: " << SrcPatch_UpLeft.transpose();
     }
     return false;
   }
@@ -389,7 +389,7 @@ bool DepthProblem::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 2: " << SrcPatch_DownRight.transpose();
+      std::cout << "patchInterpolation 2: " << SrcPatch_DownRight.transpose();
     }
     return false;
   }
@@ -413,7 +413,7 @@ bool DepthProblem::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 3: " << SrcPatch_UpLeft.transpose()
+      std::cout << "patchInterpolation 3: " << SrcPatch_UpLeft.transpose()
                 << ", location: " << location.transpose()
                 << ", floor(location[0]): " << floor(location[0])
                 << ", (wx - 1) / 2: " << (wx - 1) / 2

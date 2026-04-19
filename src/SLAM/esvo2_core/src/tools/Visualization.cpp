@@ -79,7 +79,7 @@ void Visualization::plot_map(DepthMap::Ptr &depthMapPtr, VisMapType vmType, cv::
         break;
     }
     default: {
-        LOG(INFO) << "Wrong type chosed------------------";
+        std::cout << "Wrong type chosed------------------";
         exit(0);
     }
     }
@@ -149,7 +149,7 @@ void Visualization::plot_events(
         else
             event_img.at<uchar>(ycoor, xcoor) = 255;
         it++;
-        //    LOG(INFO) << xcoor << " " << ycoor;
+        //    std::cout << xcoor << " " << ycoor;
     }
 }
 

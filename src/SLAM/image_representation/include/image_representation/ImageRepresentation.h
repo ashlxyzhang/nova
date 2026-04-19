@@ -44,24 +44,24 @@ using GlobalEventQueue = std::map<timePoint, esvo2_core::Event, ROSTimeCmp>;
 inline static EventQueue::iterator EventBuffer_lower_bound(EventQueue &eb, timePoint &t)
 {
     return std::lower_bound(eb.begin(), eb.end(), t,
-                            [](const esvo2_core::Event &e, const timePoint &t) { return esvo2_core::timePointToSec(e.ts) < esvo2_core::timePointToSec(t); });
+                            [](const esvo2_core::Event &e, const timePoint &t) { return e.timestamp < t; });
 }
 
 inline static EventQueue::iterator EventBuffer_upper_bound(EventQueue &eb, timePoint &t)
 {
     return std::upper_bound(eb.begin(), eb.end(), t,
-                            [](const timePoint &t, const esvo2_core::Event &e) { return esvo2_core::timePointToSec(t) < esvo2_core::timePointToSec(e.ts); });
+                            [](const timePoint &t, const esvo2_core::Event &e) { return t < e.timestamp; });
 }
 
 inline static std::vector<esvo2_core::Event>::iterator EventVector_lower_bound(std::vector<esvo2_core::Event> &ev, double &t)
 {
-    return std::lower_bound(ev.begin(), ev.end(), t, [](const esvo2_core::Event &e, const double &t) { return esvo2_core::timePointToSec(e.ts) < t; });
+    return std::lower_bound(ev.begin(), ev.end(), t, [](const esvo2_core::Event &e, const double &t) { return esvo2_core::timePointToSec(e.timestamp) < t; });
 }
 
 class ImageRepresentation
 {
     public:
-        ImageRepresentation(const YAML::Node &config,  
+        ImageRepresentation(std::atomic<bool> &is_running_, const YAML::Node &config,  
             MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>*multi_to_Track, 
             MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
              DataPassingDeque<cv::Mat>* AA_left_IR_to_Map
@@ -70,18 +70,19 @@ class ImageRepresentation
 
         static bool compare_time(const esvo2_core::Event &e, const double reference_time)
         {
-            return reference_time < esvo2_core::timePointToSec(e.ts);
+            return reference_time < esvo2_core::timePointToSec(e.timestamp);
         }
 
     private:
         // message passing stuff
-
         // TSleft, TSnegative, dx, dy; All left only
         MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Track;
         // TSleft, TSright, AA MAP, TS neg, dx, dy; ALL left except for TSright!
         MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map;
         DataPassingDeque<cv::Mat>* AA_left_IR_to_Map; 
 
+        // Running variable
+        std::atomic<bool> &is_running;
 
         // configuration variables struct
         YAML::Node config_;

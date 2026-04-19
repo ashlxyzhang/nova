@@ -4,16 +4,23 @@
 // #include <esvo2_core/esvo2_Mapping.h>
 #include <esvo2_core/container/CameraSystem.h>
 #include <esvo2_core/container/DepthMap.h>
+#include <esvo2_core/container/DepthPoint.h>
 #include <esvo2_core/container/TimeSurfaceObservation.h>
 #include <esvo2_core/factor/OptimizationFunctor.h>
-#include <esvo2_core/factor/imu_factor.h>
-#include <esvo2_core/factor/pose_local_parameterization.h>
+// #include <esvo2_core/factor/imu_factor.h>
+// #include <esvo2_core/factor/pose_local_parameterization.h>
 #include <esvo2_core/tools/Visualization.h>
 #include <esvo2_core/tools/utils.h>
-#include <functional>
+#include <esvo2_core/factor/imu_integration.h>
+// #include <functional>
 #include <opencv4/opencv2/core.hpp>
 #include <opencv4/opencv2/imgproc.hpp>
 #include <esvo2_core/tools/types.h>
+#include <Eigen/Dense>
+
+#include "data_passing.h"
+#include <chrono>
+#include "types.h"
 
 namespace esvo2_core
 {
@@ -23,9 +30,10 @@ using namespace factor;
 namespace core
 {
 
-const int WINDOW_SIZE = 4;
-struct DepthPointFrame
-{
+    const int WINDOW_SIZE = 4;
+    struct DepthPointFrame
+    {
+        using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
         timePoint timestamp_;
         std::vector<DepthPoint> DepthPoints_;
 
@@ -39,7 +47,7 @@ struct DepthPointFrame
         {
             return DepthPoints_.size();
         }
-};
+    };
 
 class BackendOptimization
 {
@@ -48,8 +56,7 @@ class BackendOptimization
 
         BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track);
 
-        void setProblem(std::deque<DepthPointFrame> *dqvDepthPoints, TimeSurfaceHistory *pTS_history,
-                        std::function<void(const VBaBg &)> vBaBgCallback, bool bUSE_IMU);
+        void setProblem(std::deque<DepthPointFrame> *dqvDepthPoints, TimeSurfaceHistory *pTS_history, bool bUSE_IMU);
         void sloveProblem();
 
         void double2Vector(double para_Pose[][7], double para_SpeedBias[][9]);
@@ -75,8 +82,8 @@ class BackendOptimization
         CameraSystem::Ptr camSysPtr_;
         std::deque<DepthPointFrame> *pDepthPoints_;
         TimeSurfaceHistory *pTS_history_;
-        std::function<void(const VBaBg &)> vBaBgCallback_;
-        bool initVsFlag, bUSE_IMU_;
+        bool initVsFlag;
+        bool bUSE_IMU_;
 
         Eigen::Vector3d TIC_ = Eigen::Vector3d::Zero();
         Eigen::Matrix3d RIC_;
@@ -97,7 +104,7 @@ class BackendOptimization
         std::vector<double> time_of_pts_;
         Eigen::Matrix3d K_, K_of_pts_, K_pts_inv_;
         Eigen::Matrix4d T_rect_raw_;
-        const string world_frame_id_ = "world";
+        const std::string world_frame_id_ = "world";
         const std::string dvs_frame_id_ = "dvs";
         Eigen::Matrix4d T_wopt_window0_;
 };

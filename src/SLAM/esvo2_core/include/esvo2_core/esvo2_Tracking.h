@@ -1,15 +1,15 @@
 #ifndef ESVO2_CORE_TRACKING_H
 #define ESVO2_CORE_TRACKING_H
 
-#include <ros/ros.h>
+// #include <ros/ros.h>
 
-#include <message_filters/subscriber.h>
-#include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/sync_policies/exact_time.h>
-#include <message_filters/synchronizer.h>
-#include <sensor_msgs/Imu.h>
+// #include <message_filters/subscriber.h>
+// #include <message_filters/sync_policies/approximate_time.h>
+// #include <message_filters/sync_policies/exact_time.h>
+// #include <message_filters/synchronizer.h>
+// #include <sensor_msgs/Imu.h>
 
-#include <tf2_ros/transform_broadcaster.h>
+// #include <tf2_ros/transform_broadcaster.h>
 
 #include <esvo2_core/container/CameraSystem.h>
 #include <esvo2_core/core/RegProblemLM.h>
@@ -29,6 +29,7 @@
 
 #include <pcl/point_types.h>
 
+#include <yaml-cpp/yaml.h>
 #include <esvo2_core/factor/imu_integration.h>
 #include <esvo2_core/tools/types.h>
 
@@ -49,7 +50,7 @@ class esvo2_Tracking
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        esvo2_Tracking(const YAML::Node &config,
+        esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node &config,
         DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map,
         DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track);
         virtual ~esvo2_Tracking();
@@ -64,12 +65,12 @@ class esvo2_Tracking
         void refMapCallback(const std::pair<std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>>, timePoint> &msg);
         void refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &msg);
         void VBaBgCallback(const std::shared_ptr<esvo2_core::VBaBg> &msg);
-        void groundTruthCallback(const geometry_msgs::PoseStampedConstPtr &msg);
+        void groundTruthCallback(const std::shared_ptr<esvo2_core::PoseStamped> msg);
         void timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &time_surface_left,
                                          const esvo2_core::ImagePtr &time_surface_negative,
                                          const esvo2_core::ImagePtr &time_surface_dx,
                                          const esvo2_core::ImagePtr &time_surface_dy);
-        void eventsCallback(const EventArray::ConstPtr &msg);
+        // void eventsCallback(const EventArray::ConstPtr &msg); // unused
 
         // results
         void publishPose(const timePoint &t, Transformation &tr);
@@ -78,7 +79,7 @@ class esvo2_Tracking
 
         // utils
         void reset();
-        void clearEventQueue();
+        // void clearEventQueue();
         void stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &msg);
         bool getPoseAt(const timePoint &t,
                        esvo2_core::Transformation &Tr, // T_world_something
@@ -90,6 +91,9 @@ class esvo2_Tracking
         //queues
         DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map;
         DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track;
+
+        // Running variable
+        std::atomic<bool> &is_running;
 
         // configuration variables struct
         YAML::Node config_;

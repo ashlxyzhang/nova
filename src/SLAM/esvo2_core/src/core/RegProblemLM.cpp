@@ -41,7 +41,7 @@ void RegProblemLM::setProblem(RefFrame* ref, CurFrame* cur, bool bComputeGrad)
   ResItems_.resize(numPoints_);
   VisualizationIdx_.reserve(numPoints_);
   if(bPrint_)
-    LOG(INFO) << "num points: " << numPoints_;
+    std::cout << "num points: " << numPoints_;
 
   for(size_t i = 0; i < numPoints_; i++)
   {
@@ -70,7 +70,7 @@ void RegProblemLM::setProblem(RefFrame* ref, CurFrame* cur, bool bComputeGrad)
   // set fval dimension
   resetNumberValues(numPoints_ * patchSize_);
   if(bPrint_)
-    LOG(INFO) << "RegProblemLM::setProblem succeeds.";
+    std::cout << "RegProblemLM::setProblem succeeds.";
 }
 
 void RegProblemLM::setStochasticSampling(size_t offset, size_t N)
@@ -87,10 +87,10 @@ void RegProblemLM::setStochasticSampling(size_t offset, size_t N)
   resetNumberValues(numPoints_ * patchSize_);
   if(bPrint_)
   {
-    LOG(INFO) << "offset: " << offset;
-    LOG(INFO) << "N: " << N;
-    LOG(INFO) << "ResItems_.size: " << ResItems_.size();
-    LOG(INFO) << "ResItemsStochSampled_.size: " << ResItemsStochSampled_.size();
+    std::cout << "offset: " << offset;
+    std::cout << "N: " << N;
+    std::cout << "ResItems_.size: " << ResItems_.size();
+    std::cout << "ResItemsStochSampled_.size: " << ResItemsStochSampled_.size();
   }
 }
 
@@ -137,7 +137,7 @@ int RegProblemLM::operator()(const Eigen::Matrix<double,6,1>& x, Eigen::VectorXd
       fvec[i] = sqrt(irls_weight) * ri.residual_(0);
     }
   }
-//  LOG(INFO) << "assign weighted residual ..............";
+//  std::cout << "assign weighted residual ..............";
   return 0;
 }
 
@@ -185,7 +185,7 @@ int RegProblemLM::df(const Eigen::Matrix<double,6,1>& x, Eigen::MatrixXd& fjac) 
 {
   if(x != Eigen::Matrix<double,6,1>::Zero())
   {
-    LOG(INFO) << "The Jacobian is not evaluated at Zero !!!!!!!!!!!!!";
+    std::cout << "The Jacobian is not evaluated at Zero !!!!!!!!!!!!!";
     exit(-1);
   }
   fjac.resize(m_values, 6);
@@ -242,7 +242,7 @@ int RegProblemLM::df(const Eigen::Matrix<double,6,1>& x, Eigen::MatrixXd& fjac) 
       dT_dG.block<3,3>(0,3) = ri.p_(1) * Eigen::Matrix3d::Identity();
       dT_dG.block<3,3>(0,6) = ri.p_(2) * Eigen::Matrix3d::Identity();
       dT_dG.block<3,3>(0,9) = Eigen::Matrix3d::Identity();
-//      LOG(INFO) << "dT_dG:\n" << dT_dG;
+//      std::cout << "dT_dG:\n" << dT_dG;
       fjacBlock.row(i) = grad.transpose() * dPi_dT * J_constPart * dPi_dT * dT_dG * ri.p_(2);//ri.p_(2) refers to 1/rho_i which is actually coming with dInvPi_dx.
     }
   }
@@ -269,8 +269,8 @@ int RegProblemLM::df(const Eigen::Matrix<double,6,1>& x, Eigen::MatrixXd& fjac) 
   // The linearization is performed around dtheta = 0, thus tx = ty = tz = 0, r_{ii} = 1, r_{ij} = 0.
   // dG'_dG * dG_dtheta = -dG_dtheta. This explains where is "-1" from.
 
-  // LOG(INFO) << "fjac:\n" << fjac;
-  // LOG(INFO) << "Jacobian Computation takes " << tt.toc() << " ms.";
+  // std::cout << "fjac:\n" << fjac;
+  // std::cout << "Jacobian Computation takes " << tt.toc() << " ms.";
   return 0;
 }
 
@@ -343,7 +343,7 @@ RegProblemLM::getWarpingTransformation(
   R_cur_ref = svd.matrixU() * svd.matrixV().transpose();
   if( R_cur_ref.determinant() < 0.0 )
   {
-    LOG(INFO) << "oops the matrix is left-handed\n";
+    std::cout << "oops the matrix is left-handed\n";
     exit(-1);
   }
   t_cur_ref = -R_cur_ref * ( dt + dR * t_ );
@@ -371,10 +371,10 @@ void RegProblemLM::setPose()
   T_world_left_.block<3,1>(0,3) = T_world_ref_.block<3,3>(0,0) * t_
                                   + T_world_ref_.block<3,1>(0,3);
   cur_->tr_ = Transformation(T_world_left_);
-//  LOG(INFO) << "T_world_ref_\n " << T_world_ref_ << "\n ";
-//  LOG(INFO) << "T_world_left_\n " << T_world_left_ << "\n ";
-//  LOG(INFO) << "R_\n " << R_ << "\n ";
-//  LOG(INFO) << "t_\n " << t_.transpose() << "\n ";
+//  std::cout << "T_world_ref_\n " << T_world_ref_ << "\n ";
+//  std::cout << "T_world_left_\n " << T_world_left_ << "\n ";
+//  std::cout << "R_\n " << R_ << "\n ";
+//  std::cout << "t_\n " << t_.transpose() << "\n ";
 }
 
 Eigen::Matrix4d
@@ -439,7 +439,7 @@ bool RegProblemLM::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 1: " << SrcPatch_UpLeft.transpose();
+      std::cout << "patchInterpolation 1: " << SrcPatch_UpLeft.transpose();
     }
     return false;
   }
@@ -447,7 +447,7 @@ bool RegProblemLM::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 2: " << SrcPatch_DownRight.transpose();
+      std::cout << "patchInterpolation 2: " << SrcPatch_DownRight.transpose();
     }
     return false;
   }
@@ -471,7 +471,7 @@ bool RegProblemLM::patchInterpolation(
   {
     if(debug)
     {
-      LOG(INFO) << "patchInterpolation 3: " << SrcPatch_UpLeft.transpose()
+      std::cout << "patchInterpolation 3: " << SrcPatch_UpLeft.transpose()
                 << ", location: " << location.transpose()
                 << ", floor(location[0]): " << floor(location[0])
                 << ", (wx - 1) / 2: " << (wx - 1) / 2

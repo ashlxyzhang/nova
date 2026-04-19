@@ -46,20 +46,20 @@ bool RegProblemSolverLM::resetRegProblem(RefFrame* ref, CurFrame* cur)
 {
   if( ref->vPointXYZPtr_.size() < rpConfigPtr_->BATCH_SIZE_ )
   {
-    LOG(INFO) << "resetRegProblem RESET fails for no enough point cloud in the local map.";
-    LOG(INFO) << "The system will be re-initialized";
+    std::cout << "resetRegProblem RESET fails for no enough point cloud in the local map.";
+    std::cout << "The system will be re-initialized";
     return false;
   }
-  //  LOG(INFO) << "resetRegProblem RESET succeeds.";
+  //  std::cout << "resetRegProblem RESET succeeds.";
   if(rpType_ == REG_NUMERICAL)
   {
     numDiff_regProblemPtr_->setProblem(ref, cur, false);
-//    LOG(INFO) << "numDiff_regProblemPtr_->setProblem(ref, cur, false) -----------------";
+//    std::cout << "numDiff_regProblemPtr_->setProblem(ref, cur, false) -----------------";
   }
   if(rpType_ == REG_ANALYTICAL)
   {
     regProblemPtr_->setProblem(ref, cur, true);
-//    LOG(INFO) << "regProblemPtr_->setProblem(ref, cur, true) -----------------";
+//    std::cout << "regProblemPtr_->setProblem(ref, cur, true) -----------------";
   }
 
   lmStatics_.nPoints_ = 0;
@@ -76,25 +76,25 @@ bool RegProblemSolverLM::resetRegProblem(shared_ptr<RegProblemConfig> &rpConfigP
 
   if( ref->vPointXYZPtr_.size() < rpConfigPtr_->BATCH_SIZE_ )
   {
-    LOG(INFO) << "resetRegProblem RESET fails for no enough point cloud in the local map.";
-    LOG(INFO) << "The system will be re-initialized";
+    std::cout << "resetRegProblem RESET fails for no enough point cloud in the local map.";
+    std::cout << "The system will be re-initialized";
     return false;
   }
-  //  LOG(INFO) << "resetRegProblem RESET succeeds.";
+  //  std::cout << "resetRegProblem RESET succeeds.";
   if(rpType_ == REG_NUMERICAL)
   {
     numDiff_regProblemPtr_ =
       std::make_shared<Eigen::NumericalDiff<RegProblemLM> >(camSysPtr_, rpConfigPtr_, NUM_THREAD_);
     
     numDiff_regProblemPtr_->setProblem(ref, cur, false);
-//    LOG(INFO) << "numDiff_regProblemPtr_->setProblem(ref, cur, false) -----------------";
+//    std::cout << "numDiff_regProblemPtr_->setProblem(ref, cur, false) -----------------";
   }
   if(rpType_ == REG_ANALYTICAL)
   {
     regProblemPtr_ = std::make_shared<RegProblemLM>(camSysPtr_, rpConfigPtr_, NUM_THREAD_);
 
     regProblemPtr_->setProblem(ref, cur, true);
-//    LOG(INFO) << "regProblemPtr_->setProblem(ref, cur, true) -----------------";
+//    std::cout << "regProblemPtr_->setProblem(ref, cur, true) -----------------";
   }
 
   lmStatics_.nPoints_ = 0;
@@ -172,7 +172,7 @@ bool RegProblemSolverLM::solve_numerical()
     if(status == 2 || status == 3)
       break;
   }
-//  LOG(INFO) << "LM Finished ...................";
+//  std::cout << "LM Finished ...................";
   numDiff_regProblemPtr_->setPose();
   lmStatics_.nPoints_ = numDiff_regProblemPtr_->numPoints_;
   lmStatics_.nfev_ = nfev;

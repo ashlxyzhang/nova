@@ -37,7 +37,7 @@ struct TimeSurfaceObservation
                 cv::cv2eigen(grad_x_left_, dTS_du_left_);
                 cv::cv2eigen(grad_y_left_, dTS_dv_left_);
 #ifdef TIME_SURFACE_OBSERVATION_LOG
-                LOG(INFO) << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
+                std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
                           << " ms.";
 #endif
             }
@@ -71,7 +71,7 @@ struct TimeSurfaceObservation
                 cv::cv2eigen(grad_x_left_, dTS_du_left_);
                 cv::cv2eigen(grad_y_left_, dTS_dv_left_);
 #ifdef TIME_SURFACE_OBSERVATION_LOG
-                LOG(INFO) << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
+                std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
                           << " ms.";
 #endif
             }
@@ -99,7 +99,7 @@ struct TimeSurfaceObservation
                 cv::cv2eigen(grad_y_left_, dTS_dv_left_);
 
 #ifdef TIME_SURFACE_OBSERVATION_LOG
-                LOG(INFO) << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
+                std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
                           << " ms.";
 #endif
             }
@@ -138,7 +138,7 @@ struct TimeSurfaceObservation
                 cv::cv2eigen(grad_y_right_, dTS_dv_right_);
 
 #ifdef TIME_SURFACE_OBSERVATION_LOG
-                LOG(INFO) << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
+                std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Sobel computation (" << id_ << ") takes " << tt.toc()
                           << " ms.";
 #endif
             }

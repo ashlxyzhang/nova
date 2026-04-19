@@ -15,10 +15,10 @@
 
 namespace image_representation
 {
-ImageRepresentation::ImageRepresentation(const YAML::Node &config,  
+ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const YAML::Node &config,  
             MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>*multi_to_Track, 
             MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
-             DataPassingDeque<cv::Mat>* AA_left_IR_to_Map) : config_(config)
+             DataPassingDeque<cv::Mat>* AA_left_IR_to_Map) : is_running(is_running_), config_(config)
 {
     // Setting the queues
     this->multi_to_Track = multi_to_Track;
@@ -109,15 +109,13 @@ void ImageRepresentation::init(int width, int height)
 
 void ImageRepresentation::GenerationLoop()
 {
-    ros::Rate r(generation_rate_hz_);
-    while (ros::ok())
-    {
-        sync_time_ = timePoint::now();
-        {
-            createImageRepresentationAtTime(sync_time_);
-        }
+    const std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/generation_rate_hz_));
+    timePoint next_wake_up_time = std::chrono::steady_clock::now();
 
-        r.sleep();
+    while (is_running) {
+        createImageRepresentationAtTime(std::chrono::steady_clock::now());
+        next_wake_up_time += interval;
+        std::this_thread::sleep_until(next_wake_up_time);
     }
 }
 
