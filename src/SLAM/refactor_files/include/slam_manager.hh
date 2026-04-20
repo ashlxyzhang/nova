@@ -137,12 +137,10 @@ private:
         - minkindr can be found at: https://github.com/ethz-asl/minkindr
         - Expected conversion function at: https://github.com/ethz-asl/minkindr_ros/blob/master/minkindr_conversions/include/minkindr_conversions/kindr_tf.h
 
-     - UPdate slam_manager.cpp to have correct parameters to constructors of the classes under the comment:
+     - Update slam_manager.cpp to have correct parameters to constructors of the classes under the comment:
             // The module's constructors create and detach a new thread that manages their respective processes
+            - Adde yaml file path (string) to start slam as parameter and create YAML node which is passed to constructors there
 
-     - Try to compile
-        - Update cmake lists X
-        - Fix all compile errors once get them (in progress)
 
     - Hope it runs properly
         - Fix bugs when it doesn't run properly
@@ -154,6 +152,7 @@ private:
                 Can probably edit files to get around that though. This is probably most promising solution.
         -https://daniilidis-group.github.io/mvsec/download/
             - Has h5 files, but left/right are grouped together, so would be kinda annoying to separate
+        - Need to get an h5 viewer/editer, edit them to match Prophesee expected format, then can convert to .dat and play them in NOVA
 
     - Visualization stuff
        - Figure out how to visualize PCL (point cloud library)

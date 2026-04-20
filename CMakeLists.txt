@@ -31,7 +31,7 @@ find_package(MetavisionHAL REQUIRED)
 # SLAM
 find_package(Eigen3 3.4.1 EXACT REQUIRED)
 find_package(Ceres 1.14.0 EXACT REQUIRED) # For solving the optimization problems
-find_package(PCL 1.11 COMPONENTS common REQUIRED) # For visualization + storing the 3D poing cloud
+find_package(PCL 1.11 COMPONENTS common filters REQUIRED) # For visualization + storing the 3D poing cloud
 FetchContent_Declare( # For camera/parameter configurations
   yaml-cpp
   GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
@@ -88,6 +88,11 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${COMPILED_SHADER_HEA
 add_dependencies(${CMAKE_PROJECT_NAME} shaders)
 
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
+
+if(WIN32)
+    target_compile_options(${PROJECT_NAME} PRIVATE -msse4.2)
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})

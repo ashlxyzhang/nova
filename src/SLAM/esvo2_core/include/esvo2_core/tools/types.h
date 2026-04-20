@@ -24,12 +24,12 @@ namespace esvo2_core
 {
 using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
-double timePointToSec(const timePoint& timestamp)
+inline double timePointToSec(const timePoint& timestamp)
 {
      return std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();
 }
 
-timePoint secondsToTimePoint(double seconds)
+inline timePoint secondsToTimePoint(double seconds)
 {
         std::chrono::duration<double> dur(seconds);
         std::chrono::steady_clock::duration yep = std::chrono::duration_cast<std::chrono::steady_clock::duration>(dur);
