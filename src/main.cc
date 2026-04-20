@@ -118,8 +118,6 @@ struct Application
 //! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
 int main() {
 
-    SDL_SetHint(SDL_HINT_RENDER_GPU_DEBUG, "1");
-
     // Initialize GPU device
     GPUDevice gpu;
     if (!gpu.is_open()) return 1;
@@ -128,15 +126,15 @@ int main() {
     DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/pedestrians.raw");
     if (!ds.is_open()) return 1;
     
-    // Read all data from files first
-    ds.start_reading_thread();
+    // Read all data from file first
+    ds.read_all();
 
     // Configure scrubber 
     Scrubber::State& s = ds.scrubber.state;
     s.type = Scrubber::Type::TIME;
-    s.mode = Scrubber::Mode::PLAYING;  // Auto-advance
-    s.time_window = 10000.0f;  // 10ms window
-    s.time_step = 10000.0f;    // ~30fps 
+    s.mode = Scrubber::Mode::PLAYING;  
+    s.time_window = 10000.0f;  
+    s.time_step = 20000.0f;    
     s.loop = true;
 
     // Initialize displays

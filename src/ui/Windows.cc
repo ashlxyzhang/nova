@@ -51,13 +51,6 @@ bool Window::open() {
 		return true;
 	}
 
-	// Initialize SDL
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-		open_flag = false;
-		return false;
-	}
-
 	// Initialize window
 	window = gpu_device.create_window(width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 	if (window == nullptr) {
@@ -89,7 +82,6 @@ void Window::close() {
 	if (window) {
 		gpu_device.free_window(window);
 		window = nullptr;
-		SDL_Quit();
 	}
 
 	open_flag = false;
@@ -153,24 +145,46 @@ void Window::play(DataSource& data_source, int fps) {
 
 	while (running) {
 		render(data_source);
-		poll_events(data_source);        
+		poll_events();        
 		data_source.update_scrubber();
 		
 		SDL_Delay(delay);
 	}
 }
 
-void Window::poll_events(DataSource& data_source) {
+void Window::poll_events() {
+	ImGui::SetCurrentContext(imgui_context);
+
+	// Done this way to make it easier for API users the freedom to poll for events of a specific window
+	// without destroying events for other windows. Could potentially cause event queue to reach limit 
+	// but it doesn't seem likely. Blame SDL for not having a per-window event queues ffs
+	std::vector<SDL_Event> extra_events;
+	
+	// For each event in queue
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
-		ImGui_ImplSDL3_ProcessEvent(&event);
 
-		if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
-			running = false;
-			close();
+		// If the event belongs to this window, read it with imgui, and then call handle_event
+		if (SDL_GetWindowFromEvent(&event) == window) {
+			ImGui_ImplSDL3_ProcessEvent(&event);
+			handle_event(event);
+		} 
+		// Otherwise, record to add back to queue
+		else {
+			extra_events.push_back(event);
 		}
+	}
 
-		handle_event(event, data_source);
+	// Add back unrelated events to queue
+	for (SDL_Event event: extra_events) {
+		SDL_PushEvent(&event);
+	}
+}
+
+void Window::handle_event(const SDL_Event& event) {
+	if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+		running = false;
+		close();
 	}
 }
 
@@ -200,7 +214,7 @@ void Window::play_all(std::vector<Window*> windows, DataSource& data_source, int
 				any_open = true;
 
 				window->render(data_source);
-				window->poll_events(data_source);
+				window->poll_events();
 			}
 		}
 
@@ -217,6 +231,25 @@ int Window::get_height() {
 	return height;
 }
 
+ImVec2 Window::fit_texture_to_space(RenderTarget& render_target, ImVec2 available_space) {
+	ImVec2 display_size = available_space;      
+	float aspect_ratio = render_target.width / (float) render_target.height;
+	float pane_aspect = available_space.x / available_space.y;
+	
+	if (aspect_ratio > pane_aspect)
+	{
+		display_size.y = available_space.x / aspect_ratio;
+	}
+	else
+	{
+		display_size.x = available_space.y * aspect_ratio;
+	}
+	float x_pad = (available_space.x - display_size.x) * 0.5f;
+	float y_pad = (available_space.y - display_size.y) * 0.5f;
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+	return display_size;
+}
 
 
 
@@ -234,23 +267,19 @@ void DCEDisplay::draw(DataSource& data_source) {
 	ImGui::SetNextWindowSize(viewport->WorkSize);
 	ImGui::SetNextWindowViewport(viewport->ID);
 
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar
-								| ImGuiWindowFlags_NoResize
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize
 								| ImGuiWindowFlags_NoMove
 								| ImGuiWindowFlags_NoScrollbar
 								| ImGuiWindowFlags_NoCollapse
 								| ImGuiWindowFlags_NoNav
 								| ImGuiWindowFlags_NoBringToFrontOnFocus
-								| ImGuiWindowFlags_NoDocking
-								| ImGuiWindowFlags_NoBackground;
+								| ImGuiWindowFlags_NoDocking;
 
 	ImGui::Begin(title.c_str(), nullptr, window_flags);
 	if (output.texture)
 	{
 		ImVec2 pane_size = ImGui::GetContentRegionAvail();
-		
-		// Draw image
-		ImGui::Image((ImTextureID) output.texture, pane_size);
+		ImGui::Image((ImTextureID) output.texture, Window::fit_texture_to_space(output, pane_size));
 	}
 	else
 	{
@@ -260,7 +289,9 @@ void DCEDisplay::draw(DataSource& data_source) {
 	ImGui::End();
 }
 
-void DCEDisplay::handle_event(const SDL_Event& event, DataSource& data_source) {}
+void DCEDisplay::handle_event(const SDL_Event& event) {
+	Window::handle_event(event);
+}
 
 
 VisualizerDisplay::VisualizerDisplay(GPUDevice& gpu_device, int width, int height, std::string title)
@@ -277,38 +308,19 @@ void VisualizerDisplay::draw(DataSource& data_source) {
 	ImGui::SetNextWindowSize(viewport->WorkSize);
 	ImGui::SetNextWindowViewport(viewport->ID);
 
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar
-								| ImGuiWindowFlags_NoResize
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize
 								| ImGuiWindowFlags_NoMove
 								| ImGuiWindowFlags_NoScrollbar
 								| ImGuiWindowFlags_NoCollapse
 								| ImGuiWindowFlags_NoNav
 								| ImGuiWindowFlags_NoBringToFrontOnFocus
-								| ImGuiWindowFlags_NoDocking
-								| ImGuiWindowFlags_NoBackground;
+								| ImGuiWindowFlags_NoDocking;
 
 	ImGui::Begin(title.c_str(), nullptr, window_flags);
 	if (color_target.texture)
 	{
-		
 		ImVec2 pane_size = ImGui::GetContentRegionAvail();
-		float tex_aspect = (float) color_target.width / (float) color_target.height;
-		ImVec2 display_size = pane_size;
-		float pane_aspect = pane_size.x / pane_size.y;
-		if (tex_aspect > pane_aspect)
-		{
-			display_size.y = pane_size.x / tex_aspect;
-		}
-		else
-		{
-			display_size.x = pane_size.y * tex_aspect;
-		}
-		float x_pad = (pane_size.x - display_size.x) * 0.5f;
-		float y_pad = (pane_size.y - display_size.y) * 0.5f;
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-		ImGui::Image((ImTextureID) color_target.texture, display_size);
-		color_target.is_focused = ImGui::IsItemHovered();
+		ImGui::Image((ImTextureID) color_target.texture, Window::fit_texture_to_space(color_target, pane_size));
 	}
 	else
 	{
@@ -318,45 +330,40 @@ void VisualizerDisplay::draw(DataSource& data_source) {
 	ImGui::End();
 }
 
-void VisualizerDisplay::handle_event(const SDL_Event& event, DataSource& data_source) {
+void VisualizerDisplay::handle_event(const SDL_Event& event) {
+	Window::handle_event(event);
 
-	// Check if selected visualizer output is focused
-	bool focused = data_source.visualizer_render_targets.color.is_focused;
-	
-	// Start a click, scrolling, and dragging must be done while focused
-	if (focused) {
-		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) 
+	// Clicks mouse
+	if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) 
+	{
+		is_mouse_dragging = true;
+	}
+
+	// Drags mouse
+	else if (event.type == SDL_EVENT_MOUSE_MOTION && is_mouse_dragging) 
+	{
+		float x_offset = -event.motion.xrel;
+		float y_offset = event.motion.yrel;
+		visualizer->rotate_camera(x_offset, y_offset);	
+	}
+
+	// Scrolls
+	else if (event.type == SDL_EVENT_MOUSE_WHEEL) 
+	{	
+		float scroll_delta = event.wheel.y;
+		if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
 		{
-			is_mouse_dragging = true;
+			scroll_delta = -scroll_delta;
 		}
 
-		// Drags mouse
-		else if (event.type == SDL_EVENT_MOUSE_MOTION && is_mouse_dragging) 
+		if (scroll_delta != 0.0f)
 		{
-			float x_offset = -event.motion.xrel;
-			float y_offset = event.motion.yrel;
-			visualizer->rotate_camera(x_offset, y_offset);	
-		}
-
-		// Scrolls
-		else if (event.type == SDL_EVENT_MOUSE_WHEEL) 
-		{	
-			float scroll_delta = event.wheel.y;
-			if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
-			{
-				scroll_delta = -scroll_delta;
-			}
-
-			if (scroll_delta != 0.0f)
-			{
-				visualizer->zoom_camera(scroll_delta * 0.1f);
-			}
+			visualizer->zoom_camera(scroll_delta * 0.1f);
 		}
 	}
 
-	// Releasing should be possible when not in focus
 	// Releases click
-	if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) 
+	else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) 
 	{
 		is_mouse_dragging = false;
 	}
@@ -366,7 +373,4 @@ void VisualizerDisplay::handle_event(const SDL_Event& event, DataSource& data_so
 	{
 		is_mouse_dragging = false;
 	}
-
-	// Reset focused flag
-	data_source.visualizer_render_targets.color.is_focused = false;
 }

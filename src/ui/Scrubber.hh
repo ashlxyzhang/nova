@@ -185,6 +185,26 @@ class Scrubber
                         if (loop && current_index >= max_index) current_index = 0;
                     }
                 }
+        
+            void set_time_window(float start_time, float end_time) {
+                if (end_time < start_time || start_time < 0 || end_time > max_time) {
+                    std::cout << "set_time_window() given invalid time window" << std::endl;
+                    return;
+                }
+
+                time_window = end_time - start_time;
+                current_time = end_time;
+            }
+
+            void set_event_window(size_t start_index, size_t end_index) {
+                if (end_index < start_index || start_index < 0 || end_index > max_index) {
+                    std::cout << "set_event_window() given invalid index window" << std::endl;
+                    return;
+                }
+
+                index_window = end_index - start_index;
+                current_index = end_index;
+            }
         };
 
     private:
@@ -492,6 +512,8 @@ class Scrubber
         {
             return camera_resolution;
         }
+
+
 };
 
 #endif

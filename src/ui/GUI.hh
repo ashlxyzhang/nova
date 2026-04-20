@@ -537,6 +537,9 @@ class GUI
                 }
                 ImGui::SetItemTooltip("Jump to end / track latest");
             }
+            ImGui::SameLine();
+
+            ImGui::Checkbox("Loop", &state.loop);
         }
 
 

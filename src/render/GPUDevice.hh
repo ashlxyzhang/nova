@@ -45,6 +45,8 @@ class GPUDevice
                 }
                 SDL_DestroyGPUDevice(gpu_device);
             }
+
+            SDL_Quit();
         }
 
         GPUDevice(const GPUDevice&) = delete;

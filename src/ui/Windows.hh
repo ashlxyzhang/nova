@@ -17,6 +17,7 @@ class Window {
 
 		void render(DataSource& data_source);			// Renders a single frame 
 		void play(DataSource& data_source, int fps=60);	// Blocking rendering loop 
+		void poll_events();
 		
 		bool open();	// Returns whether or not opening was successful
 		void close();							
@@ -25,7 +26,8 @@ class Window {
 		int get_height();
 		
 		static void play_all(std::vector<Window*> windows, DataSource& data_source, int fps=60);
-		
+		static ImVec2 fit_texture_to_space(RenderTarget& render_target, ImVec2 available_space);
+
 	protected:
 		GPUDevice& gpu_device;
 		SDL_Window* window;
@@ -38,9 +40,8 @@ class Window {
 		int width;
 		int height;
 		
-		void poll_events(DataSource& data_source);
 		void init_imgui();
-		virtual void handle_event(const SDL_Event& event, DataSource& data_source) = 0;
+		virtual void handle_event(const SDL_Event& event);
 		virtual void draw(DataSource& data_source) = 0;
 };
 
@@ -54,7 +55,7 @@ class DCEDisplay : public Window {
 	private:
 		std::unique_ptr<DigitalCodedExposure> dce;
 		
-		void handle_event(const SDL_Event& event, DataSource& data_source) override;
+		void handle_event(const SDL_Event& event) override;
 		void draw(DataSource& data_source) override;
 
 };
@@ -67,7 +68,7 @@ class VisualizerDisplay : public Window {
 		bool is_mouse_dragging = false;
 		std::unique_ptr<Visualizer> visualizer;
 		
-		void handle_event(const SDL_Event& event, DataSource& data_source) override;
+		void handle_event(const SDL_Event& event) override;
 		void draw(DataSource& data_source) override;
 
 };
