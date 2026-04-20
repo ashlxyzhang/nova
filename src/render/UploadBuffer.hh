@@ -5,87 +5,111 @@
 #include "util/pch.hh"
 
 /**
- * @brief Class for uploading data to the GPU.
+ * @brief Helper for uploading data to the GPU.
+ *
+ * Holds a single transfer buffer that grows as needed to fit the largest upload.
  */
 class UploadBuffer
 {
     private:
         SDL_GPUDevice *gpu_device = nullptr;
         SDL_GPUTransferBuffer *transfer_buffer = nullptr;
+        Uint32 capacity = 0;
 
-        constexpr static unsigned buffer_size = 1 << 20;
+        constexpr static Uint32 initial_capacity = 1 << 20;
+
+        static Uint32 next_pow2(Uint32 v)
+        {
+            Uint32 r = 1;
+            while (r < v)
+                r <<= 1;
+            return r;
+        }
+
+        /**
+         * @brief Grows the transfer buffer if the current capacity is too small.
+         * @param nbyte Required capacity in bytes.
+         */
+        void ensure_capacity(size_t nbyte)
+        {
+            if (nbyte <= capacity)
+                return;
+
+            if (transfer_buffer)
+                SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
+
+            capacity = next_pow2(static_cast<Uint32>(nbyte));
+            SDL_GPUTransferBufferCreateInfo info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = capacity};
+            transfer_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &info);
+        }
 
     public:
         /**
-         * @brief Constructor. Initializes GPUTransferBuffer for transferring data to GPU.
+         * @brief Constructor. Allocates the initial transfer buffer.
          * @param gpu_device SDL_GPUDevice to upload data to.
          */
         UploadBuffer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device)
         {
-            SDL_GPUTransferBufferCreateInfo transfer_buffer_create_info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-                                                                           .size = buffer_size};
-            transfer_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &transfer_buffer_create_info);
+            ensure_capacity(initial_capacity);
         }
 
         /**
-         * @brief Destructor. Releases data buffer on GPU.
+         * @brief Destructor. Releases the transfer buffer.
          */
         ~UploadBuffer()
         {
-            SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
+            if (transfer_buffer)
+                SDL_ReleaseGPUTransferBuffer(gpu_device, transfer_buffer);
         }
 
         /**
-         * @brief Uploads buffer data to GPU.
-         * @param pass SDL_GPUCopyPass for copying data to GPU.
-         * @param dst Destination of data to be copied to GPU.
-         * @param src Source data buffer to be copied.
-         * @param nbyte Number of bytes to copy from src to GPU.
+         * @brief Uploads bytes into an SDL_GPUBuffer in a single copy.
+         *
+         * Grows the transfer buffer if needed so the full payload fits contiguously;
+         * the destination is written starting at offset 0.
+         * @param pass Active SDL_GPUCopyPass.
+         * @param dst Destination GPU buffer (written from offset 0).
+         * @param src Source host pointer.
+         * @param nbyte Number of bytes to copy.
          */
         void upload_to_gpu(SDL_GPUCopyPass *pass, SDL_GPUBuffer *dst, const void *src, size_t nbyte)
         {
-            size_t offset = 0;
-            while (nbyte > 0)
-            {
-                size_t num = nbyte;
-                if (num > buffer_size)
-                    num = buffer_size;
+            if (nbyte == 0)
+                return;
 
-                void *ptr = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, true);
-                SDL_memcpy(ptr, (const char *)src + offset, num);
-                SDL_UnmapGPUTransferBuffer(gpu_device, transfer_buffer);
+            ensure_capacity(nbyte);
 
-                SDL_GPUTransferBufferLocation transfer_location = {.transfer_buffer = transfer_buffer};
-                SDL_GPUBufferRegion buffer_region = {
-                    .buffer = dst, .offset = static_cast<Uint32>(offset), .size = static_cast<Uint32>(num)};
+            void *ptr = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, true);
+            SDL_memcpy(ptr, src, nbyte);
+            SDL_UnmapGPUTransferBuffer(gpu_device, transfer_buffer);
 
-                SDL_UploadToGPUBuffer(pass, &transfer_location, &buffer_region, false);
-
-                nbyte -= num;
-                offset += num;
-            }
+            SDL_GPUTransferBufferLocation transfer_location = {.transfer_buffer = transfer_buffer};
+            SDL_GPUBufferRegion buffer_region = {.buffer = dst, .offset = 0, .size = static_cast<Uint32>(nbyte)};
+            SDL_UploadToGPUBuffer(pass, &transfer_location, &buffer_region, false);
         }
 
-        //
         /**
-         * @brief Uploads texture to GPU.
+         * @brief Uploads a cv::Mat into one layer of an SDL_GPUTexture.
          *
-         * This function will make a lot of assumptions
-         * first is that the SDL_GPUTexture is the same resolution as the cv::Mat
-         * second is that they have the same number of bits per channel
-         * third is that the texture was created with rgba8 unorm format
-         * @param pass SDL_GPUCopyPass for copying data to GPU.
-         * @param texture SDL_GPUTexture texture destination to upload texture to.
-         * @param mat Texture information as cv::Mat to upload.
-         * @param layer Texture layers.
+         * The source Mat is converted from BGR to RGBA before upload. Assumes:
+         *   - the destination texture's width/height match the Mat's cols/rows,
+         *   - the destination texture format is SDL_GPU_TEXTUREFORMAT_R8G8B8A8_*.
+         * The transfer buffer is grown as needed to hold the full converted image.
+         * @param pass Active SDL_GPUCopyPass.
+         * @param texture Destination GPU texture.
+         * @param mat Source image (BGR or BGRA; converted to RGBA internally).
+         * @param layer Destination array layer.
          */
         void upload_cv_mat(SDL_GPUCopyPass *pass, SDL_GPUTexture *texture, const cv::Mat &mat, uint32_t layer = 0)
         {
             cv::Mat rgba;
             cv::cvtColor(mat, rgba, cv::COLOR_BGR2RGBA);
 
+            size_t nbyte = rgba.total() * rgba.elemSize();
+            ensure_capacity(nbyte);
+
             void *ptr = SDL_MapGPUTransferBuffer(gpu_device, transfer_buffer, true);
-            std::memcpy(ptr, rgba.data, rgba.total() * rgba.elemSize());
+            std::memcpy(ptr, rgba.data, nbyte);
             SDL_UnmapGPUTransferBuffer(gpu_device, transfer_buffer);
 
             SDL_GPUTextureTransferInfo source_texture_transfer_info = {};
@@ -93,6 +117,7 @@ class UploadBuffer
             source_texture_transfer_info.offset = 0;
             source_texture_transfer_info.pixels_per_row = rgba.cols;
             source_texture_transfer_info.rows_per_layer = rgba.rows;
+
             SDL_GPUTextureRegion dest_texture_region = {};
             dest_texture_region.texture = texture;
             dest_texture_region.mip_level = 0;
@@ -103,6 +128,7 @@ class UploadBuffer
             dest_texture_region.w = rgba.cols;
             dest_texture_region.h = rgba.rows;
             dest_texture_region.d = 1;
+
             SDL_UploadToGPUTexture(pass, &source_texture_transfer_info, &dest_texture_region, false);
         }
 };
