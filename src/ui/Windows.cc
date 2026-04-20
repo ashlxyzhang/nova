@@ -2,27 +2,7 @@
 #include "ui/Windows.hh"
 
 Window::Window(GPUDevice& gpu_device, int width, int height, std::string title) 
-	: gpu_device(gpu_device), title(title) {
-
-	// Initialize SDL
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-		open_flag = false;
-		return;
-	}
-
-	// Initialize window
-	window = gpu_device.create_window(width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-	if (window == nullptr) {
-		SDL_Log("Couldn't create window: %s", SDL_GetError());
-		open_flag = false;
-		return;
-	}
-
-	init_imgui();
-
-	open_flag = true;
-}
+	: gpu_device(gpu_device), title(title), open_flag(false), running(false), width(width), height(height) {}
 
 Window::~Window() {
 	close();
@@ -66,7 +46,38 @@ void Window::init_imgui() {
 	ImGui_ImplSDLGPU3_Init(&init_info);
 }
 
+bool Window::open() {
+	if (open_flag) {
+		return true;
+	}
+
+	// Initialize SDL
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
+		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
+		open_flag = false;
+		return false;
+	}
+
+	// Initialize window
+	window = gpu_device.create_window(width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+	if (window == nullptr) {
+		SDL_Log("Couldn't create window: %s", SDL_GetError());
+		open_flag = false;
+		return false;
+	}
+
+	// Initialize imgui context
+	init_imgui();
+
+	open_flag = true;
+	return true;
+}
+
 void Window::close() {
+	if (!open_flag) {
+		return;
+	}
+
 	if (imgui_context) {
 		ImGui::SetCurrentContext(imgui_context);
 		ImGui_ImplSDLGPU3_Shutdown();
@@ -89,8 +100,8 @@ bool Window::is_open() {
 }
 
 void Window::render(DataSource& data_source) {
-	if (!is_open()) {
-		std::cout << "render() called on closed window: \'" << title << "\'" << std::endl;
+	if (!is_open() && !open()) {
+		std::cout << "Failed to open window" << std::endl;
 		return;
 	}
 
@@ -131,36 +142,80 @@ void Window::render(DataSource& data_source) {
 	SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
-void Window::play(DataSource& data_source) {
-	if (!is_open()) {
-		std::cout << "play() called on closed window: \'" << title << "\'" << std::endl;
+void Window::play(DataSource& data_source, int fps) {
+	if (!is_open() && !open()) {
+		std::cout << "Failed to open window" << std::endl;
 		return;
 	}
-	
-	bool running = true;
+
+	double delay = 1000 / (double) fps;
+	running = true;
+
 	while (running) {
-		// Process SDL events
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-			ImGui_ImplSDL3_ProcessEvent(&event);
-			
-            if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
-				running = false;
-            }
-
-			handle_event(event, data_source);
-        }
-
-		data_source.update_scrubber();
 		render(data_source);
-		SDL_Delay(16); // 16ms delay ~ 60fps
+		poll_events(data_source);        
+		data_source.update_scrubber();
+		
+		SDL_Delay(delay);
 	}
 }
 
+void Window::poll_events(DataSource& data_source) {
+	SDL_Event event;
+	while (SDL_PollEvent(&event)) {
+		ImGui_ImplSDL3_ProcessEvent(&event);
 
+		if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+			running = false;
+			close();
+		}
 
+		handle_event(event, data_source);
+	}
+}
 
+void Window::play_all(std::vector<Window*> windows, DataSource& data_source, int fps) {
 
+	// Ensure all windows valid and open to begin with
+	for (Window* window: windows) {
+		if (window == nullptr) {
+			std::cout << "play_all() was passed a nullptr" << std::endl;
+			return;
+		}
+
+		if (!window->is_open()) {
+			window->open();
+		}
+	}
+
+	double delay = 1000 / (double) fps;	
+	bool any_open = true;
+
+	// Continue to render all open windows until all are closed
+	while (any_open) {
+
+		any_open = false;
+		for (Window* window: windows) {
+			if (window->is_open()) {
+				any_open = true;
+
+				window->render(data_source);
+				window->poll_events(data_source);
+			}
+		}
+
+		data_source.update_scrubber();
+		SDL_Delay(delay);
+	}
+}
+
+int Window::get_width() {
+	return width;
+}
+
+int Window::get_height() {
+	return height;
+}
 
 
 
@@ -189,7 +244,7 @@ void DCEDisplay::draw(DataSource& data_source) {
 								| ImGuiWindowFlags_NoDocking
 								| ImGuiWindowFlags_NoBackground;
 
-	ImGui::Begin("DCE", nullptr, window_flags);
+	ImGui::Begin(title.c_str(), nullptr, window_flags);
 	if (output.texture)
 	{
 		ImVec2 pane_size = ImGui::GetContentRegionAvail();
@@ -232,12 +287,12 @@ void VisualizerDisplay::draw(DataSource& data_source) {
 								| ImGuiWindowFlags_NoDocking
 								| ImGuiWindowFlags_NoBackground;
 
-	ImGui::Begin("3D Visualizer", nullptr, window_flags);
+	ImGui::Begin(title.c_str(), nullptr, window_flags);
 	if (color_target.texture)
 	{
 		
 		ImVec2 pane_size = ImGui::GetContentRegionAvail();
-		float tex_aspect = (float)color_target.width / (float) color_target.height;
+		float tex_aspect = (float) color_target.width / (float) color_target.height;
 		ImVec2 display_size = pane_size;
 		float pane_aspect = pane_size.x / pane_size.y;
 		if (tex_aspect > pane_aspect)

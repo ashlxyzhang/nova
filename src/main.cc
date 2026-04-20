@@ -139,13 +139,12 @@ int main() {
     s.time_step = 10000.0f;    // ~30fps 
     s.loop = true;
 
-    // DCEDisplay dce_display(gpu, 1280, 720, "API Demo");    
-    // if (!dce_display.is_open()) return 1;
-    // dce_display.play(ds);
-
+    // Initialize displays
+    DCEDisplay dce_display(gpu, 1280, 720, "API Demo");    
     VisualizerDisplay visualizer_display(gpu, 1280, 720, "Visualizer Demo");
-    if (!visualizer_display.is_open()) return 1;
-    visualizer_display.play(ds);
+    
+    // User helper static function to play them concurrently
+    Window::play_all({&dce_display, &visualizer_display}, ds);
 
     return 0;
 }
