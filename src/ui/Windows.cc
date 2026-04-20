@@ -12,7 +12,7 @@ Window::Window(GPUDevice& gpu_device, int width, int height, std::string title)
 	}
 
 	// Initialize window
-	window = gpu_device.create_window(width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY, title);
+	window = gpu_device.create_window(width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 	if (window == nullptr) {
 		SDL_Log("Couldn't create window: %s", SDL_GetError());
 		open_flag = false;
@@ -142,9 +142,13 @@ void Window::play(DataSource& data_source) {
 		// Process SDL events
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+			ImGui_ImplSDL3_ProcessEvent(&event);
+			
             if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
 				running = false;
             }
+
+			handle_event(event, data_source);
         }
 
 		data_source.update_scrubber();
@@ -170,32 +174,28 @@ void DCEDisplay::draw(DataSource& data_source) {
 	dce->render(data_source);
 	RenderTarget& output = data_source.dce_render_targets.output;
 
-	ImGui::Begin("Frame");
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->WorkPos);
+	ImGui::SetNextWindowSize(viewport->WorkSize);
+	ImGui::SetNextWindowViewport(viewport->ID);
+
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar
+								| ImGuiWindowFlags_NoResize
+								| ImGuiWindowFlags_NoMove
+								| ImGuiWindowFlags_NoScrollbar
+								| ImGuiWindowFlags_NoCollapse
+								| ImGuiWindowFlags_NoNav
+								| ImGuiWindowFlags_NoBringToFrontOnFocus
+								| ImGuiWindowFlags_NoDocking
+								| ImGuiWindowFlags_NoBackground;
+
+	ImGui::Begin("DCE", nullptr, window_flags);
 	if (output.texture)
 	{
-        ImGui::Text("Digital Coded Exposure");
-
 		ImVec2 pane_size = ImGui::GetContentRegionAvail();
-		ImVec2 display_size = pane_size;
 		
-		float aspect_ratio = output.width / (float)output.height;
-		float pane_aspect = pane_size.x / pane_size.y;
-		if (aspect_ratio > pane_aspect)
-		{
-			display_size.y = pane_size.x / aspect_ratio;
-		}
-		else
-		{
-			display_size.x = pane_size.y * aspect_ratio;
-		}
-		float x_pad = (pane_size.x - display_size.x) * 0.5f;
-		float y_pad = (pane_size.y - display_size.y) * 0.5f;
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-
-
 		// Draw image
-		ImGui::Image((ImTextureID) output.texture, display_size);
+		ImGui::Image((ImTextureID) output.texture, pane_size);
 	}
 	else
 	{
@@ -203,4 +203,115 @@ void DCEDisplay::draw(DataSource& data_source) {
 	}
 
 	ImGui::End();
+}
+
+void DCEDisplay::handle_event(const SDL_Event& event, DataSource& data_source) {}
+
+
+VisualizerDisplay::VisualizerDisplay(GPUDevice& gpu_device, int width, int height, std::string title)
+	: Window(gpu_device, width, height, title), visualizer(std::make_unique<Visualizer>(gpu_device)) {}
+
+void VisualizerDisplay::draw(DataSource& data_source) {
+
+	// Render the new visualizer texture
+	visualizer->render(data_source);
+	RenderTarget& color_target = data_source.visualizer_render_targets.color;
+
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->WorkPos);
+	ImGui::SetNextWindowSize(viewport->WorkSize);
+	ImGui::SetNextWindowViewport(viewport->ID);
+
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar
+								| ImGuiWindowFlags_NoResize
+								| ImGuiWindowFlags_NoMove
+								| ImGuiWindowFlags_NoScrollbar
+								| ImGuiWindowFlags_NoCollapse
+								| ImGuiWindowFlags_NoNav
+								| ImGuiWindowFlags_NoBringToFrontOnFocus
+								| ImGuiWindowFlags_NoDocking
+								| ImGuiWindowFlags_NoBackground;
+
+	ImGui::Begin("3D Visualizer", nullptr, window_flags);
+	if (color_target.texture)
+	{
+		
+		ImVec2 pane_size = ImGui::GetContentRegionAvail();
+		float tex_aspect = (float)color_target.width / (float) color_target.height;
+		ImVec2 display_size = pane_size;
+		float pane_aspect = pane_size.x / pane_size.y;
+		if (tex_aspect > pane_aspect)
+		{
+			display_size.y = pane_size.x / tex_aspect;
+		}
+		else
+		{
+			display_size.x = pane_size.y * tex_aspect;
+		}
+		float x_pad = (pane_size.x - display_size.x) * 0.5f;
+		float y_pad = (pane_size.y - display_size.y) * 0.5f;
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
+		ImGui::Image((ImTextureID) color_target.texture, display_size);
+		color_target.is_focused = ImGui::IsItemHovered();
+	}
+	else
+	{
+		ImGui::Text("No texture available");
+	}
+
+	ImGui::End();
+}
+
+void VisualizerDisplay::handle_event(const SDL_Event& event, DataSource& data_source) {
+
+	// Check if selected visualizer output is focused
+	bool focused = data_source.visualizer_render_targets.color.is_focused;
+	
+	// Start a click, scrolling, and dragging must be done while focused
+	if (focused) {
+		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) 
+		{
+			is_mouse_dragging = true;
+		}
+
+		// Drags mouse
+		else if (event.type == SDL_EVENT_MOUSE_MOTION && is_mouse_dragging) 
+		{
+			float x_offset = -event.motion.xrel;
+			float y_offset = event.motion.yrel;
+			visualizer->rotate_camera(x_offset, y_offset);	
+		}
+
+		// Scrolls
+		else if (event.type == SDL_EVENT_MOUSE_WHEEL) 
+		{	
+			float scroll_delta = event.wheel.y;
+			if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+			{
+				scroll_delta = -scroll_delta;
+			}
+
+			if (scroll_delta != 0.0f)
+			{
+				visualizer->zoom_camera(scroll_delta * 0.1f);
+			}
+		}
+	}
+
+	// Releasing should be possible when not in focus
+	// Releases click
+	if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) 
+	{
+		is_mouse_dragging = false;
+	}
+
+	// Window loses focus or mouse leaves area
+	else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST || event.type == SDL_EVENT_WINDOW_MOUSE_LEAVE ) 
+	{
+		is_mouse_dragging = false;
+	}
+
+	// Reset focused flag
+	data_source.visualizer_render_targets.color.is_focused = false;
 }

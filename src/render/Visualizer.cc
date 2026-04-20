@@ -2,15 +2,15 @@
 #include "data/DataSource.hh"
 
 void Visualizer::PointsRenderer::render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                             const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                             const glm::mat4 &vp, DataSource& data_source,
                                              const Parameters &params)
 {
-    if (data_source->scrubber.get_points_buffer_size() == 0)
+    if (data_source.scrubber.get_points_buffer_size() == 0)
         return;
 
     SDL_BindGPUGraphicsPipeline(render_pass, points_pipeline);
 
-    SDL_GPUBuffer* points_buffer = data_source->scrubber.get_points_buffer();
+    SDL_GPUBuffer* points_buffer = data_source.scrubber.get_points_buffer();
     SDL_GPUBufferBinding vertex_buffer_binding;
     vertex_buffer_binding.buffer = points_buffer;
     vertex_buffer_binding.offset = 0;
@@ -24,9 +24,9 @@ void Visualizer::PointsRenderer::render_pass(SDL_GPUCommandBuffer *command_buffe
             float point_size;
     } uniforms;
 
-    glm::vec2 camera_resolution = data_source->scrubber.get_camera_resolution();
-    float lower_depth = data_source->scrubber.get_lower_depth();
-    float upper_depth = data_source->scrubber.get_upper_depth();
+    glm::vec2 camera_resolution = data_source.scrubber.get_camera_resolution();
+    float lower_depth = data_source.scrubber.get_lower_depth();
+    float upper_depth = data_source.scrubber.get_upper_depth();
     float depth_range = upper_depth - lower_depth;
 
     glm::mat4 z_translate = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -lower_depth));
@@ -49,10 +49,10 @@ void Visualizer::PointsRenderer::render_pass(SDL_GPUCommandBuffer *command_buffe
 
     SDL_PushGPUVertexUniformData(command_buffer, 0, &uniforms, sizeof(uniforms));
 
-    SDL_DrawGPUPrimitives(render_pass, data_source->scrubber.get_points_buffer_size(), 1, 0, 0);
+    SDL_DrawGPUPrimitives(render_pass, data_source.scrubber.get_points_buffer_size(), 1, 0, 0);
 }
 
-void Visualizer::TextRenderer::cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
+void Visualizer::TextRenderer::cpu_update(DataSource& data_source, const Parameters &params)
 {
     vertices.clear();
     indices.clear();
@@ -64,11 +64,8 @@ void Visualizer::TextRenderer::cpu_update(std::shared_ptr<DataSource> data_sourc
     }
     managed_text_objects.clear();
 
-    if (!data_source)
-        return;
-
-    float lower_depth = data_source->scrubber.get_lower_depth();
-    float upper_depth = data_source->scrubber.get_upper_depth();
+    float lower_depth = data_source.scrubber.get_lower_depth();
+    float upper_depth = data_source.scrubber.get_upper_depth();
     float depth_range = upper_depth - lower_depth;
 
     glm::vec3 text_position = {1.0f, -1.0f, 0.0f};
@@ -102,10 +99,10 @@ void Visualizer::TextRenderer::cpu_update(std::shared_ptr<DataSource> data_sourc
 }
 
 void Visualizer::FramesRenderer::render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                             const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                             const glm::mat4 &vp, DataSource& data_source,
                                              const Parameters &params)
 {
-    if (!frames_pipeline || data_source->scrubber.get_frames_timestamps()[0] < 0.0f)
+    if (!frames_pipeline || data_source.scrubber.get_frames_timestamps()[0] < 0.0f)
     {
         return;
     }
@@ -117,22 +114,26 @@ void Visualizer::FramesRenderer::render_pass(SDL_GPUCommandBuffer *command_buffe
     SDL_PushGPUVertexUniformData(command_buffer, 0, &mvp[0][0], sizeof(mvp));
 
     SDL_GPUTextureSamplerBinding sampler_binding = {};
-    sampler_binding.texture = data_source->scrubber.get_frames_texture();
+    sampler_binding.texture = data_source.scrubber.get_frames_texture();
     sampler_binding.sampler = sampler;
     SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
 
-    glm::vec4 frame_data = {data_source->scrubber.get_frames_timestamps()[0],
-                           data_source->scrubber.get_frames_timestamps()[1],
-                           data_source->scrubber.get_upper_depth(), 0.0f};
+    glm::vec4 frame_data = {data_source.scrubber.get_frames_timestamps()[0],
+                           data_source.scrubber.get_frames_timestamps()[1],
+                           data_source.scrubber.get_upper_depth(), 0.0f};
     SDL_PushGPUFragmentUniformData(command_buffer, 0, &frame_data, sizeof(frame_data));
 
     SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
 }
 
-void Visualizer::render(std::shared_ptr<DataSource> data_source)
+void Visualizer::render(std::shared_ptr<DataSource> data_source) {
+    render(*data_source);
+}
+
+void Visualizer::render(DataSource& data_source)
 {
-    Parameters params = data_source->visualizer_parameters;
-    RenderTargets render_targets = data_source->visualizer_render_targets;
+    Parameters params = data_source.visualizer_parameters;
+    RenderTargets render_targets = data_source.visualizer_render_targets;
 
     // CPU Update phase
     grid_renderer->cpu_update(params);

@@ -364,13 +364,13 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
+                void cpu_update(DataSource& data_source, const Parameters &params)
                 {
                     // No CPU updates needed for points
                 }
 
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass, 
-                              std::shared_ptr<DataSource> data_source)
+                              DataSource& data_source)
                 {
                     // No copy operations needed - points buffer managed by scrubber
                 }
@@ -384,7 +384,7 @@ class Visualizer
                  * @param params Visualizer parameters
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                 const glm::mat4 &vp, DataSource& data_source,
                                  const Parameters &params);
         };
 
@@ -505,7 +505,15 @@ class Visualizer
                  */
                 ~TextRenderer()
                 {
-                    cpu_update(nullptr, {});
+                    vertices.clear();
+                    indices.clear();
+                    draw_calls.clear();
+
+                    for (TTF_Text *text_obj : managed_text_objects)
+                    {
+                        TTF_DestroyText(text_obj);
+                    }
+                    managed_text_objects.clear();
 
                     if (sampler)
                         SDL_ReleaseGPUSampler(gpu_device, sampler);
@@ -588,13 +596,13 @@ class Visualizer
                 /**
                  * @brief Clears text and generates labels for depth axis.
                  */
-                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params);
+                void cpu_update(DataSource& data_source, const Parameters &params);
 
                 /**
                  * @brief Copies text data to GPU.
                  */
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                              std::shared_ptr<DataSource> data_source)
+                              DataSource& data_source)
                 {
                     if (vertices.empty() || indices.empty())
                         return;
@@ -623,7 +631,7 @@ class Visualizer
                  * @brief Renders the text.
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                 const glm::mat4 &vp, DataSource& data_source,
                                  const Parameters &params)
                 {
                     if (draw_calls.empty() || !vertex_buffer || !index_buffer || !text_pipeline)
@@ -745,12 +753,12 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
+                void cpu_update(DataSource& data_source, const Parameters &params)
                 {
                 }
 
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                              std::shared_ptr<DataSource> data_source)
+                              DataSource& data_source)
                 {
                 }
 
@@ -758,7 +766,7 @@ class Visualizer
                  * @brief Renders the frames.
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                 const glm::mat4 &vp, DataSource& data_source,
                                  const Parameters &params);
         };
 
@@ -832,6 +840,7 @@ class Visualizer
          * @param data_source Shared pointer to DataSource containing event data and scrubber
          */
         void render(std::shared_ptr<DataSource> data_source);
-};
+        void render(DataSource& data_source);
+    };
 
 #endif

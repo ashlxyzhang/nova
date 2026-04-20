@@ -53,7 +53,6 @@ class GUI
 
         // Camera control state
         bool is_mouse_dragging = false;
-        bool cursor_captured = false;
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -1051,81 +1050,59 @@ class GUI
 
             // Handle camera controls for visualizer
             std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            bool any_focused = false;
+            int num_sources = (int) sources.size();
+            if (selected_source_index >= num_sources) return;
 
-            // Check if any visualizer window is focused
-            for (const auto &source : sources)
-            {
-                if (source->visualizer_render_targets.color.is_focused)
+            // Check if selected visualizer output is focused
+            bool focused = false;
+            focused = sources[selected_source_index]->visualizer_render_targets.color.is_focused;
+            
+            // Start a click, scrolling, and dragging must be done while focused
+            if (focused) {
+                if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_LEFT) 
                 {
-                    any_focused = true;
-                    break;
+                    is_mouse_dragging = true;
                 }
-            }
-            if (any_focused)
-            {
-                switch (event->type)
+
+                // Drags mouse
+                else if (event->type == SDL_EVENT_MOUSE_MOTION && is_mouse_dragging) 
                 {
-                case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                    if (event->button.button == SDL_BUTTON_LEFT)
-                    {
-                        is_mouse_dragging = true;
-                        SDL_HideCursor();
-                        SDL_SetWindowRelativeMouseMode(window, true);
-                        cursor_captured = true;
-                    }
-                    break;
+                    float x_offset = -event->motion.xrel;
+                    float y_offset = event->motion.yrel;
+                    visualizer.rotate_camera(x_offset, y_offset);	
+                }
 
-                case SDL_EVENT_MOUSE_BUTTON_UP:
-                    if (event->button.button == SDL_BUTTON_LEFT)
-                    {
-                        is_mouse_dragging = false;
-                        if (cursor_captured)
-                        {
-                            SDL_SetWindowRelativeMouseMode(window, false);
-                            SDL_ShowCursor();
-                            cursor_captured = false;
-                        }
-                    }
-                    break;
-
-                case SDL_EVENT_MOUSE_MOTION:
-                    if (is_mouse_dragging && cursor_captured)
-                    {
-                        float x_offset = -event->motion.xrel;
-                        float y_offset = event->motion.yrel;
-                        visualizer.rotate_camera(x_offset, y_offset);
-                    }
-                    break;
-
-                case SDL_EVENT_MOUSE_WHEEL:
-                {
+                // Scrolls
+                else if (event->type == SDL_EVENT_MOUSE_WHEEL) 
+                {	
                     float scroll_delta = event->wheel.y;
                     if (event->wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+                    {
                         scroll_delta = -scroll_delta;
+                    }
 
                     if (scroll_delta != 0.0f)
-                        visualizer.zoom_camera(scroll_delta * 0.1f);
-                    break;
-                }
-
-                case SDL_EVENT_WINDOW_FOCUS_LOST:
-                    if (cursor_captured)
                     {
-                        SDL_SetWindowRelativeMouseMode(window, false);
-                        SDL_ShowCursor();
-                        cursor_captured = false;
-                        is_mouse_dragging = false;
+                        visualizer.zoom_camera(scroll_delta * 0.1f);
                     }
-                    break;
-                }
-
-                // Clear focus flags
-                for (auto &source : sources)
-                {
-                    source->visualizer_render_targets.color.is_focused = false;
                 }
             }
+
+            // Releasing should be possible when not in focus
+            // Releases click
+            if (event->type == SDL_EVENT_MOUSE_BUTTON_UP && event->button.button == SDL_BUTTON_LEFT) 
+            {
+                is_mouse_dragging = false;
+            }
+
+            // Window loses focus or mouse leaves area
+            else if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST || event->type == SDL_EVENT_WINDOW_MOUSE_LEAVE ) 
+            {
+                is_mouse_dragging = false;
+            }
+
+            // Reset focused flag
+            sources[selected_source_index]->visualizer_render_targets.color.is_focused = false;
         }
 
         /**

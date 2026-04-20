@@ -85,9 +85,9 @@ class GPUDevice
             return gpu_device; 
         }
 
-        SDL_Window* create_window(int width, int height, SDL_WindowFlags flags, std::string title) {
+        SDL_Window* create_window(int width, int height, SDL_WindowFlags flags) {
 
-            SDL_Window* window = SDL_CreateWindow(title.c_str(), width, height, flags);
+            SDL_Window* window = SDL_CreateWindow("NOVA", width, height, flags);
             if (window == nullptr) {
                 SDL_Log("Couldn't create window: %s", SDL_GetError());
                 return nullptr;

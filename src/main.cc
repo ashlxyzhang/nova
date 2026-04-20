@@ -42,7 +42,7 @@ struct Application
             return SDL_APP_FAILURE;
         }
 
-        window = gpu_device.create_window(1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY, "Nova");
+        window = gpu_device.create_window(1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
         if (window == nullptr) {
             return SDL_APP_FAILURE;
         }
@@ -130,10 +130,6 @@ int main() {
     
     // Read all data from files first
     ds.start_reading_thread();
-    
-    // Initialize displays
-    DCEDisplay dce_display(gpu, 1280, 720, "API Demo");    
-    if (!dce_display.is_open()) return 1;
 
     // Configure scrubber 
     Scrubber::State& s = ds.scrubber.state;
@@ -143,10 +139,13 @@ int main() {
     s.time_step = 10000.0f;    // ~30fps 
     s.loop = true;
 
-    // ImGui is non thread safe so this is a blocking operation
-    dce_display.play(ds);
+    // DCEDisplay dce_display(gpu, 1280, 720, "API Demo");    
+    // if (!dce_display.is_open()) return 1;
+    // dce_display.play(ds);
 
-    
+    VisualizerDisplay visualizer_display(gpu, 1280, 720, "Visualizer Demo");
+    if (!visualizer_display.is_open()) return 1;
+    visualizer_display.play(ds);
 
     return 0;
 }
