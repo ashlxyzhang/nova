@@ -17,8 +17,12 @@
 #include "shaders/visualizer/grid/grid_vert.h"
 #include "shaders/visualizer/points/points_frag.h"
 #include "shaders/visualizer/points/points_vert.h"
+#include "shaders/visualizer/slam_points/slam_points_frag.h"
+#include "shaders/visualizer/slam_points/slam_points_vert.h"
 #include "shaders/visualizer/text/text_frag.h"
 #include "shaders/visualizer/text/text_vert.h"
+
+#include <pcl/point_types.h>
 
 #include "fonts/CascadiaCode.ttf.h"
 
@@ -41,52 +45,56 @@ class Visualizer
 
         struct RenderTargets
         {
-            RenderTarget color;
-            RenderTarget depth;
+                RenderTarget color;
+                RenderTarget depth;
 
-            void init_textures(SDL_GPUDevice* gpu_device, cv::Size resolution) {
-                SDL_GPUTextureCreateInfo vis_color_create_info = {
-                    .type = SDL_GPU_TEXTURETYPE_2D,
-                    .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
-                    .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
-                    .width = 1920,
-                    .height = 1200,
-                    .layer_count_or_depth = 1,
-                    .num_levels = 1,
-                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                };
-                color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width, vis_color_create_info.height};
-                
-                SDL_GPUTextureCreateInfo vis_depth_create_info = {
-                    .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-                    .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-                    .width = 1920,
-                    .height = 1200,
-                    .layer_count_or_depth = 1,
-                    .num_levels = 1,
-                    .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                };
-                depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width, vis_depth_create_info.height};
-            }
+                void init_textures(SDL_GPUDevice *gpu_device, cv::Size resolution)
+                {
+                    SDL_GPUTextureCreateInfo vis_color_create_info = {
+                        .type = SDL_GPU_TEXTURETYPE_2D,
+                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
+                        .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                        .width = 1920,
+                        .height = 1200,
+                        .layer_count_or_depth = 1,
+                        .num_levels = 1,
+                        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                    };
+                    color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width,
+                             vis_color_create_info.height};
 
-            void delete_textures(SDL_GPUDevice* gpu_device) {
-                SDL_ReleaseGPUTexture(gpu_device, color.texture);
-                SDL_ReleaseGPUTexture(gpu_device, depth.texture);
-            }
+                    SDL_GPUTextureCreateInfo vis_depth_create_info = {
+                        .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+                        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+                        .width = 1920,
+                        .height = 1200,
+                        .layer_count_or_depth = 1,
+                        .num_levels = 1,
+                        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+                    };
+                    depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width,
+                             vis_depth_create_info.height};
+                }
+
+                void delete_textures(SDL_GPUDevice *gpu_device)
+                {
+                    SDL_ReleaseGPUTexture(gpu_device, color.texture);
+                    SDL_ReleaseGPUTexture(gpu_device, depth.texture);
+                }
         };
 
         struct Parameters
         {
-            uint32_t grid_x_subdivisions = 5;
-            uint32_t grid_y_subdivisions = 5;
-            uint32_t grid_z_subdivisions = 5;
+                uint32_t grid_x_subdivisions = 5;
+                uint32_t grid_y_subdivisions = 5;
+                uint32_t grid_z_subdivisions = 5;
 
-            float particle_scale = 3.0f;
-            glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
-            glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
+                float particle_scale = 3.0f;
+                glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
+                glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
 
-            TIME unit_type = TIME::UNIT_MS;           // MS is default
-            float unit_time_conversion_factor = 1.0f; // MS is default
+                TIME unit_type = TIME::UNIT_MS;           // MS is default
+                float unit_time_conversion_factor = 1.0f; // MS is default
         };
 
     private:
@@ -368,8 +376,8 @@ class Visualizer
                     // No CPU updates needed for points
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass, 
-                              std::shared_ptr<DataSource> data_source)
+                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
+                               std::shared_ptr<DataSource> data_source)
                 {
                     // No copy operations needed - points buffer managed by scrubber
                 }
@@ -593,7 +601,7 @@ class Visualizer
                  * @brief Copies text data to GPU.
                  */
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                              std::shared_ptr<DataSource> data_source)
+                               std::shared_ptr<DataSource> data_source)
                 {
                     if (vertices.empty() || indices.empty())
                         return;
@@ -622,8 +630,7 @@ class Visualizer
                  * @brief Renders the text.
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
-                                 const Parameters &params)
+                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source, const Parameters &params)
                 {
                     if (draw_calls.empty() || !vertex_buffer || !index_buffer || !text_pipeline)
                         return;
@@ -749,7 +756,7 @@ class Visualizer
                 }
 
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                              std::shared_ptr<DataSource> data_source)
+                               std::shared_ptr<DataSource> data_source)
                 {
                 }
 
@@ -759,6 +766,113 @@ class Visualizer
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                  const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
                                  const Parameters &params);
+        };
+
+        /**
+         * @brief Renders the SLAM filtered point cloud in world space.
+         */
+        class SlamRenderer
+        {
+            private:
+                struct SlamVertex
+                {
+                        glm::vec4 pos;   // xyz = world position
+                        glm::vec4 color; // rgb = color [0, 1]
+                };
+
+                SDL_GPUDevice *gpu_device = nullptr;
+                SDL_GPUGraphicsPipeline *slam_pipeline = nullptr;
+                SDL_GPUBuffer *vertex_buffer = nullptr;
+                std::vector<SlamVertex> vertices;
+
+            public:
+                SlamRenderer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device)
+                {
+                    SDL_GPUShaderCreateInfo vs_create_info = {0};
+                    vs_create_info.code_size = sizeof slam_points_vert;
+                    vs_create_info.code = (const unsigned char *)slam_points_vert;
+                    vs_create_info.entrypoint = "main";
+                    vs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                    vs_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+                    vs_create_info.num_uniform_buffers = 1;
+                    SDL_GPUShader *vs = SDL_CreateGPUShader(gpu_device, &vs_create_info);
+
+                    SDL_GPUShaderCreateInfo fs_create_info = {0};
+                    fs_create_info.code_size = sizeof slam_points_frag;
+                    fs_create_info.code = (const unsigned char *)slam_points_frag;
+                    fs_create_info.entrypoint = "main";
+                    fs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+                    fs_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+                    SDL_GPUShader *fs = SDL_CreateGPUShader(gpu_device, &fs_create_info);
+
+                    SDL_GPUVertexBufferDescription vertex_buffer_desc = {0, sizeof(SlamVertex),
+                                                                         SDL_GPU_VERTEXINPUTRATE_VERTEX, 0};
+                    SDL_GPUVertexAttribute vertex_attributes[] = {
+                        {0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, 0},
+                        {1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, offsetof(SlamVertex, color)}};
+                    SDL_GPUColorTargetDescription color_target_desc = {SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM};
+
+                    SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {
+                        .vertex_shader = vs,
+                        .fragment_shader = fs,
+                        .vertex_input_state = {.vertex_buffer_descriptions = &vertex_buffer_desc,
+                                               .num_vertex_buffers = 1,
+                                               .vertex_attributes = vertex_attributes,
+                                               .num_vertex_attributes = 2},
+                        .primitive_type = SDL_GPU_PRIMITIVETYPE_POINTLIST,
+                        .depth_stencil_state = {.compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
+                                                .enable_depth_test = true,
+                                                .enable_depth_write = true},
+                        .target_info = {.color_target_descriptions = &color_target_desc,
+                                        .num_color_targets = 1,
+                                        .depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+                                        .has_depth_stencil_target = true}};
+
+                    slam_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &pipeline_info);
+                    SDL_ReleaseGPUShader(gpu_device, vs);
+                    SDL_ReleaseGPUShader(gpu_device, fs);
+                }
+
+                ~SlamRenderer()
+                {
+                    if (vertex_buffer)
+                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
+                    if (slam_pipeline)
+                        SDL_ReleaseGPUGraphicsPipeline(gpu_device, slam_pipeline);
+                }
+
+                void cpu_update(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pc)
+                {
+                    vertices.clear();
+                    if (!pc)
+                        return;
+                    vertices.reserve(pc->size());
+                    for (const auto &pt : *pc)
+                        vertices.push_back({glm::vec4(pt.x, pt.y, pt.z, 1.0f),
+                                            glm::vec4(pt.r / 255.0f, pt.g / 255.0f, pt.b / 255.0f, 1.0f)});
+                }
+
+                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                {
+                    if (vertices.empty())
+                        return;
+
+                    if (vertex_buffer)
+                    {
+                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
+                        vertex_buffer = nullptr;
+                    }
+
+                    SDL_GPUBufferCreateInfo buf_info = {.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+                                                        .size =
+                                                            static_cast<Uint32>(vertices.size() * sizeof(SlamVertex))};
+                    vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &buf_info);
+                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(),
+                                                vertices.size() * sizeof(SlamVertex));
+                }
+
+                void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
+                                 const glm::mat4 &vp, const Parameters &params);
         };
 
         // Camera
@@ -774,15 +888,16 @@ class Visualizer
         PointsRenderer *points_renderer = nullptr;
         TextRenderer *text_renderer = nullptr;
         FramesRenderer *frames_renderer = nullptr;
+        SlamRenderer *slam_renderer = nullptr;
+
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> slam_pointcloud_;
 
     public:
         /**
          * @brief Constructor. Initializes pipelines only.
          * @param gpu_device SDL_GPUDevice to create texture on
          */
-        Visualizer(SDL_GPUDevice *gpu_device)
-            : gpu_device(gpu_device),
-              upload_buffer(gpu_device)
+        Visualizer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device), upload_buffer(gpu_device)
         {
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
@@ -790,6 +905,7 @@ class Visualizer
             points_renderer = new PointsRenderer(gpu_device);
             text_renderer = new TextRenderer(gpu_device);
             frames_renderer = new FramesRenderer(gpu_device);
+            slam_renderer = new SlamRenderer(gpu_device);
         }
 
         /**
@@ -809,6 +925,10 @@ class Visualizer
             {
                 delete points_renderer;
             }
+            if (slam_renderer)
+            {
+                delete slam_renderer;
+            }
             if (text_renderer)
             {
                 delete text_renderer;
@@ -824,6 +944,11 @@ class Visualizer
         void zoom_camera(float scroll_delta)
         {
             camera.processMouseScroll(scroll_delta);
+        }
+
+        void set_slam_pointcloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pc)
+        {
+            slam_pointcloud_ = std::move(pc);
         }
 
         /**
