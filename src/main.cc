@@ -11,11 +11,11 @@
 #include "render/SpinningCube.hh"
 #include "render/UploadBuffer.hh"
 #include "render/Visualizer.hh"
+#include "slam_manager.hh"
 #include "ui/GUI.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "util/threads.hh"
-#include "slam_manager.hh"
 
 struct Application
 {
@@ -63,7 +63,8 @@ static SDL_AppResult init_graphics(Application &app)
     return SDL_APP_CONTINUE;
 }
 
-static void render_gui(void *appstate) {
+static void render_gui(void *appstate)
+{
     auto *app = static_cast<Application *>(appstate);
 
     // Render GUI
@@ -97,7 +98,7 @@ static void render_gui(void *appstate) {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
-{  
+{
     // Initialize application and save to appstate so that it can be accessed in other functions
     auto *app = new Application();
     *appstate = app;
@@ -111,14 +112,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     app->data_acq = std::make_unique<DataAcquisition>(app->gpu_device_wrapper.get_device());
     app->visualizer = std::make_unique<Visualizer>(app->gpu_device_wrapper.get_device());
     app->digital_coded_exposure = std::make_unique<DigitalCodedExposure>(app->gpu_device_wrapper.get_device());
-    app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, *app->error_queue, 
-                                     app->window, app->gpu_device_wrapper.get_device());
+    app->gui = std::make_unique<GUI>(*app->data_acq, *app->visualizer, *app->error_queue, app->window,
+                                     app->gpu_device_wrapper.get_device());
     app->slam = std::make_unique<SlamManager>();
 
     // Spawn separate thread to manage the DataAcquisition
     app->data_acquisition_thread = std::thread(program_thread::data_acquisition_thread,
-                                                std::ref(app->data_acquisition_running),
-                                                std::ref(*app->data_acq));
+                                               std::ref(app->data_acquisition_running), std::ref(*app->data_acq));
 
     return SDL_APP_CONTINUE;
 }
@@ -129,9 +129,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     app->gui->event_handler(event);
 
-    if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
+    if (event->type == SDL_EVENT_QUIT)
+        return SDL_APP_SUCCESS;
 
-    if((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_ESCAPE))
+    if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_ESCAPE))
     {
         SlamManager::StartSlamParameters params;
         params.left_camera_yaml_path = "/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
@@ -140,12 +141,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         params.Tracking_yaml_path = "/src/SLAM/esvo2_core/cfg/tracking/tracking_desc_AA.yaml";
         params.IR_Left_yaml_path = "src/SLAM/image_representation/cfg/image_representation_fast.yaml";
         params.IR_Right_yaml_path = "src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
-        // TODO -> get scrubber and event data 
+        // TODO -> get scrubber and event data
 
         app->slam->startSlam(params);
-        std::cout<<"tat=ta"<<std::endl;
+        std::cout << "tat=ta" << std::endl;
     }
-
 
     return SDL_APP_CONTINUE;
 }
@@ -160,16 +160,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
-
     // Update all of the data sources
     app->data_acq->update();
-    
+
     // Update SLAM based on its scrubbers's events
     app->slam->send_events();
-    
+    auto slam_pc = app->slam->get_viz_pointcloud();
+    if (slam_pc)
+        app->visualizer->set_slam_pointcloud(slam_pc);
+
     // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();
-    for (const auto& data_source : data_sources)
+    for (const auto &data_source : data_sources)
     {
         app->digital_coded_exposure->render(data_source);
         app->visualizer->render(data_source);
@@ -192,7 +194,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     // It's important to free window after we delete app b/c GPUDevice wrapper releases window from GPU
     SDL_Window *window = app->window;
     delete app;
-    
+
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
