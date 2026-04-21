@@ -10,7 +10,7 @@ void Visualizer::PointsRenderer::render_pass(SDL_GPUCommandBuffer *command_buffe
 
     SDL_BindGPUGraphicsPipeline(render_pass, points_pipeline);
 
-    SDL_GPUBuffer* points_buffer = data_source->scrubber.get_points_buffer();
+    SDL_GPUBuffer *points_buffer = data_source->scrubber.get_points_buffer();
     SDL_GPUBufferBinding vertex_buffer_binding;
     vertex_buffer_binding.buffer = points_buffer;
     vertex_buffer_binding.offset = 0;
@@ -30,18 +30,14 @@ void Visualizer::PointsRenderer::render_pass(SDL_GPUCommandBuffer *command_buffe
     float depth_range = upper_depth - lower_depth;
 
     glm::mat4 z_translate = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -lower_depth));
-    glm::mat4 scale_matrix =
-        glm::scale(glm::mat4(1.0f), glm::vec3(2.0f / camera_resolution.x, 2.0f / camera_resolution.y,
-                                              2.0f / depth_range));
+    glm::mat4 scale_matrix = glm::scale(
+        glm::mat4(1.0f), glm::vec3(2.0f / camera_resolution.x, 2.0f / camera_resolution.y, 2.0f / depth_range));
     glm::mat4 translate_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, -1.0f, -1.0f));
-    glm::mat4 rotate_matrix =
-        glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    glm::mat4 z_switch =
-        glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 rotate_matrix = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::mat4 z_switch = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 reflect_yz = glm::scale(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 1.0f));
 
-    uniforms.mvp =
-        vp * reflect_yz * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
+    uniforms.mvp = vp * reflect_yz * z_switch * rotate_matrix * translate_matrix * scale_matrix * z_translate;
 
     uniforms.negative_color = glm::vec4(params.polarity_neg_color, 1.0f);
     uniforms.positive_color = glm::vec4(params.polarity_pos_color, 1.0f);
@@ -77,8 +73,7 @@ void Visualizer::TextRenderer::cpu_update(std::shared_ptr<DataSource> data_sourc
 
     for (uint32_t i = 0; i <= params.grid_z_subdivisions; ++i)
     {
-        float normalized_z =
-            2.0f * static_cast<float>(i) / static_cast<float>(params.grid_z_subdivisions) - 1.0f;
+        float normalized_z = 2.0f * static_cast<float>(i) / static_cast<float>(params.grid_z_subdivisions) - 1.0f;
 
         float timestamp = lower_depth + (normalized_z + 1.0f) * 0.5f * depth_range;
 
@@ -99,6 +94,29 @@ void Visualizer::TextRenderer::cpu_update(std::shared_ptr<DataSource> data_sourc
         text_position.z = normalized_z;
         add_text(timestamp_str, text_position, text_normal, text_color);
     }
+}
+
+void Visualizer::SlamRenderer::render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
+                                           const glm::mat4 &vp, const Parameters &params)
+{
+    if (!slam_pipeline || !vertex_buffer || vertices.empty())
+        return;
+
+    SDL_BindGPUGraphicsPipeline(render_pass, slam_pipeline);
+
+    SDL_GPUBufferBinding binding = {vertex_buffer, 0};
+    SDL_BindGPUVertexBuffers(render_pass, 0, &binding, 1);
+
+    struct Uniforms
+    {
+            glm::mat4 mvp;
+            float point_size;
+    } uniforms;
+    uniforms.mvp = vp;
+    uniforms.point_size = params.particle_scale;
+
+    SDL_PushGPUVertexUniformData(command_buffer, 0, &uniforms, sizeof(uniforms));
+    SDL_DrawGPUPrimitives(render_pass, static_cast<Uint32>(vertices.size()), 1, 0, 0);
 }
 
 void Visualizer::FramesRenderer::render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
@@ -122,8 +140,8 @@ void Visualizer::FramesRenderer::render_pass(SDL_GPUCommandBuffer *command_buffe
     SDL_BindGPUFragmentSamplers(render_pass, 0, &sampler_binding, 1);
 
     glm::vec4 frame_data = {data_source->scrubber.get_frames_timestamps()[0],
-                           data_source->scrubber.get_frames_timestamps()[1],
-                           data_source->scrubber.get_upper_depth(), 0.0f};
+                            data_source->scrubber.get_frames_timestamps()[1], data_source->scrubber.get_upper_depth(),
+                            0.0f};
     SDL_PushGPUFragmentUniformData(command_buffer, 0, &frame_data, sizeof(frame_data));
 
     SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
@@ -136,7 +154,7 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
 
     // CPU Update phase
     grid_renderer->cpu_update(params);
-    points_renderer->cpu_update(data_source, params);
+    slam_renderer->cpu_update(slam_pointcloud_);
     text_renderer->cpu_update(data_source, params);
     frames_renderer->cpu_update(data_source, params);
 
@@ -146,7 +164,7 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
 
     // Copy pass phase
     grid_renderer->copy_pass(upload_buffer, copy_pass);
-    points_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+    slam_renderer->copy_pass(upload_buffer, copy_pass);
     text_renderer->copy_pass(upload_buffer, copy_pass, data_source);
     frames_renderer->copy_pass(upload_buffer, copy_pass, data_source);
 
@@ -171,20 +189,18 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     depth_target_info.store_op = SDL_GPU_STOREOP_DONT_CARE;
     depth_target_info.cycle = false;
 
-    SDL_GPURenderPass *render_pass =
-        SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
+    SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, &depth_target_info);
 
     glm::mat4 view = camera.getViewMatrix();
     glm::mat4 projection = camera.getProjectionMatrix();
     glm::mat4 vp = projection * view;
 
     grid_renderer->render_pass(command_buffer, render_pass, vp);
-    points_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+    slam_renderer->render_pass(command_buffer, render_pass, vp, params);
     frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
     text_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
 
     SDL_EndGPURenderPass(render_pass);
-
 
     // Submit the command buffer
     SDL_SubmitGPUCommandBuffer(command_buffer);
