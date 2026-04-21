@@ -122,24 +122,32 @@ int main() {
     GPUDevice gpu;
     
     // Initialize data source
-    DataSource ds(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
-    
+    DataSource source1(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
+    DataSource source2(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/pedestrians.raw");
+
     // Read all data from file first
-    ds.read_all();
+    source1.read_all();
+    source2.read_all();
 
     // Configure scrubber 
-    Scrubber::State& state = ds.scrubber.state;
-    state.time_window = 10000.0f;
-    state.time_step = 20000.0f;    
-    state.mode = Scrubber::Mode::PLAYING;  
-    state.loop = true;
+    Scrubber::State& state1 = source1.scrubber.state;
+    state1.time_window = 10000.0f;
+    state1.time_step = 20000.0f;    
+    state1.mode = Scrubber::Mode::PLAYING;  
+    state1.loop = true;
+
+    Scrubber::State& state2 = source2.scrubber.state;
+    state2.time_window = 10000.0f;
+    state2.time_step = 20000.0f;    
+    state2.mode = Scrubber::Mode::PLAYING;  
+    state2.loop = true;
 
     // Initialize displays
     DCEDisplay dce_display(gpu, 1280, 720, "DCE Demo");    
     VisualizerDisplay visualizer_display(gpu, 1280, 720, "Visualizer Demo");
     
     // Play windows concurrently
-    Window::show_all({&dce_display, &visualizer_display}, ds);
+    Window::show_all({&dce_display, &visualizer_display}, {&source1, &source2}, 30);
 
     return 0;
 }

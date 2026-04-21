@@ -61,6 +61,7 @@ struct DataSource {
 
 	void read_all(); 				// Blocking
 	void start_reading_thread();	// Non-blocking
+	void wait_reading_thread();		// Blocking
 	void stop_reading_thread();		// Non-blocking
 };
 

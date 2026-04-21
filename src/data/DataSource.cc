@@ -287,3 +287,9 @@ void DataSource::stop_reading_thread() {
         reading_thread.join();
     }
 }
+
+void DataSource::wait_reading_thread() {
+    if (reading_thread.joinable()) {
+        reading_thread.join();
+    }
+}

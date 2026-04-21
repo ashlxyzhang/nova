@@ -43,7 +43,7 @@ void Window::init_imgui() {
 												SDL_GetGPUSwapchainTextureFormat(gpu_device.get_SDL_device(), window),
 											.MSAASamples = SDL_GPU_SAMPLECOUNT_1,
 											.SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-											.PresentMode = SDL_GPU_PRESENTMODE_VSYNC};
+											.PresentMode = SDL_GPU_PRESENTMODE_IMMEDIATE};
 	ImGui_ImplSDLGPU3_Init(&init_info);
 }
 
@@ -229,7 +229,7 @@ void Window::show_all(std::vector<Window*> windows, DataSource& data_source, int
 	// Continue to render all open windows until all are closed
 	while (any_open) {
 		any_open = false;
-		
+
 		for (Window* window: windows) {
 			if (window->is_open()) {
 				any_open = true;
@@ -266,7 +266,7 @@ void Window::show_all(std::vector<Window*> windows, std::vector<DataSource*> dat
 		}
 
 		// Add to the list of unique sources if it hasn't been before
-		if (std::find(unique_sources.begin(), unique_sources.end(), data_source) != unique_sources.end()) {
+		if (std::find(unique_sources.begin(), unique_sources.end(), data_source) == unique_sources.end()) {
 			unique_sources.push_back(data_source);
 		}
 	}
