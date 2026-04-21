@@ -1174,7 +1174,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
 
     pc_color_->clear();
     pc_color_->reserve(depthMapPtr->size());
-    pc_filtered_->clear();
+    pc_filtered_ = std::make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
     pc_filtered_->reserve(depthMapPtr->size());
     pc_near_->clear();
     pc_near_->reserve(depthMapPtr->size());
@@ -1231,10 +1231,12 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         // pc_to_publish->header.stamp = t;
         // pc_filtered_pub_.publish(pc_to_publish);
 
-        // VIZ PUBLISH -> not publishing anything right now
-        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_filtered2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
-        *pointcloud_filtered2 = *pc_filtered_;
+        // std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_filtered2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
+        // *pointcloud_filtered2 = *pc_filtered_;
         // timestamp is t if want to add to a queue
+
+        std::lock_guard<std::mutex> lock(viz_pc_mutex_);
+        viz_pc_ = pc_filtered_;
     }
 
     // publish global pointcloud
