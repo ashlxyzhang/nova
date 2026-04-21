@@ -94,6 +94,12 @@ class esvo2_Mapping
         void publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation &tr, timePoint &t);
         void publishImage(const cv::Mat &image, const timePoint &t, std::string encoding = "bgr8");
 
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> get_viz_pointcloud()
+        {
+            std::lock_guard<std::mutex> lock(viz_pc_mutex_);
+            return viz_pc_;
+        }
+
         /*** event processing ***/
         void createEdgeMask(std::vector<esvo2_core::Event *> &vEventsPtr, PerspectiveCamera::Ptr &camPtr, cv::Mat &edgeMap,
                             std::vector<std::pair<std::size_t, std::size_t>> &vEdgeletCoordinates, bool bUndistortEvents = true,
@@ -120,6 +126,10 @@ class esvo2_Mapping
         //queues
         // DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track; //MOVED TO BACKEND_OPTIMIZATION.h
         DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>& pointcloud_Map_to_Track_;
+
+        // visualization
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> viz_pc_;
+        std::mutex viz_pc_mutex_;
 
         // Running variable
         std::atomic<bool> &is_running;
