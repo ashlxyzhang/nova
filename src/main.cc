@@ -131,6 +131,22 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
 
+    if((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_ESCAPE))
+    {
+        SlamManager::StartSlamParameters params;
+        params.left_camera_yaml_path = "/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
+        params.right_camera_yaml_path = "/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
+        params.Mapping_yaml_path = "/src/SLAM/esvo2_core/cfg/mapping/mapping_desc_AA.yaml";
+        params.Tracking_yaml_path = "/src/SLAM/esvo2_core/cfg/tracking/tracking_desc_AA.yaml";
+        params.IR_Left_yaml_path = "src/SLAM/image_representation/cfg/image_representation_fast.yaml";
+        params.IR_Right_yaml_path = "src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
+        // TODO -> get scrubber and event data 
+
+        app->slam->startSlam(params);
+        std::cout<<"tat=ta"<<std::endl;
+    }
+
+
     return SDL_APP_CONTINUE;
 }
 

@@ -33,6 +33,7 @@
 #include <future>
 #include <map>
 #include <mutex>
+#include <string>
 
 #include <pcl/point_types.h>
 // #include <pcl_ros/point_cloud.h>
@@ -58,8 +59,10 @@ class esvo2_Mapping
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         esvo2_Mapping(std::atomic<bool> &is_running_, const YAML::Node &config, 
-            DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track,
-            DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track);
+            const std::string& left_camera_yaml_path, const std::string& right_camera_yaml_path,
+            DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track,
+            DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>& pointcloud_Map_to_Track
+        );
         virtual ~esvo2_Mapping();
 
         // mapping
@@ -115,8 +118,8 @@ class esvo2_Mapping
         bool bpoints_from_AA_; // must be public so slam_manager can access it
     private:
         //queues
-        // DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track; MOVED TO BACKEND_OPTIMIZATION.h
-        DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track;
+        // DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track; //MOVED TO BACKEND_OPTIMIZATION.h
+        DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>& pointcloud_Map_to_Track_;
 
         // Running variable
         std::atomic<bool> &is_running;
@@ -160,7 +163,7 @@ class esvo2_Mapping
         // offline data
         std::string dvs_frame_id_;
         std::string world_frame_id_;
-        std::string calibInfoDir_;
+        // std::string calibInfoDir_;
         CameraSystem::Ptr camSysPtr_;
 
         // imu data

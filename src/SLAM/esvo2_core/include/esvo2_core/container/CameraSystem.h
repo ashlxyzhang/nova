@@ -54,12 +54,12 @@ class PerspectiveCamera
 class CameraSystem
 {
   public:
-  CameraSystem(const std::string& calibInfoDir, bool bPrintCalibInfo = false);
+  CameraSystem(const std::string& left_calib_path, const std::string& right_calib_path, bool bPrintCalibInfo = false);
   virtual ~CameraSystem();
   using Ptr = std::shared_ptr<CameraSystem>;
 
   void computeBaseline();
-  void loadCalibInfo(const std::string & cameraSystemDir, bool bPrintCalibInfo = false);
+  void loadCalibInfo(const std::string& left_calib_path, const std::string& right_calib_path, bool bPrintCalibInfo = false);
   void printCalibInfo();
 
   PerspectiveCamera::Ptr cam_left_ptr_, cam_right_ptr_; // intrinsics

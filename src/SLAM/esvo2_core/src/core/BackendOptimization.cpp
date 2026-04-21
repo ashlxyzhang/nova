@@ -13,8 +13,8 @@ namespace esvo2_core
 {
 namespace core
 {
-BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>* _v_ba_bg_Map_to_Track) 
-: camSysPtr_(camSysPtr), v_ba_bg_Map_to_Track(_v_ba_bg_Map_to_Track)
+BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track) 
+: camSysPtr_(camSysPtr), v_ba_bg_Map_to_Track_(v_ba_bg_Map_to_Track)
 {
     // Init camera system
     RIC_ = camSysPtr_->cam_left_ptr_->T_b_c_.block<3, 3>(0, 0);
@@ -293,7 +293,7 @@ void BackendOptimization::publishVBaBg(double time_v)
     // (*pV_ba_bg_pub_).publish(msg);
     std::shared_ptr<esvo2_core::VBaBg> bag = std::make_shared<esvo2_core::VBaBg>();
     *bag = msg;
-    v_ba_bg_Map_to_Track->add(bag, esvo2_core::secondsToTimePoint(time_v));
+    v_ba_bg_Map_to_Track_.add(bag, esvo2_core::secondsToTimePoint(time_v));
 }
 
 bool BackendOptimization::CalibrationExRotation(Eigen::Matrix3d &calib_ric_result)

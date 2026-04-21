@@ -22,13 +22,19 @@
     SlamManager::SlamManager() {}
 
     // Spawns threads for all the modules
-    void SlamManager::startSlam(Scrubber* left_scrubber, Scrubber* right_scrubber, EventData* left_eventdata, EventData* right_eventdata)
+    void SlamManager::startSlam(StartSlamParameters params)
     {
+        // Loading YAML config files
+        yaml_IR_Left_config = YAML::LoadFile(params.IR_Left_yaml_path);
+        yaml_IR_Right_config = YAML::LoadFile(params.IR_Right_yaml_path);
+        yaml_Track_config = YAML::LoadFile(params.Tracking_yaml_path);
+        yaml_Map_config = YAML::LoadFile(params.Mapping_yaml_path);
+
         // Setting the scrubbers
-        this->left_scrubber = left_scrubber;
-        this->right_scrubber = right_scrubber;
-        this->left_eventdata = left_eventdata;
-        this->right_eventdata = right_eventdata;
+        this->left_scrubber = params.left_scrubber;
+        this->right_scrubber = params.right_scrubber;
+        this->left_eventdata = params.left_eventdata;
+        this->right_eventdata = params.right_eventdata;
 
         // Setting up the queues
         AA_left_IR_to_Map = DataPassingDeque<cv::Mat>(1000, &mapping_cv);
@@ -47,10 +53,18 @@
         tracking_running = true;
 
         // The module's constructors create and detach a new thread that manages their respective processes
-        // image_representation_left = std::make_unique<image_representation::ImageRepresentation>();
-        // image_representation_right = std::make_unique<image_representation::ImageRepresentation>();
-        // mapping = std::make_unique<esvo2_core::esvo2_Mapping>();
-        // tracking = std::make_unique<esvo2_core::esvo2_Tracking>();
+        image_representation_left = std::make_unique<image_representation::ImageRepresentation>(
+                image_representation_left_running, yaml_IR_Left_config, params.left_camera_yaml_path, 
+                multi_to_Track, multi_to_Map, AA_left_IR_to_Map);
+        image_representation_right = std::make_unique<image_representation::ImageRepresentation>(
+                image_representation_right_running, yaml_IR_Right_config, params.right_camera_yaml_path, 
+                multi_to_Track, multi_to_Map, AA_left_IR_to_Map);
+        mapping = std::make_unique<esvo2_core::esvo2_Mapping>(
+                mapping_running, yaml_Map_config, params.left_camera_yaml_path, params.right_camera_yaml_path,
+                v_ba_bg_Map_to_Track, pointcloud_Map_to_Track);
+        tracking = std::make_unique<esvo2_core::esvo2_Tracking>(
+                tracking_running, yaml_Track_config, params.left_camera_yaml_path, params.right_camera_yaml_path,
+                stamped_pose_Track_to_Map, stamped_pose_Track_to_Track);
 
         // Launching the threads to handle the queues/passing of data
         image_representation_left_thread = std::thread(&SlamManager::process_image_representation_left_thread, this, std::ref(image_representation_left_running), std::ref(image_representation_left_cv));
@@ -80,6 +94,13 @@
         mapping.reset();
         tracking.reset();
 
+        // Resetting yaml nodes
+        yaml_IR_Left_config.reset();
+        yaml_IR_Right_config.reset();
+        yaml_Track_config.reset();
+        yaml_Map_config.reset();
+        
+        // Resetting remaining variables
         firstEventBatch = true;
         this->left_scrubber = nullptr;
         this->right_scrubber = nullptr;

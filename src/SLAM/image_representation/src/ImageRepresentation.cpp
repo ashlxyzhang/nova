@@ -16,15 +16,12 @@
 namespace image_representation
 {
 ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const YAML::Node &config,  
-            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>*multi_to_Track, 
-            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
-             DataPassingDeque<cv::Mat>* AA_left_IR_to_Map) : is_running(is_running_), config_(config)
+            const std::string& camera_yaml_path,
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>& multi_to_Track, 
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>& multi_to_Map,
+            DataPassingDeque<cv::Mat>& AA_left_IR_to_Map)
+             : is_running(is_running_), config_(config), multi_to_Track_(multi_to_Track), multi_to_Map_(multi_to_Map), AA_left_IR_to_Map_(AA_left_IR_to_Map)
 {
-    // Setting the queues
-    this->multi_to_Track = multi_to_Track;
-    this->multi_to_Map = multi_to_Map;
-    this->AA_left_IR_to_Map = AA_left_IR_to_Map;
-
     // setup subscribers and publishers
     // event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
     // image_transport::ImageTransport it_(nh_);
@@ -67,8 +64,8 @@ ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const Y
     x_patches_ = config_["x_patches"].as<int>(8);
     y_patches_ = config_["y_patches"].as<int>(6);
     generation_rate_hz_ = config_["generation_rate_hz"].as<int>(100);
-    calibInfoDir_ = config_["calibInfoDir"].as<std::string>("path is not given");
-    if (!loadCalibInfo(calibInfoDir_, is_left_))
+    // calibInfoDir_ = config_["calibInfoDir"].as<std::string>("path is not given");
+    if (!loadCalibInfo(camera_yaml_path, is_left_))
     {
         printf("Load Calib Info Error!!!  Given path is: %s \n", calibInfoDir_.c_str());
     }
@@ -203,7 +200,7 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     // image_representation_pub_AA_frequency_.publish(cv_AA_frequency.toImageMsg());
     std::shared_ptr<cv::Mat> AA_freq = std::make_shared<cv::Mat>();
     *AA_freq = AA_frequency;
-    AA_left_IR_to_Map->add(AA_freq, external_sync_time);
+    AA_left_IR_to_Map_.add(AA_freq, external_sync_time);
 
     // ---Publishing AA_map
     // cv_AA_mat.encoding = "mono8";
@@ -212,7 +209,7 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     // image_representation_pub_AA_mat_.publish(cv_AA_mat.toImageMsg());
     std::shared_ptr<cv::Mat> AA_map = std::make_shared<cv::Mat>();
     *AA_map = representation_AA_;
-    multi_to_Map->add<2>({AA_map, external_sync_time});
+    multi_to_Map_.add<2>({AA_map, external_sync_time});
 
 }
 
@@ -305,8 +302,8 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             std::shared_ptr<cv::Mat> TS_left = std::make_shared<cv::Mat>();
             *TS_left = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-            multi_to_Track->add<0>({TS_left, external_sync_time});
-            multi_to_Map->add<0>({TS_left, external_sync_time});
+            multi_to_Track_.add<0>({TS_left, external_sync_time});
+            multi_to_Map_.add<0>({TS_left, external_sync_time});
 
             // ---Publishing TS_neg
             // cv_negative_TS_image.encoding = "mono8";
@@ -317,8 +314,8 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             std::shared_ptr<cv::Mat> TS_neg = std::make_shared<cv::Mat>();
             *TS_neg = negative_TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-            multi_to_Track->add<1>({TS_neg, external_sync_time});
-            multi_to_Map->add<3>({TS_neg, external_sync_time});
+            multi_to_Track_.add<1>({TS_neg, external_sync_time});
+            multi_to_Map_.add<3>({TS_neg, external_sync_time});
             
             thread0.join();
         }
@@ -361,7 +358,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             std::shared_ptr<cv::Mat> TS_right = std::make_shared<cv::Mat>();
             *TS_right = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-            multi_to_Map->add<1>({TS_right, external_sync_time});
+            multi_to_Map_.add<1>({TS_right, external_sync_time});
         }
 
         clearEvents(distance, ptr_e);
@@ -424,8 +421,8 @@ void ImageRepresentation::sobel(double external_t)
     std::shared_ptr<cv::Mat> dx_image = std::make_shared<cv::Mat>();
     *dx_image = std::move(dx_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-    multi_to_Track->add<2>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
-    multi_to_Map->add<4>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
+    multi_to_Track_.add<2>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
+    multi_to_Map_.add<4>({dx_image, esvo2_core::secondsToTimePoint(external_t)});
 
 
     // Publishing dy
@@ -434,22 +431,22 @@ void ImageRepresentation::sobel(double external_t)
     std::shared_ptr<cv::Mat> dy_image = std::make_shared<cv::Mat>();
     *dy_image = std::move(dy_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-    multi_to_Track->add<3>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
-    multi_to_Map->add<5>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
+    multi_to_Track_.add<3>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
+    multi_to_Map_.add<5>({dy_image, esvo2_core::secondsToTimePoint(external_t)});
 
 }
 
-bool ImageRepresentation::loadCalibInfo(const std::string &cameraSystemDir, bool &is_left)
+bool ImageRepresentation::loadCalibInfo(const std::string& camera_yaml_path, bool &is_left)
 {
     bCamInfoAvailable_ = false;
     std::string cam_calib_dir;
-    if (is_left)
-        cam_calib_dir = cameraSystemDir + "/left.yaml";
-    else
-        cam_calib_dir = cameraSystemDir + "/right.yaml";
-    if (!fileExists(cam_calib_dir))
+    // if (is_left)
+    //     cam_calib_dir = cameraSystemDir + "/left.yaml";
+    // else
+    //     cam_calib_dir = cameraSystemDir + "/right.yaml";
+    if (!fileExists(camera_yaml_path))
         return bCamInfoAvailable_;
-    YAML::Node CamCalibInfo = YAML::LoadFile(cam_calib_dir);
+    YAML::Node CamCalibInfo = YAML::LoadFile(camera_yaml_path);
 
     // load calib (left)
     size_t width = CamCalibInfo["image_width"].as<int>();

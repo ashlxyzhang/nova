@@ -62,9 +62,10 @@ class ImageRepresentation
 {
     public:
         ImageRepresentation(std::atomic<bool> &is_running_, const YAML::Node &config,  
-            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>*multi_to_Track, 
-            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map,
-             DataPassingDeque<cv::Mat>* AA_left_IR_to_Map
+            const std::string& camera_yaml_path,
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>& multi_to_Track, 
+            MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>& multi_to_Map,
+            DataPassingDeque<cv::Mat>& AA_left_IR_to_Map
         );
         virtual ~ImageRepresentation();
 
@@ -79,10 +80,10 @@ class ImageRepresentation
     private:
         // message passing stuff
         // TSleft, TSnegative, dx, dy; All left only
-        MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Track;
+        MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat>& multi_to_Track_;
         // TSleft, TSright, AA MAP, TS neg, dx, dy; ALL left except for TSright!
-        MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>* multi_to_Map;
-        DataPassingDeque<cv::Mat>* AA_left_IR_to_Map; 
+        MultiDataPassing<cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat, cv::Mat>& multi_to_Map_;
+        DataPassingDeque<cv::Mat>& AA_left_IR_to_Map_; 
 
         // Running variable
         std::atomic<bool> &is_running;
@@ -100,7 +101,7 @@ class ImageRepresentation
 
         // utils
         void clearEventQueue();
-        bool loadCalibInfo(const std::string &cameraSystemDir, bool &is_left);
+        bool loadCalibInfo(const std::string &camera_yaml_path, bool &is_left);
         void clearEvents(int distance, std::vector<esvo2_core::Event>::iterator ptr_e);
 
         void AA_thread(std::vector<esvo2_core::Event>::iterator &ptr_e, int distance, double external_t);

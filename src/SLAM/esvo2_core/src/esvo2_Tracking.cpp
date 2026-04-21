@@ -6,16 +6,20 @@
 #include "data_passing.hh"
 #include "multi_data_passing.hh"
 #include <fstream>
+#include <string>
 
 // #define ESVO2_CORE_TRACKING_DEBUG
 // #define ESVO2_CORE_TRACKING_DEBUG
 namespace esvo2_core
 {
 esvo2_Tracking::esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node &config,
-        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map,
-        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track)
-    : is_running(is_running_), config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
-      camSysPtr_(new CameraSystem(calibInfoDir_, false)),
+        const std::string& left_camera_yaml_path, const std::string& right_camera_yaml_path,
+        DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Map,
+        DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Track)
+    : is_running(is_running_), config_(config), stamped_pose_Track_to_Map_(stamped_pose_Track_to_Map),
+      stamped_pose_Track_to_Track_(stamped_pose_Track_to_Track), 
+    //   calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
+      camSysPtr_(new CameraSystem(left_camera_yaml_path, right_camera_yaml_path, false)),
       rpConfigPtr_(new RegProblemConfig(
           config_["patch_size_X"].as<int>(25), config_["patch_size_Y"].as<int>(25), config_["kernelSize"].as<int>(15),
           config_["LSnorm"].as<std::string>("l2"), config_["huber_threshold"].as<double>(10.0),
@@ -28,10 +32,6 @@ esvo2_Tracking::esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node 
                 g_optimal),
       ets_(IDLE)
 {
-    //queues
-    this->stamped_pose_Track_to_Map = stamped_pose_Track_to_Map;
-    this->stamped_pose_Track_to_Track = stamped_pose_Track_to_Track;
-
     // offline data
     dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
     world_frame_id_ = config_["world_frame_id"].as<std::string>("world");
@@ -655,8 +655,8 @@ void esvo2_Tracking::publishPose(const timePoint &t, Transformation &tr)
     ps_ptr->orientation[3] = tr.getRotation().w();
     // pose_pub_.publish(ps_ptr);
     // Can send same ptr to both because the callback functions treat the pose as const
-    stamped_pose_Track_to_Map->add(ps_ptr, t);
-    stamped_pose_Track_to_Track->add(ps_ptr, t);
+    stamped_pose_Track_to_Map_.add(ps_ptr, t);
+    stamped_pose_Track_to_Track_.add(ps_ptr, t);
 
     if (!resultPath_.empty())
     {

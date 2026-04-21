@@ -20,10 +20,24 @@ class SlamManager {
 public:
     using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
+    struct StartSlamParameters
+    {
+        Scrubber* left_scrubber;
+        Scrubber* right_scrubber;
+        EventData* left_eventdata;
+        EventData* right_eventdata;
+        std::string IR_Left_yaml_path;
+        std::string IR_Right_yaml_path;
+        std::string Tracking_yaml_path;
+        std::string Mapping_yaml_path;
+        std::string left_camera_yaml_path;
+        std::string right_camera_yaml_path;
+    };
+    
     SlamManager() ;
 
     // Starts slam
-    void startSlam(Scrubber* left_scrubber, Scrubber* right_scrubber, EventData* left_eventdata, EventData* right_eventdata);
+    void startSlam(StartSlamParameters params);
 
     // Stops slam
     void stopSlam();
@@ -57,6 +71,14 @@ private:
     std::unique_ptr<image_representation::ImageRepresentation> image_representation_right;
     std::unique_ptr<esvo2_core::esvo2_Mapping> mapping;
     std::unique_ptr<esvo2_core::esvo2_Tracking> tracking;
+
+    // For calibration
+    YAML::Node yaml_IR_Left_config;
+    YAML::Node yaml_IR_Right_config;
+    YAML::Node yaml_Track_config;
+    YAML::Node yaml_Map_config;
+    YAML::Node _config;
+    
 
     // For sending events
     timePoint zero_absolute_timestamp;
@@ -137,22 +159,10 @@ private:
         - minkindr can be found at: https://github.com/ethz-asl/minkindr
         - Expected conversion function at: https://github.com/ethz-asl/minkindr_ros/blob/master/minkindr_conversions/include/minkindr_conversions/kindr_tf.h
 
-     - Update slam_manager.cpp to have correct parameters to constructors of the classes under the comment:
-            // The module's constructors create and detach a new thread that manages their respective processes
-            - Adde yaml file path (string) to start slam as parameter and create YAML node which is passed to constructors there
-
-
-    - Hope it runs properly
+    - Finish setting up params and call start_slam in main.cc
+        - Hope it runs properly
         - Fix bugs when it doesn't run properly
-           - Might be worth to visualize the cv::Mat inverse depth if need to debug something
-
-    - Datasets
-        -https://dsec.ifi.uzh.ch/dsec-datasets/download/
-            - Is promising, has h5 files, but are not in standard prophesee format so can't auto convert to .dat.
-                Can probably edit files to get around that though. This is probably most promising solution.
-        -https://daniilidis-group.github.io/mvsec/download/
-            - Has h5 files, but left/right are grouped together, so would be kinda annoying to separate
-        - Need to get an h5 viewer/editer, edit them to match Prophesee expected format, then can convert to .dat and play them in NOVA
+        - Might be worth to visualize the cv::Mat inverse depth if need to debug something
 
     - Visualization stuff
        - Figure out how to visualize PCL (point cloud library)
@@ -180,4 +190,36 @@ private:
       of ESVO2 I think but is pretty sus.
     - EventQueue was originally called EventBuffer and was a vector of Event* before started refactoring. I don't think it affects anything
       but it might be an issue 
+    - Dataset may have repeating events because of how query it?
+*/
+
+
+// ---------CONFIG NOTES----------
+/*
+- I don't think can do defaults? Because need the .yaml file in their file system somewhere
+
+Image Representation
+    - Does not depend on camera type. (If camera type has lots of pixels, may want the less expensive version though).
+    - More expensive, better results -> image_representation_fast_40hz.yaml
+    - Less expensive, worse results -> image_representation_fast.yaml
+    - _r means for right camera
+    - Default should be less expensive probably because NOVA as a whole is already expensive
+
+CameraSystem
+    - Depends on camera type
+    - Path is passed in constructor of image representaiton
+    - Stores left/right camera configurations
+
+Mapping
+    - Does not depend on camera type. (If camera type has lots of pixels, may want the less expensive version though).
+    - kinda up to you idk what all the settings do
+    - default should just be whichever of the given ones works best
+
+Tracking
+    - Does not depend on camera type. (If camera type has lots of pixels, may want the less expensive version though).  
+    - kinda up to you idk what all the settings do
+    - default should just be whichever of the given ones works best
+    - Need to set USE_IMU  to false!
+
+
 */

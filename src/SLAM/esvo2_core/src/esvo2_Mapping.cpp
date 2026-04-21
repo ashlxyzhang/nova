@@ -17,6 +17,7 @@
 #include <memory>
 #include <thread>
 #include <utility>
+#include <string>
 
 #include <data_passing.hh>
 #include <multi_data_passing.hh>
@@ -29,10 +30,12 @@
 namespace esvo2_core
 {
 esvo2_Mapping::esvo2_Mapping(std::atomic<bool> &is_running_, const YAML::Node &config, 
-            DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track,
-            DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>* pointcloud_Map_to_Track)
-    : is_running(is_running_), config_(config), calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
-      camSysPtr_(new CameraSystem(calibInfoDir_, false)),
+            const std::string& left_camera_yaml_path, const std::string& right_camera_yaml_path,
+            DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track,
+            DataPassingDeque<pcl::PointCloud<pcl::PointXYZRGBL>>& pointcloud_Map_to_Track)
+    : is_running(is_running_), config_(config), pointcloud_Map_to_Track_(pointcloud_Map_to_Track), 
+    // calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
+      camSysPtr_(new CameraSystem(left_camera_yaml_path, right_camera_yaml_path, false)),
       dpConfigPtr_(new DepthProblemConfig(
           config_["patch_size_X"].as<int>(5), config_["patch_size_Y"].as<int>(5),
           config_["LSnorm_ln"].as<std::string>("Tdist"), config_["Tdist_nu"].as<double>(0.0),
@@ -54,9 +57,6 @@ esvo2_Mapping::esvo2_Mapping(std::atomic<bool> &is_running_, const YAML::Node &c
       depthFramePtr_(new DepthFrame(camSysPtr_->cam_left_ptr_->height_, camSysPtr_->cam_left_ptr_->width_)),
       BackendOpt_(camSysPtr_, v_ba_bg_Map_to_Track)
 {
-    //queues
-    // this->v_ba_bg_Map_to_Track = v_ba_bg_Map_to_Track;
-    this->pointcloud_Map_to_Track = pointcloud_Map_to_Track;
     // frame id
     dvs_frame_id_ = config_["dvs_frame_id"].as<std::string>("dvs");
     world_frame_id_ = config_["world_frame_id"].as<std::string>("world");
@@ -1223,7 +1223,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         // pc_pub_.publish(pc_to_publish);
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_local_2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
         *pointcloud_local_2 = *pc_color_;
-        pointcloud_Map_to_Track->add(pointcloud_local_2, t);
+        pointcloud_Map_to_Track_.add(pointcloud_local_2, t);
     }
     if (!pc_filtered_->empty())
     {

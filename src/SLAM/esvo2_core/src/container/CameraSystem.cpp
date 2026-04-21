@@ -151,11 +151,11 @@ PerspectiveCamera::world2Cam(
 
 /************************************************************/
 /************************************************************/
-CameraSystem::CameraSystem(const std::string& calibInfoDir, bool bPrintCalibInfo)
+CameraSystem::CameraSystem(const std::string& left_calib_path, const std::string& right_calib_path, bool bPrintCalibInfo)
 {
   cam_left_ptr_ = std::shared_ptr<PerspectiveCamera>(new PerspectiveCamera());
   cam_right_ptr_ = std::shared_ptr<PerspectiveCamera>(new PerspectiveCamera());
-  loadCalibInfo(calibInfoDir, bPrintCalibInfo);
+  loadCalibInfo(left_calib_path, right_calib_path, bPrintCalibInfo);
   computeBaseline();
 }
 CameraSystem::~CameraSystem() {}
@@ -168,10 +168,10 @@ void CameraSystem::computeBaseline()
   std::cout << "Baseline: " << baseline_;
 }
 
-void CameraSystem::loadCalibInfo(const std::string &cameraSystemDir, bool bPrintCalibInfo)
+void CameraSystem::loadCalibInfo(const std::string& left_calib_path, const std::string& right_calib_path, bool bPrintCalibInfo)
 {
-  const std::string left_cam_calib_dir(cameraSystemDir + "/left.yaml");
-  const std::string right_cam_calib_dir(cameraSystemDir + "/right.yaml");
+  const std::string left_cam_calib_dir(left_calib_path);
+  const std::string right_cam_calib_dir(right_calib_path);
   YAML::Node leftCamCalibInfo = YAML::LoadFile(left_cam_calib_dir);
   YAML::Node rightCamCalibInfo = YAML::LoadFile(right_cam_calib_dir);
 

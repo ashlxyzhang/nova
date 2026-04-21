@@ -52,7 +52,7 @@ class BackendOptimization
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-        BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track);
+        BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track);
 
         void setProblem(std::deque<DepthPointFrame> *dqvDepthPoints, TimeSurfaceHistory *pTS_history, bool bUSE_IMU);
         void sloveProblem();
@@ -75,7 +75,7 @@ class BackendOptimization
 
     private:
         // Queue
-        DataPassingDeque<esvo2_core::VBaBg>* v_ba_bg_Map_to_Track;
+        DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track_;
 
         CameraSystem::Ptr camSysPtr_;
         std::deque<DepthPointFrame> *pDepthPoints_;

@@ -54,8 +54,10 @@ class esvo2_Tracking
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node &config,
-        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map,
-        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track);
+            const std::string& left_camera_yaml_path, const std::string& right_camera_yaml_path,
+            DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Map,
+            DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Track
+        );
         virtual ~esvo2_Tracking();
 
         // functions regarding tracking
@@ -92,8 +94,8 @@ class esvo2_Tracking
 
     private:
         //queues
-        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Map;
-        DataPassingDeque<esvo2_core::PoseStamped>* stamped_pose_Track_to_Track;
+        DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Map_;
+        DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Track_;
 
         // Running variable
         std::atomic<bool> &is_running;
@@ -135,7 +137,7 @@ class esvo2_Tracking
         // offline data
         std::string dvs_frame_id_;
         std::string world_frame_id_;
-        std::string calibInfoDir_;
+        // std::string calibInfoDir_;
         CameraSystem::Ptr camSysPtr_;
 
         // inter-thread management
