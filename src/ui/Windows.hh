@@ -13,21 +13,15 @@ class Window {
 	public:
 		Window(GPUDevice& gpu_device, int width, int height, std::string title="");
 		~Window();
-		bool is_open();
-
-		void render(DataSource& data_source);			// Renders a single frame 
-		void play(DataSource& data_source, int fps=60);	// Blocking rendering loop 
-		void poll_events();
 		
-		bool open();	// Returns whether or not opening was successful
-		void close();							
+		void show(DataSource& data_source, int fps=60);	
+		static void show_all(std::vector<Window*> windows, DataSource& data_source, int fps=60);
+		static void show_all(std::vector<Window*> windows, std::vector<DataSource*> data_sources, int fps=60);
 		
 		int get_width();
 		int get_height();
 		
-		static void play_all(std::vector<Window*> windows, DataSource& data_source, int fps=60);
-		static ImVec2 fit_texture_to_space(RenderTarget& render_target, ImVec2 available_space);
-
+		
 	protected:
 		GPUDevice& gpu_device;
 		SDL_Window* window;
@@ -40,9 +34,20 @@ class Window {
 		int width;
 		int height;
 		
+		bool open();	
+		void close();	
+		bool is_open();
+		
 		void init_imgui();
+		void poll_events();
+		void render(DataSource& data_source);
+		
 		virtual void handle_event(const SDL_Event& event);
 		virtual void draw(DataSource& data_source) = 0;
+
+		// Helpers
+		static ImVec2 fit_texture_to_space(RenderTarget& render_target, ImVec2 available_space);
+		static bool check_windows(std::vector<Window*>& windows);
 };
 
 

@@ -187,7 +187,7 @@ class Scrubber
                 }
         
             void set_time_window(float start_time, float end_time) {
-                if (end_time < start_time || start_time < 0 || end_time > max_time) {
+                if (end_time < start_time) {
                     std::cout << "set_time_window() given invalid time window" << std::endl;
                     return;
                 }
@@ -197,7 +197,7 @@ class Scrubber
             }
 
             void set_event_window(size_t start_index, size_t end_index) {
-                if (end_index < start_index || start_index < 0 || end_index > max_index) {
+                if (end_index < start_index) {
                     std::cout << "set_event_window() given invalid index window" << std::endl;
                     return;
                 }

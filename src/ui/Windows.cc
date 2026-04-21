@@ -1,5 +1,6 @@
 
 #include "ui/Windows.hh"
+#include <algorithm>
 
 Window::Window(GPUDevice& gpu_device, int width, int height, std::string title) 
 	: gpu_device(gpu_device), title(title), open_flag(false), running(false), width(width), height(height) {}
@@ -134,7 +135,7 @@ void Window::render(DataSource& data_source) {
 	SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
-void Window::play(DataSource& data_source, int fps) {
+void Window::show(DataSource& data_source, int fps) {
 	if (!is_open() && !open()) {
 		std::cout << "Failed to open window" << std::endl;
 		return;
@@ -188,18 +189,38 @@ void Window::handle_event(const SDL_Event& event) {
 	}
 }
 
-void Window::play_all(std::vector<Window*> windows, DataSource& data_source, int fps) {
-
+bool Window::check_windows(std::vector<Window*>& windows) {
 	// Ensure all windows valid and open to begin with
 	for (Window* window: windows) {
 		if (window == nullptr) {
 			std::cout << "play_all() was passed a nullptr" << std::endl;
-			return;
+			return false;
+		}
+
+		if (std::count(windows.begin(), windows.end(), window) > 1) {
+			std::cout << "Duplicate windows passed to show_all(): all windows must be unique" << std::endl;
+			return false;
 		}
 
 		if (!window->is_open()) {
 			window->open();
 		}
+	}
+
+	return true;
+}
+
+void Window::show_all(std::vector<Window*> windows, DataSource& data_source, int fps) {
+
+	// Ensure windows are all valid
+	if (!check_windows(windows)) {
+		return;
+	}
+
+	// Ensure data source is open
+	if (!data_source.is_open()) {
+		std::cout << "DataSource passed to Window::show() was not properly opened" << std::endl;
+		return;
 	}
 
 	double delay = 1000 / (double) fps;	
@@ -209,6 +230,62 @@ void Window::play_all(std::vector<Window*> windows, DataSource& data_source, int
 	while (any_open) {
 
 		any_open = false;
+		for (Window* window: windows) {
+			if (window->is_open()) {
+				any_open = true;
+
+				window->render(data_source);
+				window->poll_events();
+			}
+		}
+
+		data_source.update_scrubber();
+		SDL_Delay(delay);
+	}
+}
+
+void Window::show_all(std::vector<Window*> windows, std::vector<DataSource*> data_sources, int fps) {
+
+	// Ensure the lists are the same size
+	if (windows.size() != data_sources.size()) {
+		std::cout << "show_all(): size of window list != size of data source list" << std::endl;
+		return;
+	}
+
+	// Ensure windows are valid
+	if (!check_windows(windows)) {
+		return;
+	}
+
+	// Ensure each data source is open and account for multiple windows drawing the same data source
+	std::vector<DataSource*> unique_data_sources;
+
+	for (DataSource* data_source: data_sources) {
+		if (!data_source->is_open()) {
+			std::cout << "DataSource passed to Window::show() was not properly opened" << std::endl;
+			return;
+		}
+	}
+
+	double delay = 1000 / (double) fps;	
+	bool any_open = true;
+	int num_windows = (int) windows.size();
+
+	// Continue to render all open windows until all are closed
+	while (any_open) {
+
+		any_open = false;
+		for (int window_index=0; window_index<num_windows; window_index++) {
+			Window* window = windows[window_index];
+			DataSource* source = data_sources[window_index];
+
+			if (window->is_open()) {
+				any_open = true;
+
+
+			}
+		}
+
 		for (Window* window: windows) {
 			if (window->is_open()) {
 				any_open = true;
