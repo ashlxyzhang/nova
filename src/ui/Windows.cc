@@ -228,12 +228,11 @@ void Window::show_all(std::vector<Window*> windows, DataSource& data_source, int
 
 	// Continue to render all open windows until all are closed
 	while (any_open) {
-
 		any_open = false;
+		
 		for (Window* window: windows) {
 			if (window->is_open()) {
 				any_open = true;
-
 				window->render(data_source);
 				window->poll_events();
 			}
@@ -257,15 +256,22 @@ void Window::show_all(std::vector<Window*> windows, std::vector<DataSource*> dat
 		return;
 	}
 
-	// Ensure each data source is open and account for multiple windows drawing the same data source
-	std::vector<DataSource*> unique_data_sources;
-
+	// show_all() supports the same data source in multiple windows but it needs to make sure that
+	// update_scrubber() is only called once per source
+	std::vector<DataSource*> unique_sources;
 	for (DataSource* data_source: data_sources) {
 		if (!data_source->is_open()) {
 			std::cout << "DataSource passed to Window::show() was not properly opened" << std::endl;
 			return;
 		}
+
+		// Add to the list of unique sources if it hasn't been before
+		if (std::find(unique_sources.begin(), unique_sources.end(), data_source) != unique_sources.end()) {
+			unique_sources.push_back(data_source);
+		}
 	}
+
+
 
 	double delay = 1000 / (double) fps;	
 	bool any_open = true;
@@ -273,29 +279,25 @@ void Window::show_all(std::vector<Window*> windows, std::vector<DataSource*> dat
 
 	// Continue to render all open windows until all are closed
 	while (any_open) {
-
 		any_open = false;
+
+		// Render each data source to its respective window
 		for (int window_index=0; window_index<num_windows; window_index++) {
 			Window* window = windows[window_index];
-			DataSource* source = data_sources[window_index];
+			DataSource* data_source = data_sources[window_index];
 
 			if (window->is_open()) {
 				any_open = true;
-
-
-			}
-		}
-
-		for (Window* window: windows) {
-			if (window->is_open()) {
-				any_open = true;
-
-				window->render(data_source);
+				window->render(*data_source);
 				window->poll_events();
 			}
 		}
 
-		data_source.update_scrubber();
+		// Update all unique data sources
+		for (DataSource* data_source: unique_sources) {
+			data_source->update_scrubber();
+		}
+
 		SDL_Delay(delay);
 	}
 }
