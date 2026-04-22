@@ -134,18 +134,39 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_ESCAPE))
     {
+        std::cout<<"huh"<<std::endl;
         SlamManager::StartSlamParameters params;
-        params.left_camera_yaml_path = "/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
-        params.right_camera_yaml_path = "/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
-        params.Mapping_yaml_path = "/src/SLAM/esvo2_core/cfg/mapping/mapping_desc_AA.yaml";
-        params.Tracking_yaml_path = "/src/SLAM/esvo2_core/cfg/tracking/tracking_desc_AA.yaml";
-        params.IR_Left_yaml_path = "src/SLAM/image_representation/cfg/image_representation_fast.yaml";
-        params.IR_Right_yaml_path = "src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
-        // TODO -> get scrubber and event data
+        params.left_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
+        params.right_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
+        params.Mapping_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
+        params.Tracking_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
+        params.IR_Left_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast.yaml";
+        params.IR_Right_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
+        // TODO -> get scrubber and event data 
+        // "C:\Users\jackm\Desktop\nova\src\SLAM\esvo2_core\calib\dsec\zurich_city_04_a\left.yaml"
 
+        std::vector<std::shared_ptr<DataSource>> sources = app->data_acq->get_data_sources();
+        params.left_scrubber = &sources.at(0)->scrubber;
+        params.left_eventdata = &sources.at(0)->event_data;
+        params.right_scrubber = &sources.at(1)->scrubber;
+        params.right_eventdata = &sources.at(1)->event_data;
+
+        std::cout<<"about to start app"<<std::endl;
         app->slam->startSlam(params);
-        std::cout << "tat=ta" << std::endl;
+        std::cout<<"tat=ta"<<std::endl;
+        std::cerr<<"testing cerr"<<std::endl;
     }
+
+    if((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_BACKSPACE))
+    {
+        std::cout<<"About to stop"<<std::endl;
+        app->slam->stopSlam();
+        std::cout<<"stopped"<<std::endl;
+
+    }
+
+
+
 
     return SDL_APP_CONTINUE;
 }

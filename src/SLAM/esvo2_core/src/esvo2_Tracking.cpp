@@ -193,16 +193,18 @@ void esvo2_Tracking::TrackingLoop()
 // #endif
 //         r.sleep();
 //     } // while
-
+     std::cout<<"first time at tracking whiel loop!"<<std::endl;
 
     const std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/tracking_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
     while (is_running)
     {
+        //  std::cout<<"at beginning of tracking while loop!"<<std::endl;
         // Keep Idling
         if (refPCMap_.size() < 1 || TS_history_.size() < 1)
         {
             next_wake_up_time += interval;
+            // std::cout<<"at end of tracking while loop! Sizes are too small"<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -213,6 +215,7 @@ void esvo2_Tracking::TrackingLoop()
         {
             reset();
             next_wake_up_time += interval;
+            // std::cout<<"at end of tracking while loop! Are reset from dynamic reconfigure woah"<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -237,11 +240,13 @@ void esvo2_Tracking::TrackingLoop()
                 }
                 if (!curDataTransferring())
                 {
+                    // std::cout<<"at end of tracking while loop! not current data transfeerring"<<std::endl;
                     continue;
                 }
             }
             else
             {
+                // std::cout<<"at end of tracking while loop! IDK bro"<<std::endl;
                 continue;
             }
         }
@@ -303,8 +308,10 @@ void esvo2_Tracking::TrackingLoop()
         std::cout << "------------------------------------------------------------";
 #endif
         next_wake_up_time += interval;
+        // std::cout<<"at end of tracking while loop!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
+    std::cout<<"Tracking is no longer running!"<<std::endl;
 }
 
 bool esvo2_Tracking::refDataTransferring()
@@ -706,7 +713,8 @@ void esvo2_Tracking::saveTrajectory(std::string &resultDir)
     {
         std::cout << "File at " << resultPath_ + "stamped_traj_estimate.txt"
                   << " is not opened, save trajectory failed.";
-        exit(-1);
+        return;
+        // exit(-1);
     }
     f << std::fixed;
 

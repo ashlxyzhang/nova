@@ -5,6 +5,7 @@
 #include <mutex>
 #include <chrono>
 #include <condition_variable>
+#include <iostream>
 
 template<typename T>
 class DataPassingDeque {
@@ -19,6 +20,10 @@ class DataPassingDeque {
 
         DataPassingDeque &operator=(const DataPassingDeque &other)
         {
+            if(this == &other)
+                return *this;
+            this->dq.clear();
+            // this->data_mutex = other.data_mutex;
             this->max_queue_size = other.max_queue_size;
             this->cv = other.cv;
             return *this;
@@ -27,12 +32,18 @@ class DataPassingDeque {
         // Adds a thing to the queue
         void add(std::shared_ptr<T> thingToAdd, timePoint timestamp)
         {
+            // std::cout<<"about to lock"<<std::endl;
             lock();
+            // std::cout<<"locked! Stuff: "<<dq.size()<<" "<<max_queue_size<<std::endl;
             while(dq.size() >= max_queue_size)
                 dq.pop_front();
+            // std::cout<<"popped: "<<dq.size()<<"about to push back"<<std::endl;
             dq.push_back({thingToAdd, timestamp});
+            // std::cout<<"added to dq, about to unlock"<<std::endl;
             unlock();
+            // std::cout<<"unlocked, about to notivy"<<std::endl;
             cv->notify_one();
+            // std::cout<<"notified"<<std::endl;
         }
         
         void lock()

@@ -286,10 +286,12 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
     //     r.sleep();
     // }
 
+    std::cout<<"start of mapping loop!"<<std::endl;
     std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/mapping_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
     while (is_running)
     {
+        // std::cout<<"in beginning of mapping while loop!"<<std::endl;
         // reset mapping rate
         if (changed_frame_rate_)
         {
@@ -321,6 +323,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
                     if (future_reset.wait_for(std::chrono::nanoseconds(1)) == std::future_status::ready)
                     {
                         prom_mapping.set_value();
+                        std::cout<<"at end of mapping while loop! Returned for some reason..."<<std::endl;
                         return;
                     }
                 }
@@ -330,6 +333,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             if (TS_obs_ptr_->second.isEmpty())
             {
                 next_wake_up_time += interval;
+                std::cout<<"at end of mapping while loop! Checking if TS observation or something"<<std::endl;
                 std::this_thread::sleep_until(next_wake_up_time);
                 continue;
             }
@@ -337,6 +341,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             // Do initialization (State Machine)
             if (getSystemStatus() == SystemStatus::INITIALIZATION || getSystemStatus() == SystemStatus::RESET)
             {
+                std::cout<<"about to do mapping initialization"<<std::endl;
                 if (InitializationAtTime(TS_obs_ptr_->first))
                 {
                     std::cout << "Initialization is successfully done!"<<std::endl;
@@ -361,8 +366,10 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             }
         }
         next_wake_up_time += interval;
+        // std::cout<<"at end of mapping while loop!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     }
+    std::cout<<"Mapping is no longer running!"<<std::endl;
 }
 
 void esvo2_Mapping::MappingAtTime(const timePoint &t)
@@ -876,6 +883,7 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
 
 void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg)
 {
+    std::cout<<"starting mapping events callback with this many events: "<<msg->events.size()<<std::endl;
     EventQueue &EQ = events_left_;
     std::lock_guard<std::mutex> lock(data_mutex_);
 
@@ -912,7 +920,9 @@ void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray>
         }
         EQ[i + 1] = e;
     }
+    // std::cout<<"endning mapping events callback, about to clear"<<std::endl;
     clearEventQueue(EQ);
+    // std::cout<<"ended mapping events callbacl"<<std::endl;
 }
 
 void esvo2_Mapping::clearEventQueue(EventQueue &EQ)

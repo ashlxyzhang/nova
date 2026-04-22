@@ -90,6 +90,7 @@ class SlamManager
 
         // For sending events
         timePoint zero_absolute_timestamp;
+        double last_processed_event_time = 0;
         bool firstEventBatch = true;
         Scrubber *left_scrubber = nullptr;
         Scrubber *right_scrubber = nullptr;

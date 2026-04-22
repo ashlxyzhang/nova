@@ -966,6 +966,20 @@ public:
 
   MultiDataPassing &operator=(const MultiDataPassing &other)
   {
+    if(this == &other)
+      return *this;
+
+    // 'Destructor'
+    this->outputQueue = other.outputQueue;
+    this->last_stamps_ = other.last_stamps_;
+    this->warned_about_incorrect_bound_ = other.warned_about_incorrect_bound_;
+    this->inter_message_lower_bounds_ = other.inter_message_lower_bounds_;
+    this->has_dropped_messages_ = other.has_dropped_messages_;
+    this->candidate_ = other.candidate_;
+    this->past_ = other.past_;
+    this->deques_ = other.deques_;
+
+    // Constructor
     this->queue_size_ = other.queue_size_;
     this->output_queue_size = other.output_queue_size;
     this->cv = other.cv;
@@ -973,9 +987,13 @@ public:
     this->num_reset_deques_ = 0;
     this->num_non_empty_deques_ = 0;
     this->pivot_ = NO_PIVOT;
+    this->pivot_time_ = other.pivot_time_;
+    this->candidate_end_ = other.candidate_end_;
+    this->candidate_start_ = other.candidate_start_;
     this->max_interval_duration_ = std::chrono::steady_clock::duration::max();
     this->age_penalty_ = 0.1;
     this->realTypeCount = other.realTypeCount;
+    // this->data_mutex_ = other.data_mutex_;
     assert(this->queue_size_ > 0);  // The synchronizer will tend to drop many messages with a queue size of 1. At least 2 is recommended.
     inter_message_lower_bounds_.resize(9, std::chrono::steady_clock::duration::zero());
     warned_about_incorrect_bound_.resize(9, false);
