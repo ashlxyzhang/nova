@@ -152,21 +152,31 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     Parameters params = data_source->visualizer_parameters;
     RenderTargets render_targets = data_source->visualizer_render_targets;
 
+    bool slam_active = slam_pointcloud_ != nullptr;
+
     // CPU Update phase
-    grid_renderer->cpu_update(params);
     slam_renderer->cpu_update(slam_pointcloud_);
-    text_renderer->cpu_update(data_source, params);
-    frames_renderer->cpu_update(data_source, params);
+    if (!slam_active)
+    {
+        grid_renderer->cpu_update(params);
+        points_renderer->cpu_update(data_source, params);
+        text_renderer->cpu_update(data_source, params);
+        frames_renderer->cpu_update(data_source, params);
+    }
 
     // Create command buffer and copy pass once for all sub-renderers
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     // Copy pass phase
-    grid_renderer->copy_pass(upload_buffer, copy_pass);
     slam_renderer->copy_pass(upload_buffer, copy_pass);
-    text_renderer->copy_pass(upload_buffer, copy_pass, data_source);
-    frames_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+    if (!slam_active)
+    {
+        grid_renderer->copy_pass(upload_buffer, copy_pass);
+        points_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+        text_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+        frames_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+    }
 
     // End copy pass
     SDL_EndGPUCopyPass(copy_pass);
@@ -195,10 +205,14 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     glm::mat4 projection = camera.getProjectionMatrix();
     glm::mat4 vp = projection * view;
 
-    grid_renderer->render_pass(command_buffer, render_pass, vp);
     slam_renderer->render_pass(command_buffer, render_pass, vp, params);
-    frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
-    text_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+    if (!slam_active)
+    {
+        grid_renderer->render_pass(command_buffer, render_pass, vp);
+        points_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+        frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+        text_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+    }
 
     SDL_EndGPURenderPass(render_pass);
 
