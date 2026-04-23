@@ -849,7 +849,7 @@ class Visualizer
                         return;
                     vertices.reserve(pc->size());
                     for (const auto &pt : *pc)
-                        vertices.push_back({glm::vec4(pt.x, pt.y, pt.z, 1.0f),
+                        vertices.push_back({glm::vec4(pt.x, -pt.y, pt.z, 1.0f),
                                             glm::vec4(pt.r / 255.0f, pt.g / 255.0f, pt.b / 255.0f, 1.0f)});
                 }
 
