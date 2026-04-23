@@ -134,40 +134,43 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_ESCAPE))
     {
-        std::cout<<"huh"<<std::endl;
-        SlamManager::StartSlamParameters params;
-        params.left_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
-        params.right_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
-        params.Mapping_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
-        params.Tracking_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
-        params.IR_Left_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast.yaml";
-        params.IR_Right_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
-        // TODO -> get scrubber and event data 
-        // "C:\Users\jackm\Desktop\nova\src\SLAM\esvo2_core\calib\dsec\zurich_city_04_a\left.yaml"
+        if (app->slam->isRunning())
+        {
+            std::cout << "Stopping SLAM" << std::endl;
+            app->slam->stopSlam();
+            std::cout << "SLAM stopped" << std::endl;
+        }
+        else
+        {
+            SlamManager::StartSlamParameters params;
+            params.left_camera_yaml_path =
+                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
+            params.right_camera_yaml_path =
+                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
+            params.Mapping_yaml_path =
+                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
+            params.Tracking_yaml_path =
+                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
+            params.IR_Left_yaml_path =
+                "/Users/ashley/Documents/repos/nova/src/SLAM/image_representation/cfg/image_representation_fast.yaml";
+            params.IR_Right_yaml_path =
+                "/Users/ashley/Documents/repos/nova/src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
 
-        std::vector<std::shared_ptr<DataSource>> sources = app->data_acq->get_data_sources();
-        params.left_scrubber = &sources.at(0)->scrubber;
-        params.left_eventdata = &sources.at(0)->event_data;
-        params.right_scrubber = &sources.at(1)->scrubber;
-        params.right_eventdata = &sources.at(1)->event_data;
-        std::cout<<sources.size()<<std::endl;
+            std::vector<std::shared_ptr<DataSource>> sources = app->data_acq->get_data_sources();
+            if (sources.size() < 2)
+            {
+                std::cerr << "Need at least 2 data sources (left + right) to start SLAM" << std::endl;
+                return SDL_APP_CONTINUE;
+            }
+            params.left_scrubber = &sources.at(0)->scrubber;
+            params.left_eventdata = &sources.at(0)->event_data;
+            params.right_scrubber = &sources.at(1)->scrubber;
+            params.right_eventdata = &sources.at(1)->event_data;
 
-        std::cout<<"about to start app"<<std::endl;
-        app->slam->startSlam(params);
-        std::cout<<"tat=ta"<<std::endl;
-        std::cerr<<"testing cerr"<<std::endl;
+            std::cout << "Starting SLAM" << std::endl;
+            app->slam->startSlam(params);
+        }
     }
-
-    if((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_BACKSPACE))
-    {
-        std::cout<<"About to stop"<<std::endl;
-        app->slam->stopSlam();
-        std::cout<<"stopped"<<std::endl;
-
-    }
-
-
-
 
     return SDL_APP_CONTINUE;
 }
@@ -187,9 +190,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // Update SLAM based on its scrubbers's events
     app->slam->send_events();
-    auto slam_pc = app->slam->get_viz_pointcloud();
-    if (slam_pc)
-        app->visualizer->set_slam_pointcloud(slam_pc);
+    app->visualizer->set_slam_pointcloud(app->slam->get_viz_pointcloud());
 
     // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();
