@@ -1,8 +1,8 @@
 #include "esvo2_core/core/BackendOptimization.h"
 #include "data_passing.hh"
-#include <ceres/ceres.h>
 #include "esvo2_core/tools/TicToc.h"
 #include <Eigen/Dense>
+#include <ceres/ceres.h>
 #include <esvo2_core/factor/imu_factor.h>
 #include <esvo2_core/factor/pose_local_parameterization.h>
 #include <vector>
@@ -13,8 +13,9 @@ namespace esvo2_core
 {
 namespace core
 {
-BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track) 
-: camSysPtr_(camSysPtr), v_ba_bg_Map_to_Track_(v_ba_bg_Map_to_Track)
+BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr,
+                                         DataPassingDeque<esvo2_core::VBaBg> &v_ba_bg_Map_to_Track)
+    : camSysPtr_(camSysPtr), v_ba_bg_Map_to_Track_(v_ba_bg_Map_to_Track)
 {
     // Init camera system
     RIC_ = camSysPtr_->cam_left_ptr_->T_b_c_.block<3, 3>(0, 0);
@@ -32,7 +33,8 @@ BackendOptimization::BackendOptimization(const CameraSystem::Ptr &camSysPtr, Dat
     g_optimal << 0, 9.8, 0;
 }
 
-void BackendOptimization::setProblem(std::deque<DepthPointFrame> *pDepthPoints, TimeSurfaceHistory *pTS_history, bool bUSE_IMU)
+void BackendOptimization::setProblem(std::deque<DepthPointFrame> *pDepthPoints, TimeSurfaceHistory *pTS_history,
+                                     bool bUSE_IMU)
 {
     pDepthPoints_ = pDepthPoints;
     pTS_history_ = pTS_history;
@@ -40,7 +42,7 @@ void BackendOptimization::setProblem(std::deque<DepthPointFrame> *pDepthPoints, 
     // pV_ba_bg_pub_ = pV_ba_bg_pub;
 }
 
-void BackendOptimization::sloveProblem()
+void BackendOptimization::solveProblem()
 {
     TicToc t_optimization;
     // get parameters
@@ -64,7 +66,7 @@ void BackendOptimization::sloveProblem()
         auto ts_obs = (*pTS_history_).find(tt);
         // convert vector to double for ceres
         vector2Double(ts_obs, last_obs, para_Pose, para_SpeedBias, i);
-        
+
         ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
         problem.AddParameterBlock(para_Pose[i], 7, local_parameterization);
         if (initVsFlag)
@@ -114,9 +116,9 @@ void BackendOptimization::sloveProblem()
 #ifdef ESVO2_CORE_BACKEND_DEBUG
     if (!(Bgs[WINDOW_SIZE].norm() > 1 || Bas[WINDOW_SIZE].norm() > 1))
     {
-        std::cout << summary.BriefReport()<<std::endl;
-        std::cout << "Ba = " << Bas[WINDOW_SIZE].transpose()<<std::endl;
-        std::cout << "Bg = " << Bgs[WINDOW_SIZE].transpose()<<std::endl;
+        std::cout << summary.BriefReport() << std::endl;
+        std::cout << "Ba = " << Bas[WINDOW_SIZE].transpose() << std::endl;
+        std::cout << "Bg = " << Bgs[WINDOW_SIZE].transpose() << std::endl;
     }
 
 #endif
@@ -270,6 +272,8 @@ void BackendOptimization::double2Vector(double para_Pose[][7], double para_Speed
         Transformation Tr(T);
         timePoint tt = (*pDepthPoints_)[(*pDepthPoints_).size() - WINDOW_SIZE - 1 + i].timestamp_;
         auto ts_obs = (*pTS_history_).find(tt);
+        if (ts_obs == (*pTS_history_).end())
+            continue;
         ts_obs->second.setTransformation(Tr);
     }
 }
