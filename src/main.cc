@@ -150,6 +150,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         params.left_eventdata = &sources.at(0)->event_data;
         params.right_scrubber = &sources.at(1)->scrubber;
         params.right_eventdata = &sources.at(1)->event_data;
+        std::cout<<sources.size()<<std::endl;
 
         std::cout<<"about to start app"<<std::endl;
         app->slam->startSlam(params);

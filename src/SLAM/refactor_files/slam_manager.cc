@@ -19,7 +19,7 @@
 #include <opencv2/core/mat.hpp>
 #include <pcl/point_types.h>
 
-
+#include <iomanip>
     SlamManager::SlamManager() {}
 
     // Spawns threads for all the modules
@@ -147,7 +147,8 @@
         right_scrubber = nullptr;
         left_eventdata = nullptr;
         right_eventdata = nullptr;
-        last_processed_event_time = 0;
+        last_processed_event_idx_left = 0;
+        last_processed_event_idx_right = 0;
     }
 
     void SlamManager::send_events()
@@ -155,18 +156,19 @@
         // If SLAM is not running, just return
         if(!image_representation_left_running)
             return;
-        std::cout<<"Sending events!"<<std::endl;
+        // std::cout<<"Sending events!"<<std::endl;
         sendEventsPerScrubber(*left_eventdata, *left_scrubber, true);
         sendEventsPerScrubber(*right_eventdata, *right_scrubber, false);
-        std::cout<<"Sent events!"<<std::endl;
+        // std::cout<<"Sent events!"<<std::endl;
     }
 
     void SlamManager::sendEventsPerScrubber(EventData &event_data, Scrubber &scrubber, bool is_left)
     {
         // If SLAM is not running, just return
         if(!image_representation_left_running)
-            return;
-
+        return;
+        
+        std::size_t& last_processed_event_idx = is_left ? last_processed_event_idx_left : last_processed_event_idx_right;
         const glm::vec2 frame_dims = event_data.get_camera_event_resolution();
         const std::size_t width = frame_dims[0];
         const std::size_t height = frame_dims[1];
@@ -176,7 +178,7 @@
 
         if(!event_vector.empty() && points_buffer_size > 0)
         {
-            std::cout<<"event vector has size and scrub # points: "<<event_vector.size()<<" "<<points_buffer_size<<std::endl;
+            // std::cout<<"event vector has size and scrub # points: "<<event_vector.size()<<" "<<points_buffer_size<<std::endl;
             const glm::vec4* data_ptr = event_data.get_evt_vector_ref().data() + current_lower_index;
             event_data.lock_data_vectors();
 
@@ -201,8 +203,17 @@
                 // https://docs.inivation.com/software/introduction.html: "timestamp represents the time of the start of exposure of the 
                 // frame. It is represented as a Unix Timestamp in **microseconds**. Type: int64"
                 // Do nanoseconds of (1000 * microseconds) so get higher precision
+                std::cout<<std::fixed<<std::setprecision(16)<<std::endl;
                 std::chrono::nanoseconds end_duration(static_cast<long long>((data_ptr + (points_buffer_size - 1))->z * 1000));
+                std::cout<<"end duration"<<end_duration.count()<<" og timestamp: "<<(data_ptr + (points_buffer_size - 1))->z * 1000<<std::endl;
+                std::cout<<"now: "<<esvo2_core::timePointToSec(now)<<std::endl;
                 zero_absolute_timestamp = now - end_duration;
+                std::cout<<"zero timestamp: "<<esvo2_core::timePointToSec(zero_absolute_timestamp)<<std::endl;
+                std::cout<<"npw: "<<now.time_since_epoch().count()<<std::endl;
+                std::cout<<"now3: "<<(now.time_since_epoch().count()/ (1000000000.0))<<std::endl;
+                long long test = 101;
+                std::cout<<"test: "<<test/100.0<<std::endl;
+                std::cout<<"0: "<<zero_absolute_timestamp.time_since_epoch().count()<<std::endl;  
                 firstEventBatch = false;
                 std::cout<<"first time?"<<std::endl;
             }
@@ -215,9 +226,17 @@
             evtArray.width = width;
             evtArray.height = height;
 
-            std::cout<<"duration stuff: threshold, lower, upper: "<<duration_threshold<<" "<<curr_lower_bound_timestamp<<" "<<upper_bound_timestamp<<std::endl;
+            // std::cout<<"duration stuff: threshold, lower, upper: "<<duration_threshold<<" "<<curr_lower_bound_timestamp<<" "<<upper_bound_timestamp<<std::endl;
 
-            for(std::size_t index = 0; index < points_buffer_size; index++)
+            int num_skipped = 0;
+            int num_did = 0;
+            // Skip data if already processed it
+            int start_index = 0;
+            if(last_processed_event_idx >= current_lower_index)
+            {
+                start_index = last_processed_event_idx - current_lower_index + 1;
+            }
+            for(std::size_t index = start_index; index < points_buffer_size; index++)
             {
                 // std::cout<<"index and pb size: "<<index<<" "<<points_buffer_size<<std::endl;
                 // If no longer running, just return
@@ -227,11 +246,7 @@
                     return;
                 }
 
-                // Skip data if already processed it
-                if(data_ptr[index].z <= last_processed_event_time)
-                {
-                    return;
-                }
+                num_did++;
 
                 // If reached the upper bound timestamp, can send the event array to the queues
                 while(data_ptr[index].z >= upper_bound_timestamp)
@@ -259,11 +274,12 @@
                 evt.polarity = data_ptr[index].w;
                 // Adding the event to the array
                 evtArray.events.push_back(evt);
-                if(index == points_buffer_size-1)
-                {
-                    last_processed_event_time = data_ptr[index].z;
-                }
             }
+
+            if(points_buffer_size != 0)
+                last_processed_event_idx = std::max(last_processed_event_idx, current_lower_index + points_buffer_size - 1);
+
+            // std::cout<<"Sent events, scrubber size: "<<points_buffer_size<<" Num did: "<<num_did<<std::endl;
 
             // std::cout<<"done with while loop in send events per scrubber"<<std::endl;
             // If evtArray is nonempty once finish for loop, send the events to the queues

@@ -75,6 +75,7 @@ ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const Y
     else
         std::cout << "\33[32m" << "Right event representation node is up " << "\33[0m"<<std::endl;
 
+    // std::cout<<"creating IR "<<is_left_<<std::endl;
     // start generation
     std::thread GenerationThread(&ImageRepresentation::GenerationLoop, this);
     GenerationThread.detach();
@@ -106,7 +107,7 @@ void ImageRepresentation::init(int width, int height)
 
 void ImageRepresentation::GenerationLoop()
 {
-    std::cout<<"start of IR "<<is_left_<<" generation loop!"<<std::endl;
+    // std::cout<<"start of IR "<<is_left_<<" generation loop!"<<std::endl;
     const std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/generation_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
 
@@ -216,6 +217,9 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     *AA_freq = AA_frequency;
     // std::cout<<"AA thread abotu to publish"<<std::endl;
     AA_left_IR_to_Map_.add(AA_freq, external_sync_time);
+    std::cout<<"showing freq aa "<<std::endl;
+    cv::imshow("Frequency AA", AA_frequency);
+    cv::waitKey(10);
 
     // ---Publishing AA_map
     // cv_AA_mat.encoding = "mono8";
@@ -225,33 +229,44 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     // std::cout<<"AA thread about to publish again"<<std::endl;
     std::shared_ptr<cv::Mat> AA_map = std::make_shared<cv::Mat>();
     *AA_map = representation_AA_;
+    // std::cout<<"AA thread about to add"<<std::endl;
     multi_to_Map_.add<2>({AA_map, external_sync_time});
+    std::cout<<"showing rep aa"<<std::endl;
+    cv::imshow("Representation AA", representation_AA_);
+    cv::waitKey(10);
     // std::cout<<"AA thread is done"<<std::endl;
 
 }
 
-void ImageRepresentation::createImageRepresentationAtTime(const timePoint &external_sync_time)
+void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_external_sync_time)
 {
     if (!bcreat_)
         return;
     else
         bcreat_ = false;
+    // std::cout<<"Starting createImageRepresentationAtTime callback "<<is_left_<<std::endl;
     std::lock_guard<std::mutex> lock(data_mutex_);
     if (!bSensorInitialized_ || !bCamInfoAvailable_)
+    {
+        // std::cout<<"IR not initialized so returning"<<bSensorInitialized_<<" "<<bCamInfoAvailable_<<std::endl;
         return;
+    }
 
     // for AA generation
     cv::Mat filiter_image = cv::Mat::zeros(sensor_size_, CV_64F);
     cv::Mat rectangle_image = cv::Mat::zeros(cv::Size(80, 80), CV_8U);
     cv::Mat AA_frequency = cv::Mat::zeros(sensor_size_, CV_8U);
 
-    // std::cout<<"Starting createImageRepresentationAtTime callback "<<is_left_<<std::endl;
+    
     if (representation_mode_ == Fast)
     {
         // std::cout<<"fast mode for createImageRepresentationAtTime for side: "<<is_left_<<std::endl;
         if (vEvents_.size() == 0)
             return;
-        double external_t = esvo2_core::timePointToSec(external_sync_time);
+        // double external_t = esvo2_core::timePointToSec(external_sync_time);
+        double external_t = esvo2_core::timePointToSec(vEvents_.at(vEvents_.size()-1).timestamp);
+        // std::cout<<"IR time: "<<external_t<<" "<<esvo2_core::timePointToSec(esvo2_core::secondsToTimePoint(external_t))<<std::endl;
+        timePoint external_sync_time = vEvents_.at(vEvents_.size()-1).timestamp;
         std::vector<esvo2_core::Event>::iterator ptr_e = EventVector_lower_bound(vEvents_, external_t);
         int distance = std::distance(vEvents_.begin(), ptr_e);
 
@@ -266,10 +281,11 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // if the event rate is too high, we need to downsample the events
             // step = 1 indicates that we use all the events
             // double step = static_cast<double>(distance) / 90000.0;
-
             double step = 1;
+
             std::vector<esvo2_core::Event>::iterator it = vEvents_.begin();
 
+            // cv::Mat testImge = cv::Mat::zeros(sensor_size_, CV_8U);
             // generate TS map
             for (int i = 0; i < distance; i++)
             {
@@ -278,14 +294,31 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
                     break;
                 esvo2_core::Event e = *(it + index);
                 TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.timestamp) / decay_sec_;
+                // testImge.at<uchar>(e.y, e.x) = 255;
+                // std::cout<< "event: "<<e.x<<" "<<e.y<<" "<<esvo2_core::timePointToSec(e.timestamp)<<std::endl;
+                
             }
 
             cv::eigen2cv(TS_temp_map, representation_TS_);
             representation_TS_ = representation_TS_ - external_t / decay_sec_;
+
+            double event_time_sec = esvo2_core::timePointToSec((it+distance-1)->timestamp);
+            double time_diff = event_time_sec - external_t;
+            // std::cout << "Time difference: " << time_diff << " s" << std::endl;
+            // std::cout<<"Timestamps:"<<esvo2_core::timePointToSec((it+distance-1)->timestamp)<<" "<<external_t<<std::endl;
+             
             cv::exp(representation_TS_, representation_TS_);
 
             TS_img = representation_TS_ * 255.0;
             TS_img.convertTo(TS_img, CV_8U);
+
+            // testImge.convertTo(testImge, CV_8U);
+            
+            // cv::imshow("Test", testImge);
+            // cv::waitKey(10);
+
+            //  cv::imshow("Early Left TS", TS_img);
+            // cv::waitKey(10);
 
             // distortion correction
             cv::remap(TS_img, TS_img, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
@@ -345,11 +378,15 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             
             // std::cout<<"joining aa thread"<<std::endl;
             thread0.join();
+            // cv::imshow("Left TS", *TS_left);
+            // cv::waitKey(10);
+            // cv::imshow("Neg Left TS", *TS_neg);
+            // cv::waitKey(10);
             // std::cout<<"aa thread joined"<<std::endl;
         }
         else // generate TS, just for right camera
         {
-            // std::cout<<"right IR"<<std::endl;
+            // std::cout<<"right IR is image generating"<<std::endl;
             representation_TS_.setTo(cv::Scalar(0));
             cv::Mat TS_img = cv::Mat::zeros(sensor_size_, CV_64F);
 
@@ -390,6 +427,9 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &exter
             // std::cout<<"IR right sending ts right"<<std::endl;
             multi_to_Map_.add<1>({TS_right, external_sync_time});
             // std::cout<<"IR right sent ts right"<<std::endl;
+
+            cv::imshow("Right TS", *TS_right);
+            cv::waitKey(10);
         }
 
         // std::cout<<"about to clear events"<<std::endl;

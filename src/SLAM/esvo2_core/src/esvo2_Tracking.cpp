@@ -46,6 +46,8 @@ esvo2_Tracking::esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node 
     resultPath_ = config_["PATH_TO_SAVE_TRAJECTORY"].as<std::string>(std::string());
     setSystemStatus(SystemStatus::INITIALIZATION);
 
+    std::cout<<"savers?: "<<bSaveTrajectory_<<std::endl;
+    
     // get extrinsic parameters
     R_b_c_ = camSysPtr_->cam_left_ptr_->T_b_c_.block<3, 3>(0, 0);
 
@@ -204,7 +206,7 @@ void esvo2_Tracking::TrackingLoop()
         if (refPCMap_.size() < 1 || TS_history_.size() < 1)
         {
             next_wake_up_time += interval;
-            // std::cout<<"at end of tracking while loop! Sizes are too small"<<std::endl;
+            std::cout<<"at end of tracking while loop! Sizes are too small: "<<refPCMap_.size()<<" "<<TS_history_.size()<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -215,7 +217,7 @@ void esvo2_Tracking::TrackingLoop()
         {
             reset();
             next_wake_up_time += interval;
-            // std::cout<<"at end of tracking while loop! Are reset from dynamic reconfigure woah"<<std::endl;
+            std::cout<<"at end of tracking while loop! Are reset from dynamic reconfigure woah"<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -236,11 +238,12 @@ void esvo2_Tracking::TrackingLoop()
                 if (esvo2_core::timePointToSec(ref_.t_) >= esvo2_core::timePointToSec(TS_history_.rbegin()->first))
                 {
                     std::cout << "The time_surface observation should be obtained after the reference frame" << std::endl;
-                    exit(-1);
+                    // exit(-1);
+                    std::cout<<"Tracking wanted to kill the program because it is dumb"<<std::endl;
                 }
                 if (!curDataTransferring())
                 {
-                    // std::cout<<"at end of tracking while loop! not current data transfeerring"<<std::endl;
+                    std::cout<<"at end of tracking while loop! not current data transfeerring"<<std::endl;
                     continue;
                 }
             }
@@ -281,6 +284,7 @@ void esvo2_Tracking::TrackingLoop()
             if (bSaveTrajectory_)
             {
                 // save results to listPose and listPoseGt
+                std::cout<<"Tracking is saving the results"<<std::endl;
                 lTimestamp_.push_back(std::to_string(esvo2_core::timePointToSec(cur_.t_)));
                 lPose_.push_back(cur_.tr_.getTransformationMatrix());
             }
@@ -308,7 +312,7 @@ void esvo2_Tracking::TrackingLoop()
         std::cout << "------------------------------------------------------------";
 #endif
         next_wake_up_time += interval;
-        // std::cout<<"at end of tracking while loop!"<<std::endl;
+        std::cout<<"at end of tracking while loop!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
     std::cout<<"Tracking is no longer running!"<<std::endl;
@@ -582,12 +586,13 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
                                                  const esvo2_core::ImagePtr &time_surface_dy)
 {
 
+    std::cout<<"Tracking negts callback"<<std::endl;
     cv::Mat cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy;
     cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
     cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
     cv_ptr_dx = *(time_surface_dx.image); //cv_bridge::toCvCopy(time_surface_dx, sensor_msgs::image_encodings::TYPE_16SC1);
     cv_ptr_dy = *(time_surface_dy.image); //cv_bridge::toCvCopy(time_surface_dy, sensor_msgs::image_encodings::TYPE_16SC1);
-   
+   std::cout<<"made cv mats"<<std::endl;
     std::lock_guard<std::mutex> lock(data_mutex_);
     // push back the most current TS.
     timePoint t_new_ts = time_surface_left.header_stamp;
@@ -595,12 +600,16 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
                         TimeSurfaceObservation(cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy, TS_id_, false));
     TS_id_++;
 
+    std::cout<<"added to ts history"<<std::endl;
     // keep TS_history_'s size constant
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin();
+        std::cout<<"about to erase from ts history"<<std::endl;
         TS_history_.erase(it);
+        std::cout<<"erased from ts history"<<std::endl;
     }
+    std::cout<<"removed from ts history maybe and are done!"<<std::endl;
 }
 
 void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &msg)
@@ -610,6 +619,7 @@ void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseS
     esvo2_core::Transform tf(msg->orientation[0], msg->orientation[1], msg->orientation[2],
                                     msg->orientation[3], msg->position[0], msg->position[1], msg->position[2]);
     esvo2_core::StampedTransform st(tf, msg->timestamp, msg->frame_id, dvs_frame_id_);
+    std::cout<<"Tracking is adding transform with ts: "<<esvo2_core::timePointToSec(msg->timestamp)<<std::endl;
     tf_->setTransform(st);
 
     // VIZ PUBLISH -> not publishing anything right now
@@ -623,13 +633,14 @@ bool esvo2_Tracking::getPoseAt(const timePoint &t, esvo2_core::Transformation &T
     std::string *err_msg = new std::string();
     if (!tf_->canTransform(world_frame_id_, source_frame, t, err_msg))
     {
-        std::cout<<"WARNING:" << timePointToSec(t) << " : " << *err_msg<<std::endl;
+        std::cout<<"tracking WARNING:" << timePointToSec(t) << " : " << *err_msg<<std::endl;
         delete err_msg;
         return false;
     }
     else
     {
         esvo2_core::StampedTransform st;
+        std::cout<<"tf is looking up a transform in tracking"<<std::endl;
         tf_->lookupTransform(world_frame_id_, source_frame, t, st);
         st.toKindrTransformation(Tr);
         // tf::transformTFToKindr(st, &Tr);

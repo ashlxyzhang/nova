@@ -23,6 +23,7 @@
 #include "shaders/visualizer/text/text_vert.h"
 
 #include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 
 #include "fonts/CascadiaCode.ttf.h"
 

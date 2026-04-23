@@ -143,7 +143,7 @@ esvo2_Mapping::esvo2_Mapping(std::atomic<bool> &is_running_, const YAML::Node &c
 
     // Backend parameters
     initFirstPoseFlag = false;
-    prevTime = 0; //\Users\jackm\Desktop\nova\vcpkg\buildtrees\openeb\src\5.2.0-b808f57c67.clean\sdk\modules\stream\cpp\samples\metavision_file_to_dat\build\build>
+    prevTime = 0;
     first_imu = false;
 
     // initialize Event Batch Matcher
@@ -291,7 +291,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
     while (is_running)
     {
-        // std::cout<<"in beginning of mapping while loop!"<<std::endl;
+        std::cout<<"in beginning of mapping while loop!"<<std::endl;
         // reset mapping rate
         if (changed_frame_rate_)
         {
@@ -307,6 +307,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
         }
 
         // To assure the esvo2_time_surface node has been working
+        // std::cout<<"Mapping: ts history size: "<<TS_history_.size()<<std::endl;
         if (TS_history_.size() >= 10)
         {
             TicToc total_mapping;
@@ -314,8 +315,10 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             {
                 if (data_mutex_.try_lock())
                 {
+                    std::cout<<"mapping is calling data transferring"<<std::endl;
                     dataTransferring();
                     data_mutex_.unlock();
+                    std::cout<<"Mapping is done calling data transferring"<<std::endl;
                     break;
                 }
                 else
@@ -353,12 +356,17 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
 
             // Do mapping
             if (getSystemStatus() == SystemStatus::WORKING)
+            {
+                std::cout<<"mapping is getting the mapping at time!"<<std::endl;
                 MappingAtTime(TS_obs_ptr_->first);
-
+            }
+            std::cout<<"about to backend opt slide window in mapping"<<std::endl;
             BackendOpt_.slideWindow();
+            std::cout<<"done backend opt slide windowing!"<<std::endl;
         }
         else
         {
+            std::cout<<"waiting for enought TS"<<std::endl;
             if (future_reset.wait_for(std::chrono::nanoseconds(1)) == std::future_status::ready)
             {
                 prom_mapping.set_value();
@@ -366,7 +374,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             }
         }
         next_wake_up_time += interval;
-        // std::cout<<"at end of mapping while loop!"<<std::endl;
+        std::cout<<"at end of mapping while loop!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     }
     std::cout<<"Mapping is no longer running!"<<std::endl;
@@ -566,6 +574,7 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
     double time_optimize = t_optimize.toc();
     t_overall_count += time_optimize;
 
+    std::cout<<"creating thread to publish mapping results!!!!"<<std::endl;
     std::thread tPublishMappingResult(&esvo2_Mapping::publishMappingResults, this, depthFramePtr_->dMap_,
                                       depthFramePtr_->T_world_frame_, t);
     tPublishMappingResult.detach();
@@ -655,6 +664,7 @@ bool esvo2_Mapping::InitializationAtTime(const timePoint &t)
     dqvDepthPoints_.push_back(vdpf_sgm);
     dFusor_.naive_propagation(vdp_sgm, depthFramePtr_);
     // publish the invDepth map
+    std::cout<<"creating a thread 2 to publihs the inv depth results!"<<std::endl;
     std::thread tPublishMappingResult(&esvo2_Mapping::publishMappingResults, this, depthFramePtr_->dMap_,
                                       depthFramePtr_->T_world_frame_, t);
     tPublishMappingResult.detach();
@@ -854,6 +864,7 @@ void esvo2_Mapping::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseSt
     esvo2_core::Transform tf(ps_msg->orientation[0], ps_msg->orientation[1], ps_msg->orientation[2],
                      ps_msg->orientation[3], ps_msg->position[0], ps_msg->position[1], ps_msg->position[2]);
     esvo2_core::StampedTransform st(tf, ps_msg->timestamp, ps_msg->frame_id, dvs_frame_id_);
+    std::cout<<"Mapping is adding transform with ts: "<<esvo2_core::timePointToSec(ps_msg->timestamp)<<std::endl;
     tf_->setTransform(st);
 }
 
@@ -866,7 +877,7 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
     if (!tf_->canTransform(world_frame_id_, source_frame, t, err_msg))
     {
 #ifdef ESVO2_CORE_MAPPING_LOG
-        std::cout<<"WARNING:" << t.toNSec() << " : " << *err_msg<<std::endl;
+        std::cout<<"mapping WARNING:" << t.toNSec() << " : " << *err_msg<<std::endl;
 #endif
         delete err_msg;
         return false;
@@ -874,6 +885,7 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
     else
     {
         esvo2_core::StampedTransform st;
+        std::cout<<"tf is looking up a transform in mapping"<<std::endl;
         tf_->lookupTransform(world_frame_id_, source_frame, t, st);
         st.toKindrTransformation(Tr);
         // tf::transformTFToKindr(st, &Tr);
@@ -883,7 +895,7 @@ bool esvo2_Mapping::getPoseAt(const timePoint &t,
 
 void esvo2_Mapping::eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg)
 {
-    std::cout<<"starting mapping events callback with this many events: "<<msg->events.size()<<std::endl;
+    // std::cout<<"starting mapping events callback with this many events: "<<msg->events.size()<<std::endl;
     EventQueue &EQ = events_left_;
     std::lock_guard<std::mutex> lock(data_mutex_);
 
@@ -943,10 +955,11 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
                                         const esvo2_core::ImagePtr &time_surface_negative_dy)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
+    // std::cout<<"At start of mapping mult callback"<<std::endl;
     // check time-stamp inconsistency
     if (!TS_history_.empty())
     {
-        static constexpr double max_time_diff_before_reset_s = 1;
+        static constexpr double max_time_diff_before_reset_s = 4;
         const timePoint stamp_last_image = TS_history_.rbegin()->first;
         const double dt = esvo2_core::timePointToSec(time_surface_left.header_stamp) - esvo2_core::timePointToSec(stamp_last_image);
         if (dt < 0 || std::fabs(dt) >= max_time_diff_before_reset_s)
@@ -966,7 +979,7 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
    
     // push back the new time surface map
     timePoint t_new_TS = time_surface_left.header_stamp;
-
+    // std::cout<<"mapping multicallback set variables and stuff"<<std::endl;
     // Made the gradient computation optional which is up to the jacobian choice.
     if (dpSolver_.getProblemType() == NUMERICAL || dpSolver_ln_.getProblemType() == NUMERICAL)
         TS_history_.emplace(t_new_TS,
@@ -976,12 +989,14 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
         TS_history_.emplace(t_new_TS,
                             TimeSurfaceObservation(cv_ptr_left, cv_ptr_right, cv_ptr_AA_map_left, cv_ptr_negative,
                                                    cv_ptr_negative_dx, cv_ptr_negative_dy, TS_id_, true));
+    // std::cout<<"Mapping multi callback added to ts history"<<std::endl;
     // keep TS_history's size constant
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin();
         TS_history_.erase(it);
     }
+    // std::cout<<"at end of mapping multi callback"<<std::endl;
 }
 
 void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
@@ -990,13 +1005,13 @@ void esvo2_Mapping::AACallback(const esvo2_core::ImagePtr &AA_left)
     // check timestamp consistency
     if (!TS_history_.empty())
     {
-        static constexpr double max_time_diff_before_reset_s = 1;
+        static constexpr double max_time_diff_before_reset_s = 4;
         const timePoint stamp_last_image = TS_history_.rbegin()->first;
         const double dt = esvo2_core::timePointToSec(AA_left.header_stamp) - esvo2_core::timePointToSec(stamp_last_image);
         if (std::fabs(dt) >= max_time_diff_before_reset_s)
         {
-            printf("Inconsistent frame timestamp detected <AACallback> (new: %f, old %f), resetting.",
-                     esvo2_core::timePointToSec(AA_left.header_stamp), esvo2_core::timePointToSec(stamp_last_image));
+            printf("Inconsistent frame timestamp detected <AACallback> (new: %f, old %f, dt %f, fabs %f), resetting.",
+                     esvo2_core::timePointToSec(AA_left.header_stamp), esvo2_core::timePointToSec(stamp_last_image), dt, std::fabs(dt));
             reset();
         }
     }
@@ -1147,6 +1162,7 @@ void esvo2_Mapping::reset()
 
 void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformation tr, timePoint t)
 {
+    std::cout<<"publishong mapping results Mapping!"<<std::endl;
     cv::Mat invDepthImage, stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
 
     invDepthImage = TS_obs_ptr_->second.img_left_.clone();
@@ -1155,16 +1171,23 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
 
     // VIZ PUBLISH -> not publishing anything right now
     // Skip publishing the inv depth map for now
-    // publishImage(invDepthImage, t, invDepthMap_pub_);
+    publishImage(invDepthImage, t);
 
     if (getSystemStatus() == SystemStatus::INITIALIZATION)
+    {
+        std::cout<<"mapping publihsing becayse in initialization"<<std::endl;
         publishPointCloud(depthMapPtr, tr, t);
+        std::cout<<"done publishong the point cloud"<<std::endl;
+    }
     if (getSystemStatus() == SystemStatus::WORKING)
     {
         if (FusionStrategy_ == "CONST_FRAMES")
         {
             if (dqvDepthPoints_.size() == maxNumFusionFrames_)
+            {
+                std::cout<<"mapping publishing becasue const frames"<<std::endl;
                 publishPointCloud(depthMapPtr, tr, t);
+            }
         }
         if (FusionStrategy_ == "CONST_POINTS")
         {
@@ -1172,7 +1195,10 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
             for (std::size_t n = 0; n < dqvDepthPoints_.size(); n++)
                 numFusionPoints += dqvDepthPoints_[n].size();
             if (numFusionPoints > 0.5 * maxNumFusionPoints_)
+            {
+                std::cout<<"mapping publihsing because max fusion points"<<std::endl;
                 publishPointCloud(depthMapPtr, tr, t);
+            }
         }
     }
 }
@@ -1225,12 +1251,14 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
     }
 
     // publish the local 3D map which is used by the tracker.
+    std::cout<<"checking if pc color is empty! Size stuff: "<<pc_color_->size()<<" "<<depthMapPtr->size()<<std::endl;
     if (!pc_color_->empty())
     {
         // --Publishing the point cloud to tracking 
         // pcl::toROSMsg(*pc_color_, *pc_to_publish);
         // pc_to_publish->header.stamp = t;
         // pc_pub_.publish(pc_to_publish);
+        std::cout<<"mapping is publishing the point cloud!"<<std::endl;
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pointcloud_local_2 = make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
         *pointcloud_local_2 = *pc_color_;
         pointcloud_Map_to_Track_.add(pointcloud_local_2, t);
@@ -1291,7 +1319,8 @@ void esvo2_Mapping::publishImage(const cv::Mat &image, const timePoint &t, std::
     // std_msgs::Header header;
     // header.stamp = t;
     // VIZ PUBLISH -> not being used right now, so are commenting it out. Was used to publish the inv depth map
-
+    cv::imshow("Inverse depth", image);
+    cv::waitKey(10);
     // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, encoding.c_str(), image).toImageMsg();
     // pub.publish(msg);
 }

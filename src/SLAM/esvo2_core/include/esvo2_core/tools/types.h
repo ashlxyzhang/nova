@@ -26,7 +26,8 @@ using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
 inline double timePointToSec(const timePoint& timestamp)
 {
-     return std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();
+//      return std::chrono::duration<double>(timestamp.time_since_epoch()).count();
+     return timestamp.time_since_epoch().count() / (1000000000.0);
 }
 
 inline timePoint secondsToTimePoint(double seconds)
@@ -183,17 +184,32 @@ public:
         // Turns this Stamped Transform into a Transformation = kindr::minimal::QuatTransformation; 
         void toKindrTransformation(kindr::minimal::QuatTransformation& kindr_tf)
         {
-                Eigen::Matrix<double, 3, 1> kindr_pos(trans.x, trans.y, trans.z);
-                kindr::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
-                
-                // Enforce positive w.
-                if (kindr_rot.w() < 0) {
-                        kindr_rot.setValues(kindr_rot.w()*-1, kindr_rot.x()*-1, kindr_rot.y()*-1, kindr_rot.z()*-1);
-                        // rotate.coeffs() = -rotate.coeffs();
-                }
-                kindr_rot.normalize();
+                Eigen::Matrix<double, 3, 1> position;
+                Eigen::Quaternion<double> rotation;
+                Eigen::Quaterniond kindr_double(rot.w, rot.x, rot.y, rot.z);
+                rotation = kindr_double.cast<double>();
 
-               kindr_tf = kindr::minimal::QuatTransformation(kindr_rot, kindr_pos);
+                Eigen::Matrix<double, 3, 1> kindr_double_vec;
+                kindr_double_vec(0) = trans.x;
+                kindr_double_vec(1) = trans.y;
+                kindr_double_vec(2) = trans.z;
+                position = kindr_double_vec.cast<double>();
+
+                if (rotation.w() < 0) {
+                        rotation.coeffs() = -rotation.coeffs();
+                }
+
+                kindr_tf = kindr::minimal::QuatTransformationTemplate<double>(rotation, position);
+                // Eigen::Matrix<double, 3, 1> kindr_pos(trans.x, trans.y, trans.z);
+                // kindr::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
+                
+                // // Enforce positive w.
+                // if (kindr_rot.w() < 0) {
+                //         kindr_rot.setValues(kindr_rot.w()*-1, kindr_rot.x()*-1, kindr_rot.y()*-1, kindr_rot.z()*-1);
+                //         // rotate.coeffs() = -rotate.coeffs();
+                // }
+                // kindr_rot.normalize();
+                // kindr_tf = kindr::minimal::QuatTransformation(kindr_rot, kindr_pos);
         }
 };
 
@@ -245,6 +261,12 @@ public:
         // Says if lookupTransform will be valid if called with timePoint t
         bool canTransform(std::string from, std::string to, timePoint t, std::string* err)
         {
+                std::cout<<"are in can transform!"<<std::endl;
+                std::cout<<transform_buffer.size()<<std::endl;
+                for (auto i : transform_buffer)
+                {
+                        std::cout<<esvo2_core::timePointToSec(i.timestamp)<<std::endl;
+                }
                 StampedTransform test(t);
                 auto right = transform_buffer.lower_bound(test);
                 // Nothing is greater than t, so cannot lerp
@@ -254,6 +276,7 @@ public:
                         return false;
                 }
                 // Right exactly equals t, so can just return right
+                // if(esvo2_core::timePointToSec(right->timestamp) == esvo2_core::timePointToSec(t))
                 if(right->timestamp == t)
                         return true;
                 // There exists another timestamp before t, so can lerp because have a left and right
@@ -271,7 +294,7 @@ public:
                 StampedTransform timestamp_want(t);
                 auto right = transform_buffer.lower_bound(timestamp_want);
                 // Right exactly equals t, so can just return right
-                if(right->timestamp == t)
+                if(esvo2_core::timePointToSec(right->timestamp) == esvo2_core::timePointToSec(t))
                 {
                         st = *right;
                         return;
