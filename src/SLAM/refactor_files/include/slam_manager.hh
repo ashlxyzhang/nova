@@ -43,6 +43,8 @@ class SlamManager
         // Stops slam
         void stopSlam();
 
+        bool isRunning() const { return image_representation_left_running; }
+
         // Sends left/right events from scrubbers to the SLAM threads
         void send_events();
 
