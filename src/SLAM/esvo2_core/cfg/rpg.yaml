@@ -61,7 +61,7 @@ mapping:
 
   # Configuration for mapping system
   TS_HISTORY_LENGTH: 100
-  USE_IMU: True
+  use_imu: False
   INIT_SGM_DP_NUM_THRESHOLD: 1500
   mapping_rate_hz: 10
   large_scale: False

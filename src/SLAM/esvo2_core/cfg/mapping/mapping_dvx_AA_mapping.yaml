@@ -59,7 +59,7 @@ visualize_range: 30
 
 # Configuration for mapping system
 TS_HISTORY_LENGTH: 100
-USE_IMU: True
+use_imu: False
 INIT_SGM_DP_NUM_THRESHOLD: 500
 mapping_rate_hz: 20
 large_scale: True

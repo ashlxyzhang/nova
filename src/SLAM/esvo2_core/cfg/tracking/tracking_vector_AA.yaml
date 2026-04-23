@@ -17,4 +17,4 @@ SAVE_TRAJECTORY: True
 # PATH_TO_SAVE_TRAJECTORY: "/home/bell/data/ESVO2_result/"
 PATH_TO_SAVE_TRAJECTORY: "/home/njk/output/ESVO2/"
 VISUALIZE_TRAJECTORY: True
-USE_IMU: True
+use_imu: False
