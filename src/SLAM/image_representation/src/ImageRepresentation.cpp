@@ -1,5 +1,6 @@
 // #include <glog/logging.h>
 #include "image_representation/ImageRepresentation.h"
+#include "../../refactor_files/unused/debug_log.hh"
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
@@ -130,7 +131,7 @@ void ImageRepresentation::GenerationLoop()
 
 void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &ptr_e, int distance, double external_t)
 {
-    // std::cout<<"AA thread is running its function!"<<std::endl;
+    DLOG("AA_thread START  is_left=" << is_left_ << "  distance=" << distance << "  t=" << external_t);
     timePoint external_sync_time(esvo2_core::secondsToTimePoint(external_t));
 
     representation_AA_ = cv::Mat::zeros(sensor_size_, CV_8U);   // for temporal stereo matching
@@ -216,10 +217,10 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     std::shared_ptr<cv::Mat> AA_freq = std::make_shared<cv::Mat>();
     *AA_freq = AA_frequency;
     // std::cout<<"AA thread abotu to publish"<<std::endl;
+    DLOG("AA_thread adding AA_freq to AA_left_IR_to_Map");
     AA_left_IR_to_Map_.add(AA_freq, external_sync_time);
-    std::cout<<"showing freq aa "<<std::endl;
-    cv::imshow("Frequency AA", AA_frequency);
-    cv::waitKey(10);
+    // cv::imshow("Frequency AA", AA_frequency);
+    // cv::waitKey(10);
 
     // ---Publishing AA_map
     // cv_AA_mat.encoding = "mono8";
@@ -230,10 +231,11 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     std::shared_ptr<cv::Mat> AA_map = std::make_shared<cv::Mat>();
     *AA_map = representation_AA_;
     // std::cout<<"AA thread about to add"<<std::endl;
+    DLOG("AA_thread adding AA_map to multi_to_Map channel 2");
     multi_to_Map_.add<2>({AA_map, external_sync_time});
-    std::cout<<"showing rep aa"<<std::endl;
-    cv::imshow("Representation AA", representation_AA_);
-    cv::waitKey(10);
+    DLOG("AA_thread DONE");
+    // cv::imshow("Representation AA", representation_AA_);
+    // cv::waitKey(10);
     // std::cout<<"AA thread is done"<<std::endl;
 
 }
@@ -262,7 +264,10 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
     {
         // std::cout<<"fast mode for createImageRepresentationAtTime for side: "<<is_left_<<std::endl;
         if (vEvents_.size() == 0)
+        {
+            DLOG("createImageRepresentation early-return: vEvents_ empty  is_left=" << is_left_);
             return;
+        }
         // double external_t = esvo2_core::timePointToSec(external_sync_time);
         double external_t = esvo2_core::timePointToSec(vEvents_.at(vEvents_.size()-1).timestamp);
         // std::cout<<"IR time: "<<external_t<<" "<<esvo2_core::timePointToSec(esvo2_core::secondsToTimePoint(external_t))<<std::endl;
@@ -359,6 +364,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             *TS_left = TS_img;
             // std::cout<<"adding ts left"<<std::endl;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
+            DLOG("LEFT: adding TS_left to Track ch0 and Map ch0  t=" << esvo2_core::timePointToSec(external_sync_time));
             multi_to_Track_.add<0>({TS_left, external_sync_time});
             multi_to_Map_.add<0>({TS_left, external_sync_time});
             // std::cout<<"added ts left"<<std::endl;
@@ -425,11 +431,12 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             *TS_right = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             // std::cout<<"IR right sending ts right"<<std::endl;
+            DLOG("RIGHT: adding TS_right to Map ch1  t=" << esvo2_core::timePointToSec(external_sync_time));
             multi_to_Map_.add<1>({TS_right, external_sync_time});
             // std::cout<<"IR right sent ts right"<<std::endl;
 
-            cv::imshow("Right TS", *TS_right);
-            cv::waitKey(10);
+            // cv::imshow("Right TS", *TS_right);
+            // cv::waitKey(10);
         }
 
         // std::cout<<"about to clear events"<<std::endl;
