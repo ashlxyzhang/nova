@@ -455,7 +455,7 @@ bool esvo2_Tracking::curImuTransferring()
 
 void esvo2_Tracking::reset()
 {
-    // clear all maintained data
+    std::lock_guard<std::mutex> lock(data_mutex_);
     ets_ = IDLE;
     TS_id_ = 0;
     TS_history_.clear();
