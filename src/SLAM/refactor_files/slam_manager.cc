@@ -1,4 +1,5 @@
 #include "slam_manager.hh"
+#include "unused/debug_log.hh"
 
 #include <thread>
 #include <atomic>
@@ -438,6 +439,7 @@
                     esvo2_core::ImagePtr time_surface_negative_dx(dx);
                     esvo2_core::ImagePtr time_surface_negative_dy(dy);
 
+                    DLOG("multi_to_Map fired -> calling timeSurfaceCallback");
                     mapping->timeSurfaceCallback(time_surface_left, time_surface_right, AA_map, time_surface_negative, time_surface_negative_dx, time_surface_negative_dy);
                     // std::cout<<"mapping thread done processing multidata queue"<<std::endl;
                 }
