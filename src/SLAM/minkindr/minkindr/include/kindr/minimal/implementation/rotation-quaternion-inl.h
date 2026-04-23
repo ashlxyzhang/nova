@@ -25,7 +25,7 @@
 #ifndef KINDR_MIN_ROTATION_QUATERNION_INL_H_
 #define KINDR_MIN_ROTATION_QUATERNION_INL_H_
 
-// #include <glog/logging.h>
+#include <glog/logging.h>
 #include <kindr/minimal/rotation-quaternion.h>
 #include <kindr/minimal/angle-axis.h>
 

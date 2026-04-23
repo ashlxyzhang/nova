@@ -9,14 +9,14 @@
 #include "esvo2_core/factor/OptimizationFunctor.h"
 // #include <esvo2_core/factor/imu_factor.h>
 // #include <esvo2_core/factor/pose_local_parameterization.h>
-#include <esvo2_core/tools/Visualization.h>
-#include <esvo2_core/tools/utils.h>
-#include <esvo2_core/factor/imu_integration.h>
-#include <opencv4/opencv2/core.hpp>
-#include <opencv4/opencv2/imgproc.hpp>
 #include "esvo2_core/tools/types.h"
 #include <Eigen/Dense>
 #include <chrono>
+#include <esvo2_core/factor/imu_integration.h>
+#include <esvo2_core/tools/Visualization.h>
+#include <esvo2_core/tools/utils.h>
+#include <opencv4/opencv2/core.hpp>
+#include <opencv4/opencv2/imgproc.hpp>
 
 #include "data_passing.hh"
 
@@ -28,9 +28,9 @@ using namespace factor;
 namespace core
 {
 
-    const int WINDOW_SIZE = 4;
-    struct DepthPointFrame
-    {
+const int WINDOW_SIZE = 4;
+struct DepthPointFrame
+{
         using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
         timePoint timestamp_;
         std::vector<DepthPoint> DepthPoints_;
@@ -45,17 +45,18 @@ namespace core
         {
             return DepthPoints_.size();
         }
-    };
+};
 
 class BackendOptimization
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-        BackendOptimization(const CameraSystem::Ptr &camSysPtr, DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track);
+        BackendOptimization(const CameraSystem::Ptr &camSysPtr,
+                            DataPassingDeque<esvo2_core::VBaBg> &v_ba_bg_Map_to_Track);
 
         void setProblem(std::deque<DepthPointFrame> *dqvDepthPoints, TimeSurfaceHistory *pTS_history, bool bUSE_IMU);
-        void sloveProblem();
+        void solveProblem();
 
         void double2Vector(double para_Pose[][7], double para_SpeedBias[][9]);
         void Tcam2Timu(esvo2_core::container::TimeSurfaceHistory::iterator ts_obs,
@@ -75,7 +76,7 @@ class BackendOptimization
 
     private:
         // Queue
-        DataPassingDeque<esvo2_core::VBaBg>& v_ba_bg_Map_to_Track_;
+        DataPassingDeque<esvo2_core::VBaBg> &v_ba_bg_Map_to_Track_;
 
         CameraSystem::Ptr camSysPtr_;
         std::deque<DepthPointFrame> *pDepthPoints_;
