@@ -39,7 +39,7 @@ void RegProblemLM::setProblem(RefFrame* ref, CurFrame* cur, bool bComputeGrad)
   if(numPoints_ > rpConfigPtr_->MAX_REGISTRATION_POINTS_)
     numPoints_ = rpConfigPtr_->MAX_REGISTRATION_POINTS_;
   ResItems_.resize(numPoints_);
-  VisualizationIdx_.reserve(numPoints_);
+  VisualizationIdx_.resize(numPoints_);
   if(bPrint_)
     std::cout << "num points: " << numPoints_;
 

@@ -168,43 +168,26 @@ class SlamManager
 
 // -------TODO---------
 /*
-    - Fix types.h toKindrTransformation, which is very probably wrong. Hard to check though without compiling
-        - minkindr can be found at: https://github.com/ethz-asl/minkindr
-        - Expected conversion function at:
-   https://github.com/ethz-asl/minkindr_ros/blob/master/minkindr_conversions/include/minkindr_conversions/kindr_tf.h
-
-    - Finish setting up params and call start_slam in main.cc
-        - Hope it runs properly
-        - Fix bugs when it doesn't run properly
-        - Might be worth to visualize the cv::Mat inverse depth if need to debug something
-
     - Visualization stuff
-       - Figure out how to visualize PCL (point cloud library)
-           - Set up a class for SLAM in the visualizer
-           - Send data to that class via a reference to pc_global_ in esvo2_Mapping.cpp
-       - If have time, can add ways to visualize the other stuff
-         - All visualization queues are commented out above, so can readd them if want to
-         - visualize the other types of point clouds
-         - visualize the pose/trajectory info
-         - visualize the various cv::Mat images produced (like time surface, aa, inverse depth, etc.)
+       - get visualization working on Windows
+       - add toggle to view global point cloud vs just filtered
+       
+    - Controls/GUI
+        - add start slam button that shows up if have two data sources
+        - figure out how user should select all the YAML files + output file for pose stuff if they want
+        - add toggle to view global point cloud vs just filtered
 */
 
 // -----------NOTES on sus things---------
 /*
     - (10,10) for multi_data_passing queue sizes might be incorrect, but it should be fine
-    - I am pretty sure stuff in the subscribe callback functions treat variables as a const,
-        so I have been treating it as okay to send the same shared ptr to multiple queues
-    - Because of relative to absolute time conversion, must run SLAM on time scrub mode and in real time (no speeding
-   up/slowing down probably) Can still play from file, but must play file in real time.
-    - types.h toKindrTransformation is very probably wrong
-    -#include <esvo2_core/DVS_MappingStereoConfig.h> in Mapping.h may be necessary
+    - types.h toKindrTransformation is a bit sus
     - ref_.vPointXYZPtr_.push_back(&(*PointXYZ_begin_it)); // Copy the pointer of the pointXYZ in Tracking.cpp is very
    sus but I think it is correct
     - Mapping.cpp does vEventsPtr_left_SGM_.push_back(&(*ev_begin_it)); because vEventsPtr_left_SGM_ holds pointers.
    This replicates functionality of ESVO2 I think but is pretty sus.
     - EventQueue was originally called EventBuffer and was a vector of Event* before started refactoring. I don't think
    it affects anything but it might be an issue
-    - Dataset may have repeating events because of how query it?
 */
 
 // ---------CONFIG NOTES----------

@@ -143,18 +143,12 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         else
         {
             SlamManager::StartSlamParameters params;
-            params.left_camera_yaml_path =
-                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
-            params.right_camera_yaml_path =
-                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
-            params.Mapping_yaml_path =
-                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
-            params.Tracking_yaml_path =
-                "/Users/ashley/Documents/repos/nova/src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
-            params.IR_Left_yaml_path =
-                "/Users/ashley/Documents/repos/nova/src/SLAM/image_representation/cfg/image_representation_fast.yaml";
-            params.IR_Right_yaml_path =
-                "/Users/ashley/Documents/repos/nova/src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
+            params.left_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
+            params.right_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
+            params.Mapping_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
+            params.Tracking_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
+            params.IR_Left_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast.yaml";
+            params.IR_Right_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
 
             std::vector<std::shared_ptr<DataSource>> sources = app->data_acq->get_data_sources();
             if (sources.size() < 2)

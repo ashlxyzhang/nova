@@ -1,1 +1,0 @@
-glslc -fshader-stage=vertex slam_points.vert -o slam_points.spv

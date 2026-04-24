@@ -261,12 +261,12 @@ public:
         // Says if lookupTransform will be valid if called with timePoint t
         bool canTransform(std::string from, std::string to, timePoint t, std::string* err)
         {
-                std::cout<<"are in can transform!"<<std::endl;
-                std::cout<<transform_buffer.size()<<std::endl;
-                for (auto i : transform_buffer)
-                {
-                        std::cout<<esvo2_core::timePointToSec(i.timestamp)<<std::endl;
-                }
+                // std::cout<<"are in can transform!"<<std::endl;
+                // std::cout<<transform_buffer.size()<<std::endl;
+                // for (auto i : transform_buffer)
+                // {
+                        // std::cout<<esvo2_core::timePointToSec(i.timestamp)<<std::endl;
+                // }
                 StampedTransform test(t);
                 auto right = transform_buffer.lower_bound(test);
                 // Nothing is greater than t, so cannot lerp

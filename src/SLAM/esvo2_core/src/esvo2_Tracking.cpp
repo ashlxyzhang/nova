@@ -195,7 +195,7 @@ void esvo2_Tracking::TrackingLoop()
 // #endif
 //         r.sleep();
 //     } // while
-     std::cout<<"first time at tracking whiel loop!"<<std::endl;
+    //  std::cout<<"first time at tracking whiel loop!"<<std::endl;
 
     const std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/tracking_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
@@ -206,7 +206,7 @@ void esvo2_Tracking::TrackingLoop()
         if (refPCMap_.size() < 1 || TS_history_.size() < 1)
         {
             next_wake_up_time += interval;
-            std::cout<<"at end of tracking while loop! Sizes are too small: "<<refPCMap_.size()<<" "<<TS_history_.size()<<std::endl;
+            // std::cout<<"at end of tracking while loop! Sizes are too small: "<<refPCMap_.size()<<" "<<TS_history_.size()<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -217,7 +217,7 @@ void esvo2_Tracking::TrackingLoop()
         {
             reset();
             next_wake_up_time += interval;
-            std::cout<<"at end of tracking while loop! Are reset from dynamic reconfigure woah"<<std::endl;
+            // std::cout<<"at end of tracking while loop! Are reset from dynamic reconfigure woah"<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -237,13 +237,13 @@ void esvo2_Tracking::TrackingLoop()
             {
                 if (esvo2_core::timePointToSec(ref_.t_) >= esvo2_core::timePointToSec(TS_history_.rbegin()->first))
                 {
-                    std::cout << "The time_surface observation should be obtained after the reference frame" << std::endl;
+                    std::cerr << "The time_surface observation should be obtained after the reference frame" << std::endl;
                     // exit(-1);
-                    std::cout<<"Tracking wanted to kill the program because it is dumb"<<std::endl;
+                    // std::cerr<<"Tracking wanted to kill the program because it is dumb"<<std::endl;
                 }
                 if (!curDataTransferring())
                 {
-                    std::cout<<"at end of tracking while loop! not current data transfeerring"<<std::endl;
+                    // std::cout<<"at end of tracking while loop! not current data transfeerring"<<std::endl;
                     continue;
                 }
             }
@@ -312,7 +312,7 @@ void esvo2_Tracking::TrackingLoop()
         std::cout << "------------------------------------------------------------";
 #endif
         next_wake_up_time += interval;
-        std::cout<<"at end of tracking while loop!"<<std::endl;
+        // std::cout<<"at end of tracking while loop!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
     std::cout<<"Tracking is no longer running!"<<std::endl;
@@ -321,8 +321,10 @@ void esvo2_Tracking::TrackingLoop()
 bool esvo2_Tracking::refDataTransferring()
 {
     // load reference info.
-    ref_.t_ = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(refPCMap_.rbegin()->first));
-    timePoint t = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(refPCMap_.rbegin()->first) - 0.001);
+    ref_.t_ = refPCMap_.rbegin()->first;
+    // timePoint t = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(refPCMap_.rbegin()->first) - 0.001);
+    // Because are not doing based on chrono::now(), won't have to go back in time or anything and can just use the exact timestamp
+    timePoint t = refPCMap_.rbegin()->first;
     if (getSystemStatus() == SystemStatus::INITIALIZATION && ets_ == IDLE)
         ref_.tr_.setIdentity();
     if (getSystemStatus() == SystemStatus::WORKING ||
@@ -586,13 +588,13 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
                                                  const esvo2_core::ImagePtr &time_surface_dy)
 {
 
-    std::cout<<"Tracking negts callback"<<std::endl;
+    // std::cout<<"Tracking negts callback"<<std::endl;
     cv::Mat cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy;
     cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
     cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
     cv_ptr_dx = *(time_surface_dx.image); //cv_bridge::toCvCopy(time_surface_dx, sensor_msgs::image_encodings::TYPE_16SC1);
     cv_ptr_dy = *(time_surface_dy.image); //cv_bridge::toCvCopy(time_surface_dy, sensor_msgs::image_encodings::TYPE_16SC1);
-   std::cout<<"made cv mats"<<std::endl;
+//    std::cout<<"made cv mats"<<std::endl;
     std::lock_guard<std::mutex> lock(data_mutex_);
     // push back the most current TS.
     timePoint t_new_ts = time_surface_left.header_stamp;
@@ -600,16 +602,16 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
                         TimeSurfaceObservation(cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy, TS_id_, false));
     TS_id_++;
 
-    std::cout<<"added to ts history"<<std::endl;
+    // std::cout<<"added to ts history"<<std::endl;
     // keep TS_history_'s size constant
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin();
-        std::cout<<"about to erase from ts history"<<std::endl;
+        // std::cout<<"about to erase from ts history"<<std::endl;
         TS_history_.erase(it);
-        std::cout<<"erased from ts history"<<std::endl;
+        // std::cout<<"erased from ts history"<<std::endl;
     }
-    std::cout<<"removed from ts history maybe and are done!"<<std::endl;
+    // std::cout<<"removed from ts history maybe and are done!"<<std::endl;
 }
 
 void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &msg)
@@ -619,7 +621,7 @@ void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseS
     esvo2_core::Transform tf(msg->orientation[0], msg->orientation[1], msg->orientation[2],
                                     msg->orientation[3], msg->position[0], msg->position[1], msg->position[2]);
     esvo2_core::StampedTransform st(tf, msg->timestamp, msg->frame_id, dvs_frame_id_);
-    std::cout<<"Tracking is adding transform with ts: "<<esvo2_core::timePointToSec(msg->timestamp)<<std::endl;
+    // std::cout<<"Tracking is adding transform with ts: "<<esvo2_core::timePointToSec(msg->timestamp)<<std::endl;
     tf_->setTransform(st);
 
     // VIZ PUBLISH -> not publishing anything right now

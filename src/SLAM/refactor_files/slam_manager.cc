@@ -130,16 +130,16 @@
         // Stall to give time for the modules to terminate?
         std::this_thread::sleep_for(200ms);
 
-        std::cout<<"resetting all the modules"<<std::endl;
-        // Reset (deleting) all of the module's unique pointers
-        std::cout<<"resetting ir left"<<std::endl;
-        image_representation_left.reset(nullptr);
-        std::cout<<"resetting ir right"<<std::endl;
-        image_representation_right.reset(nullptr);
-        std::cout<<"resetting mapping"<<std::endl;
-        mapping.reset(nullptr);
-        std::cout<<"resetting tracking"<<std::endl;
-        tracking.reset(nullptr);
+        // std::cout<<"resetting all the modules"<<std::endl;
+        // // Reset (deleting) all of the module's unique pointers
+        // std::cout<<"resetting ir left"<<std::endl;
+        // image_representation_left.reset(nullptr);
+        // std::cout<<"resetting ir right"<<std::endl;
+        // image_representation_right.reset(nullptr);
+        // std::cout<<"resetting mapping"<<std::endl;
+        // mapping.reset(nullptr);
+        // std::cout<<"resetting tracking"<<std::endl;
+        // tracking.reset(nullptr);
         
         std::cout<<"resetting remaining variables"<<std::endl;
         // Resetting remaining variables

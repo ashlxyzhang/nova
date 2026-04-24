@@ -860,13 +860,18 @@ void esvo2_core::core::EventBM::match2(EventBM::Job &job)
     size_t totalNumEvents = job.pvEventPtr_->size();
     job.pvEventMatchPair_->reserve(totalNumEvents / NUM_THREAD_ + 1);
     auto ev_it = job.pvEventPtr_->begin();
+    if(i_thread >= totalNumEvents)
+        return;
     std::advance(ev_it, i_thread);
-    for (size_t i = i_thread; i < totalNumEvents; i += NUM_THREAD_, std::advance(ev_it, NUM_THREAD_))
+    for (size_t i = i_thread; i < totalNumEvents; i += NUM_THREAD_)
     {
         EventMatchPair emp;
         std::pair<size_t, size_t> pDisparityBound = (*job.pvpDisparitySearchBound_)[i];
         if (match_an_event2(*ev_it, pDisparityBound, emp))
             job.pvEventMatchPair_->push_back(emp);
+        // Originally was i += NUM_THREAD_,  std::advance(ev_it, NUM_THREAD_) but that could crash so have this now
+        if(i + NUM_THREAD_ < totalNumEvents)
+            std::advance(ev_it, NUM_THREAD_);
     }
 }
 
@@ -876,13 +881,18 @@ void esvo2_core::core::EventBM::match2_TwoFrames(EventBM::Job2 &job)
     size_t totalNumEvents = job.pvEventPairPtr_->size();
     job.pvEventMatchPair_->reserve(totalNumEvents / NUM_THREAD_ + 1);
     auto ev_it = job.pvEventPairPtr_->begin();
+    if(i_thread >= totalNumEvents)
+        return;
     std::advance(ev_it, i_thread);
-    for (size_t i = i_thread; i < totalNumEvents; i += NUM_THREAD_, std::advance(ev_it, NUM_THREAD_))
+    for (size_t i = i_thread; i < totalNumEvents; i += NUM_THREAD_)
     {
         EventMatchPair emp;
         std::pair<size_t, size_t> pDisparityBound = (*job.pvpDisparitySearchBound_)[i];
         if (match_an_eventTwoFrames(*ev_it, pDisparityBound, emp))
             job.pvEventMatchPair_->push_back(emp);
+        // Originally was i += NUM_THREAD_,  std::advance(ev_it, NUM_THREAD_) but that could crash so have this now
+        if(i + NUM_THREAD_ < totalNumEvents)
+            std::advance(ev_it, NUM_THREAD_);
     }
 }
 

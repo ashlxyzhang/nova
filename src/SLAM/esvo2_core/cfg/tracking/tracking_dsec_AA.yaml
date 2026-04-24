@@ -15,6 +15,6 @@ MIN_NUM_EVENTS: 1000
 RegProblemType: 1 # 0 numerical, 1 analytical
 SAVE_TRAJECTORY: True
 # PATH_TO_SAVE_TRAJECTORY: "/home/bell/data/ESVO2_result/"
-PATH_TO_SAVE_TRAJECTORY: "/Users/ashley/Documents/repos/nova/src/SLAM/refactor_files/unused/"
+PATH_TO_SAVE_TRAJECTORY: "C:/Users/jackm/Desktop/nova/src/SLAM/refactor_files/unused/"
 VISUALIZE_TRAJECTORY: True
 USE_IMU: False

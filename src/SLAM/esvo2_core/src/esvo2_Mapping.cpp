@@ -287,12 +287,12 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
     //     r.sleep();
     // }
 
-    std::cout << "start of mapping loop!" << std::endl;
+    // std::cout << "start of mapping loop!" << std::endl;
     std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9 / mapping_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
     while (is_running)
     {
-        std::cout << "in beginning of mapping while loop!" << std::endl;
+        // std::cout << "in beginning of mapping while loop!" << std::endl;
         // reset mapping rate
         if (changed_frame_rate_)
         {
@@ -316,10 +316,10 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             {
                 if (data_mutex_.try_lock())
                 {
-                    std::cout << "mapping is calling data transferring" << std::endl;
+                    // std::cout << "mapping is calling data transferring" << std::endl;
                     dataTransferring();
                     data_mutex_.unlock();
-                    std::cout << "Mapping is done calling data transferring" << std::endl;
+                    // std::cout << "Mapping is done calling data transferring" << std::endl;
                     break;
                 }
                 else
@@ -327,7 +327,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
                     if (future_reset.wait_for(std::chrono::nanoseconds(1)) == std::future_status::ready)
                     {
                         prom_mapping.set_value();
-                        std::cout << "at end of mapping while loop! Returned for some reason..." << std::endl;
+                        // std::cout << "at end of mapping while loop! Returned for some reason..." << std::endl;
                         return;
                     }
                 }
@@ -337,7 +337,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             if (TS_obs_ptr_->second.isEmpty())
             {
                 next_wake_up_time += interval;
-                std::cout << "at end of mapping while loop! Checking if TS observation or something" << std::endl;
+                // std::cout << "at end of mapping while loop! Checking if TS observation or something" << std::endl;
                 std::this_thread::sleep_until(next_wake_up_time);
                 continue;
             }
@@ -346,16 +346,16 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             if (getSystemStatus() == SystemStatus::INITIALIZATION || getSystemStatus() == SystemStatus::RESET)
             {
                 DLOG("Calling InitializationAtTime  TS_history.size=" << TS_history_.size());
-                std::cout << "about to do mapping initialization" << std::endl;
+                // std::cout << "about to do mapping initialization" << std::endl;
                 if (InitializationAtTime(TS_obs_ptr_->first))
                 {
                     DLOG("Initialization SUCCESS");
-                    std::cout << "Initialization is successfully done!" << std::endl;
+                    // std::cout << "Initialization is successfully done!" << std::endl;
                 }
                 else
                 {
                     DLOG("Initialization FAILED (not enough SGM points)");
-                    std::cout << "Initialization fails once." << std::endl;
+                    // std::cout << "Initialization fails once." << std::endl;
                 }
             }
             double Data_transfer = total_mapping.toc();
@@ -363,16 +363,16 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             // Do mapping
             if (getSystemStatus() == SystemStatus::WORKING)
             {
-                std::cout << "mapping is getting the mapping at time!" << std::endl;
+                // std::cout << "mapping is getting the mapping at time!" << std::endl;
                 MappingAtTime(TS_obs_ptr_->first);
             }
-            std::cout << "about to backend opt slide window in mapping" << std::endl;
+            // std::cout << "about to backend opt slide window in mapping" << std::endl;
             BackendOpt_.slideWindow();
-            std::cout << "done backend opt slide windowing!" << std::endl;
+            // std::cout << "done backend opt slide windowing!" << std::endl;
         }
         else
         {
-            std::cout << "waiting for enought TS" << std::endl;
+            // std::cout << "waiting for enought TS" << std::endl;
             if (future_reset.wait_for(std::chrono::nanoseconds(1)) == std::future_status::ready)
             {
                 prom_mapping.set_value();
@@ -380,7 +380,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
             }
         }
         next_wake_up_time += interval;
-        std::cout << "at end of mapping while loop!" << std::endl;
+        // std::cout << "at end of mapping while loop!" << std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     }
     std::cout << "Mapping is no longer running!" << std::endl;
@@ -792,6 +792,9 @@ bool esvo2_Mapping::dataTransferring()
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
+        // Have this check because can be out of bounds if nothing in events_left with time >= TS_obs_ptr_->first + 0.005
+        if(ev_end_it == events_left_.end())
+            --ev_end_it;
         const std::size_t MAX_NUM_Event_INVOLVED = 30000;
         vEventsPtr_left_SGM_.reserve(MAX_NUM_Event_INVOLVED);
         while (ev_begin_it != ev_end_it && vEventsPtr_left_SGM_.size() <= PROCESS_EVENT_NUM_)
@@ -824,6 +827,9 @@ bool esvo2_Mapping::dataTransferring()
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
+        // Have this check because can be out of bounds if nothing in events_left with time >= TS_obs_ptr_->first + 0.005
+        if(ev_end_it == events_left_.end())
+            --ev_end_it;
         const std::size_t MAX_NUM_Event_INVOLVED = PROCESS_EVENT_NUM_;
         vALLEventsPtr_left_.reserve(MAX_NUM_Event_INVOLVED);
         vCloseEventsPtr_left_.reserve(MAX_NUM_Event_INVOLVED);
@@ -1196,6 +1202,7 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
     std::cout << "publishong mapping results Mapping!" << std::endl;
     cv::Mat invDepthImage, stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
 
+    std::cout<<"ts is empty bruh"<<TS_obs_ptr_->second.img_left_.empty()<<std::endl;
     invDepthImage = TS_obs_ptr_->second.img_left_.clone();
     visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
                          stdVar_vis_threshold_, age_vis_threshold_);
@@ -1309,6 +1316,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         // make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>(); *pointcloud_filtered2 = *pc_filtered_; timestamp is t if
         // want to add to a queue
 
+        std::cout<<"set pc filtered!"<<std::endl;
         std::lock_guard<std::mutex> lock(viz_pc_mutex_);
         viz_pc_ = pc_filtered_;
     }
@@ -1355,8 +1363,8 @@ void esvo2_Mapping::publishImage(const cv::Mat &image, const timePoint &t, std::
     // std_msgs::Header header;
     // header.stamp = t;
     // VIZ PUBLISH -> not being used right now, so are commenting it out. Was used to publish the inv depth map
-    // cv::imshow("Inverse depth", image);
-    // cv::waitKey(10);
+    cv::imshow("Inverse depth", image);
+    cv::waitKey(10);
     // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, encoding.c_str(), image).toImageMsg();
     // pub.publish(msg);
 }

@@ -247,6 +247,8 @@ bool RegProblemSolverLM::solve_analytical()
     // reprojMap_pub_->publish(msg);
     std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
     *reprojected_map_left = reprojMap_left;
+    cv::imshow("reproj map left", reprojMap_left);
+    cv::waitKey(10);
       // timestamp is numDiff_regProblemPtr_->cur_->t_;
   }
   /*************************** Visualization ************************/

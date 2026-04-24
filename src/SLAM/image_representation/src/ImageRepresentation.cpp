@@ -122,7 +122,7 @@ void ImageRepresentation::GenerationLoop()
     if(thread_sobel.joinable())
     {
         std::cout<<"joining sobel"<<std::endl;
-        std::cout<<"test"<<std::endl;
+        // std::cout<<"test"<<std::endl;
         thread_sobel.join();
     }
 
@@ -307,8 +307,8 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             cv::eigen2cv(TS_temp_map, representation_TS_);
             representation_TS_ = representation_TS_ - external_t / decay_sec_;
 
-            double event_time_sec = esvo2_core::timePointToSec((it+distance-1)->timestamp);
-            double time_diff = event_time_sec - external_t;
+            // double event_time_sec = esvo2_core::timePointToSec((it+distance-1)->timestamp);
+            // double time_diff = event_time_sec - external_t;
             // std::cout << "Time difference: " << time_diff << " s" << std::endl;
             // std::cout<<"Timestamps:"<<esvo2_core::timePointToSec((it+distance-1)->timestamp)<<" "<<external_t<<std::endl;
              
@@ -364,7 +364,7 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             *TS_left = TS_img;
             // std::cout<<"adding ts left"<<std::endl;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-            DLOG("LEFT: adding TS_left to Track ch0 and Map ch0  t=" << esvo2_core::timePointToSec(external_sync_time));
+            // DLOG("LEFT: adding TS_left to Track ch0 and Map ch0  t=" << esvo2_core::timePointToSec(external_sync_time));
             multi_to_Track_.add<0>({TS_left, external_sync_time});
             multi_to_Map_.add<0>({TS_left, external_sync_time});
             // std::cout<<"added ts left"<<std::endl;
@@ -384,10 +384,10 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             
             // std::cout<<"joining aa thread"<<std::endl;
             thread0.join();
-            // cv::imshow("Left TS", *TS_left);
-            // cv::waitKey(10);
-            // cv::imshow("Neg Left TS", *TS_neg);
-            // cv::waitKey(10);
+            cv::imshow("Left TS", *TS_left);
+            cv::waitKey(10);
+            cv::imshow("Neg Left TS", *TS_neg);
+            cv::waitKey(10);
             // std::cout<<"aa thread joined"<<std::endl;
         }
         else // generate TS, just for right camera
@@ -431,12 +431,12 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             *TS_right = TS_img;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             // std::cout<<"IR right sending ts right"<<std::endl;
-            DLOG("RIGHT: adding TS_right to Map ch1  t=" << esvo2_core::timePointToSec(external_sync_time));
+            // DLOG("RIGHT: adding TS_right to Map ch1  t=" << esvo2_core::timePointToSec(external_sync_time));
             multi_to_Map_.add<1>({TS_right, external_sync_time});
             // std::cout<<"IR right sent ts right"<<std::endl;
 
-            // cv::imshow("Right TS", *TS_right);
-            // cv::waitKey(10);
+            cv::imshow("Right TS", *TS_right);
+            cv::waitKey(10);
         }
 
         // std::cout<<"about to clear events"<<std::endl;
