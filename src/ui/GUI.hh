@@ -14,8 +14,11 @@
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
 
+
+
 // Forward declarations for callbacks
-inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
+inline void SDLCALL open_file_callback(void *user_data, const char *const *data_file_list, int filter);
+inline void SDLCALL save_file_callback(void *user_data, const char *const *data_file_list, int filter);
 
 /**
  * @brief This class provides functions to draw the GUI.
@@ -35,6 +38,15 @@ class GUI
             END     // Aligns end of data sources when sync scrubbing
         };
 
+        // Container for all save data
+        struct SaveConfig {
+            std::shared_ptr<DataSource> source;
+            enum Mode {TIME, EVENT} mode = Mode::TIME;
+            
+            std::pair<float, float> save_time_bounds = {0, 0};
+            std::pair<int, int> save_index_bounds = {0, 0};
+        };
+
     private:
         // Modules
         DataAcquisition &data_acquisition;
@@ -50,6 +62,9 @@ class GUI
         ViewMode view_mode = ViewMode::SINGLE;
         SyncMode sync_mode = SyncMode::START;
         int selected_source_index = 0;
+
+        // Save settings
+        SaveConfig save_config;
 
         // Camera control state
         bool is_mouse_dragging = false;
@@ -144,6 +159,64 @@ class GUI
                 }
                 ImGui::EndPopup();
             }
+        }
+
+        void draw_save_popup_window() {
+
+            // Only continue if there is a set save source
+            if (!save_config.source) return;
+            std::shared_ptr<DataSource> source = save_config.source;
+
+            ImGui::OpenPopup("Save Menu");
+            
+            const ImGuiViewport *viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            ImVec2 windowSize = ImVec2(viewport->Size.x * 0.75f, viewport->Size.y * 0.75f);
+            ImGui::SetNextWindowSize(windowSize, ImGuiCond_Appearing);
+            
+            ImGui::BeginPopup("Save Menu");
+
+            // Toggle between specifying time bounds and events bounds
+            ImGui::Text("Mode:");
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Time", save_config.mode == SaveConfig::Mode::TIME)) {
+                save_config.mode = SaveConfig::Mode::TIME;
+            }
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Event", save_config.mode == SaveConfig::Mode::EVENT)) {
+                save_config.mode = SaveConfig::Mode::EVENT;
+            }
+            ImGui::Separator();
+
+
+            // Draw double slider bar to control 
+            if (save_config.mode == SaveConfig::Mode::TIME) {
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputFloat("Start Time", &save_config.save_time_bounds.first);
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputFloat("End Time", &save_config.save_time_bounds.second);
+            } else if (save_config.mode == SaveConfig::Mode::EVENT) {
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputInt("Start Index", &save_config.save_index_bounds.first);
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputInt("End Index", &save_config.save_index_bounds.second);
+            }
+
+            // Connect save button to callback function
+            if (ImGui::Button("Save")) {
+                static SDL_DialogFileFilter filters[] = {
+                    {"AEDAT4 Files", "aedat4"}
+                };
+                SDL_ShowSaveFileDialog(save_file_callback, &save_config, window, filters, 1, "");
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Close")) {
+                save_config.source.reset();
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
         }
 
         /**
@@ -260,7 +333,7 @@ class GUI
             
             if (ImGui::Button("Add File Source"))
             {
-                SDL_ShowOpenFileDialog(stream_file_handle_callback, &data_acquisition, window, nullptr, 0, nullptr, 0);
+                SDL_ShowOpenFileDialog(open_file_callback, &data_acquisition, window, nullptr, 0, nullptr, 0);
             }
 
             ImGui::SameLine();
@@ -313,7 +386,13 @@ class GUI
                         selected_source_index = (std::max)(0, static_cast<int>(sources.size()) - 2);
                     }
                 }
-                
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Save")) {
+                    std::shared_ptr<DataSource> source = sources[selected_source_index];
+                    save_config.source = source;
+                    save_config.save_time_bounds = {0, source->scrubber.state.max_time};
+                    save_config.save_index_bounds = {0, source->scrubber.state.max_index};
+                }
                 ImGui::PopID();
             }
 
@@ -1133,6 +1212,7 @@ class GUI
             }
 
             draw_error_popup_window();
+            draw_save_popup_window();
             draw_info_window();
             draw_debug_window(fps);
             draw_data_sources_window();
@@ -1202,7 +1282,7 @@ class GUI
 };
 
 // Callback functions
-inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused)
+inline void SDLCALL open_file_callback(void *user_data, const char *const *data_file_list, int filter)
 {
     DataAcquisition *data_acq = static_cast<DataAcquisition*>(user_data);
     if (data_file_list && *data_file_list)
@@ -1213,6 +1293,34 @@ inline void SDLCALL stream_file_handle_callback(void *user_data, const char *con
     else
     {
         std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
+
+inline void SDLCALL save_file_callback(void *user_data, const char *const *data_file_list, int filter)
+{   
+    // Ensure source and destination are valid
+    GUI::SaveConfig* save_config = static_cast<GUI::SaveConfig*>(user_data);
+    if (data_file_list && *data_file_list && save_config->source) {
+        std::string path = *data_file_list;
+        if (!path.ends_with(".aedat4")) {
+            path += ".aedat4";
+        }
+
+        // Time saving mode
+        if (save_config->mode == GUI::SaveConfig::Mode::TIME) {
+            auto bounds = save_config->save_time_bounds;
+            save_config->source->save_to_file_by_time(path, bounds.first, bounds.second);
+
+        } 
+        // Event saving mode
+        else {
+            auto bounds = save_config->save_index_bounds;
+            save_config->source->save_to_file_by_index(path, bounds.first, bounds.second);
+        }
+
+        save_config->source.reset();
+    } else {
+        std::cout << "Error occured when selecting save destination" << std::endl;
     }
 }
 
