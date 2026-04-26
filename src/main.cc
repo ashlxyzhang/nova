@@ -120,11 +120,22 @@ int main() {
     GPUDevice gpu;
     
     // Initialize data source
+    std::cout << "Converting to .aedat... ";
     DataSource source1(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
     source1.read_all();
+    source1.save_to_file("C:/Users/Peanu/OneDrive/Desktop/Recording/fidget_spinner.aedat4");
+    std::cout << "COMPLETED" << std::endl;
+
+
+    std::cout << "Reading back .aedat...";
+    DataSource source2(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/fidget_spinner.aedat4");
+    source2.read_all();
+    std::cout << "COMPLETED" << std::endl;
+
+    std::cout << "Total Events: " << source2.event_data.size() << std::endl;
 
     // Configure scrubber
-    Scrubber::State& state = source1.scrubber.state;
+    Scrubber::State& state = source2.scrubber.state;
     state.current_time = 10000.0f;
     state.time_window = 10000.0f;
     state.time_step = 20000.0f;    
@@ -132,16 +143,16 @@ int main() {
     state.loop = false;
 
     // Initialize renderer
-    Visualizer vis(gpu);
+    DigitalCodedExposure dce(gpu);
     
     int i=0;
-    while (!state.is_eof() && ++i < 300) {
+    while (!state.is_eof() && ++i < 500) {
         std::cout << i << ": " << std::endl;
         
-        source1.update();
-        vis.render(source1);
+        source2.update();
+        dce.render(source2);
         
-        cv::Mat frame = source1.save_visualizer_output();
+        cv::Mat frame = source2.save_dce_output();
         imshow("DCE", frame);
         cv::waitKey(0);
     }

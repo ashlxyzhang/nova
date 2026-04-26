@@ -23,6 +23,9 @@
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <set>
 
+#include "data/IEventWriter.hh"
+#include "data/DVEventWriter.hh"
+
 /**
  * @brief From previous NOVA source code
  *        Used for timestamp comparisons of event data
@@ -420,6 +423,64 @@ class EventData
               evt_data_latest_timestamp{-1}, frame_data_latest_timestamp{-1}, camera_event_width{},
               camera_event_height{}, camera_frame_width{}, camera_frame_height{}, evt_lock{}
         {
+        }
+
+        void save_to_file(const std::string& path, size_t start_index, size_t end_index, std::atomic<bool>& running) {
+
+            /*
+            To avoid blocking it too much, I'd like to just load it all into memory but the whole point of using 
+            boost mapped file is to avoid that so I gotta do it in batches and make copies kind of like the scrubber
+            does... 
+            */
+
+            // Make sure bounds are OK
+            if (start_index > end_index || end_index >= size()) {
+                std::cout << "Invalid indices passed to save_to_file()" << std::endl;  
+                return;
+            }
+
+
+            // Attempt to initialize writer object
+            std::unique_ptr<IEventWriter> writer;
+            glm::vec2 resolution = get_camera_event_resolution();
+
+            if (path.ends_with(".aedat4")) {
+                writer = std::make_unique<DVEventWriter>(path, resolution.x, resolution.y);
+            } else if (path.ends_with(".raw")) {
+                // writer = std::make_unique<MetavisionEventWriter>(path, resolution.x, resolution.y);
+            } else {
+                std::cout << "save_to_file() only supports saving to .aedat for now" << std::endl;
+                return;
+            }
+
+
+            // Write data from event buffer in batches
+            size_t current_index = start_index;
+            size_t window_size = 1<<16;
+            std::vector<glm::vec4> window(window_size);
+
+            std::cout << "HERE" << std::endl;
+            while (running && current_index < end_index) {
+                std::cout << "NOW HERE" << std::endl;
+
+                // Make copy of window to avoid excessive blocking
+                lock_data_vectors();
+                const glm::vec4* data = evt_data_vector_relative.data() + current_index;
+
+                size_t current_window_size = (std::min)(window_size, end_index - current_index);
+                window.assign(data, data + window_size); 
+                unlock_data_vectors();
+
+                std::cout << "Attempting to write " << window.size() << " events" << std::endl;
+
+                // Use writer to add events to file
+                writer->write_event_batch(window);
+                
+                current_index += window_size;
+
+            }
+
+            running = false;
         }
 
         size_t size()

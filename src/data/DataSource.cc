@@ -177,9 +177,15 @@ void DataSource::init_render_targets()
 
 DataSource::~DataSource()
 {   
+    // Close helper threads
+    stop_writing_thread();
     stop_reading_thread();
+
+    // Destory rendering textures 
     dce_render_targets.delete_textures(gpu_device);
     visualizer_render_targets.delete_textures(gpu_device);
+
+    // Clear all event data
     event_data.clear();
 }
 
@@ -326,4 +332,39 @@ cv::Mat DataSource::texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureForm
     SDL_SubmitGPUCommandBuffer(command_buffer);
     SDL_WaitForGPUIdle(gpu_device);
     return result;
+}
+
+void DataSource::save_to_file(const std::string& path) {
+    save_to_file_by_index(path, 0, event_data.size()-1);
+}
+
+void DataSource::save_to_file_by_time(const std::string& path, float start_time, float end_time) {
+    size_t start_index = event_data.get_event_index_from_relative_timestamp(start_time);
+    size_t end_index = event_data.get_event_index_from_relative_timestamp(end_time);
+    save_to_file_by_index(path, start_index, end_index);
+}
+
+void DataSource::save_to_file_by_index(const std::string& path, size_t start_index, size_t end_index) {
+    if (writing_thread_running) {
+        std::cout << "Cannot call 'save' on DataSource currently being saved. Please wait for previous save to finish." << std::endl;
+        return; 
+    }
+
+    writing_thread_running = true;
+    writing_thread = std::thread([this, path, start_index, end_index]() {
+        this->event_data.save_to_file(path, start_index, end_index, this->writing_thread_running);
+    });
+}
+
+void DataSource::stop_writing_thread() {
+    writing_thread_running = false;
+    if (writing_thread.joinable()) {
+        writing_thread.join();
+    }
+}		
+
+void DataSource::wait_writing_thread() {
+    if (writing_thread.joinable()) {
+        writing_thread.join();
+    }
 }
