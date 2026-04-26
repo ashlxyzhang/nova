@@ -1,8 +1,8 @@
 #include "util/pch.hh"
 
 // DO NOT MOVE THIS TO PCH.HH, IT WILL NOT COMPILE 😊
-// #define SDL_MAIN_USE_CALLBACKS 1
-// #include <SDL3/SDL_main.h>
+#define SDL_MAIN_USE_CALLBACKS 1
+#include <SDL3/SDL_main.h>
 
 #include "data/DataAcquisition.hh"
 #include "data/DataSource.hh"
@@ -111,56 +111,6 @@ struct Application
     }
 };
 
-
-// ! TESTING PURPOSES ONLY, uncomment '#define SDL_MAIN_USE_CALLBACKS 1' and 
-// ! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
-int main() {
-    
-    // Initialize GPU device
-    GPUDevice gpu;
-    
-    // Initialize data source
-    std::cout << "Converting to .aedat... ";
-    DataSource source1(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
-    source1.read_all();
-    source1.save_to_file("C:/Users/Peanu/OneDrive/Desktop/Recording/fidget_spinner.aedat4");
-    std::cout << "COMPLETED" << std::endl;
-
-
-    std::cout << "Reading back .aedat...";
-    DataSource source2(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/fidget_spinner.aedat4");
-    source2.read_all();
-    std::cout << "COMPLETED" << std::endl;
-
-    std::cout << "Total Events: " << source2.event_data.size() << std::endl;
-
-    // Configure scrubber
-    Scrubber::State& state = source2.scrubber.state;
-    state.current_time = 10000.0f;
-    state.time_window = 10000.0f;
-    state.time_step = 20000.0f;    
-    state.mode = Scrubber::Mode::PLAYING;  
-    state.loop = false;
-
-    // Initialize renderer
-    DigitalCodedExposure dce(gpu);
-    
-    int i=0;
-    while (!state.is_eof() && ++i < 500) {
-        std::cout << i << ": " << std::endl;
-        
-        source2.update();
-        dce.render(source2);
-        
-        cv::Mat frame = source2.save_dce_output();
-        imshow("DCE", frame);
-        cv::waitKey(0);
-    }
-
-    std::cout << "Exiting Loop" << std::endl;
-    cv::destroyAllWindows();
-    return 0;
-}
 
 //////////////////////////////////////
 /** 

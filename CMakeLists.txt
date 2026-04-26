@@ -58,23 +58,35 @@ file(GLOB IMGUI_BACKENDS
     "${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp"
     "${IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp"
 )
-list(APPEND SOURCES ${IMGUI_CORE_SOURCES} ${IMGUI_BACKENDS})
 
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${COMPILED_SHADER_HEADERS})
-add_dependencies(${CMAKE_PROJECT_NAME} shaders)
+# Remove main.cc from library sources
+list(REMOVE_ITEM SOURCES "${CMAKE_SOURCE_DIR}/src/main.cc")
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
+# Create library with all sources except main.cc
+add_library(nova_lib STATIC 
+    ${SOURCES} 
+    ${HEADERS} 
+    ${IMGUI_CORE_SOURCES} 
+    ${IMGUI_BACKENDS}
+    ${COMPILED_SHADER_HEADERS}
+)
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${IMGUI_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE "resources/")
-target_include_directories(${PROJECT_NAME} PRIVATE "src/")
+add_dependencies(nova_lib shaders)
+
+target_compile_features(nova_lib PUBLIC cxx_std_23)
+set_target_properties(nova_lib PROPERTIES CXX_EXTENSIONS OFF)
+
+target_include_directories(nova_lib PUBLIC 
+    ${IMGUI_DIR}
+    "resources/"
+    "src/"
+)
 
 if(APPLE)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+    target_compile_definitions(nova_lib PUBLIC BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_link_libraries(nova_lib PUBLIC
     SDL3::SDL3
     SDL3_ttf::SDL3_ttf
     glm::glm
@@ -85,6 +97,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     MetavisionSDK::stream
     Metavision::HAL
 )
+
+# Create executable with just main.cc
+add_executable(${CMAKE_PROJECT_NAME} src/main.cc)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE nova_lib)
+
 option(NOVA_BUILD_TESTS "Build NOVA test suite" ON)
 if(NOVA_BUILD_TESTS)
     enable_testing()

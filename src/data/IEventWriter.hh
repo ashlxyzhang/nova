@@ -8,20 +8,11 @@
 class IEventWriter {
 	protected:
 		std::string path;
-		int width;
-		int height;
+		cv::Size resolution;
 
 	public:
+		IEventWriter(const std::string& path, int width, int height): path(path), resolution(width, height) {}
 		virtual ~IEventWriter() = default;
-
-		int get_width() {
-			return width;
-		}
-
-		int get_height() {
-			return height; 
-		}
-
 		virtual void write_event_batch(std::vector<glm::vec4>& batch) = 0;
 };
 

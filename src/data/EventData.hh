@@ -439,7 +439,6 @@ class EventData
                 return;
             }
 
-
             // Attempt to initialize writer object
             std::unique_ptr<IEventWriter> writer;
             glm::vec2 resolution = get_camera_event_resolution();
@@ -453,31 +452,27 @@ class EventData
                 return;
             }
 
-
             // Write data from event buffer in batches
             size_t current_index = start_index;
-            size_t window_size = 1<<16;
+            size_t window_size = 1<<20;
             std::vector<glm::vec4> window(window_size);
 
-            std::cout << "HERE" << std::endl;
             while (running && current_index < end_index) {
-                std::cout << "NOW HERE" << std::endl;
 
                 // Make copy of window to avoid excessive blocking
                 lock_data_vectors();
                 const glm::vec4* data = evt_data_vector_relative.data() + current_index;
 
                 size_t current_window_size = (std::min)(window_size, end_index - current_index);
-                window.assign(data, data + window_size); 
+                window.assign(data, data + current_window_size); 
                 unlock_data_vectors();
 
-                std::cout << "Attempting to write " << window.size() << " events" << std::endl;
+                std::cout << "Writing: " << window.size() << " events..." << std::endl;
 
                 // Use writer to add events to file
                 writer->write_event_batch(window);
                 
                 current_index += window_size;
-
             }
 
             running = false;
