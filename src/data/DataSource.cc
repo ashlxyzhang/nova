@@ -292,7 +292,7 @@ void DataSource::start_reading_thread() {
 
     reading_thread_running = true;
     reading_thread = std::thread([this]() {
-        while (reading_thread_running) {
+        while (reading_thread_running && reader->isEventsRunning()) {
             get_batch_event_data();
             get_batch_frame_data();
             scrubber.state.update_bounds(event_data);

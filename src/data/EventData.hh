@@ -467,8 +467,6 @@ class EventData
                 window.assign(data, data + current_window_size); 
                 unlock_data_vectors();
 
-                std::cout << "Writing: " << window.size() << " events..." << std::endl;
-
                 // Use writer to add events to file
                 writer->write_event_batch(window);
                 
