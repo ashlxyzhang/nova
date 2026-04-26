@@ -53,7 +53,7 @@ void DigitalCodedExposure::render(DataSource& data_source)
     // Get points buffer; run passes B and C only if there are points to process
     SDL_GPUBuffer *points_buffer = data_source.scrubber.get_points_buffer();
     int point_count = data_source.scrubber.get_points_buffer_size();
-
+    
     if (points_buffer && point_count > 0)
     {
         // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage
@@ -81,8 +81,10 @@ void DigitalCodedExposure::render(DataSource& data_source)
         SDL_EndGPUComputePass(process_pass);
     }
 
-    SDL_SubmitGPUCommandBuffer(command_buffer);
-    SDL_WaitForGPUIdle(gpu_device);
+    // Stalls CPU until this particular command is finished
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+    SDL_WaitForGPUFences(gpu_device, true, &fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, fence);
 }
 
 void DigitalCodedExposure::render(std::shared_ptr<DataSource> data_source) {

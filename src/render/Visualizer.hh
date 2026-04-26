@@ -7,7 +7,7 @@
 #include "data/EventData.hh"
 #include "render/Camera.hh"
 #include "render/RenderTarget.hh"
-#include "render/UploadBuffer.hh"
+#include "render/TransferBuffer.hh"
 #include "render/GPUDevice.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
@@ -240,10 +240,10 @@ class Visualizer
 
                 /**
                  * @brief Uploads updated grid lines to GPU.
-                 * @param upload_buffer UploadBuffer object for uploading data to GPU
+                 * @param transfer_buffer TransferBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPU_CopyPass for copying data to GPU
                  */
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     if (lines.empty())
                         return;
@@ -259,7 +259,7 @@ class Visualizer
                     vertex_buffer_create_info.size = lines.size() * sizeof(glm::vec3);
                     vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
 
-                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
+                    transfer_buffer.upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
                                                 lines.size() * sizeof(glm::vec3));
                 }
 
@@ -369,7 +369,7 @@ class Visualizer
                     // No CPU updates needed for points
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass, 
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass, 
                               DataSource& data_source)
                 {
                     // No copy operations needed - points buffer managed by scrubber
@@ -601,7 +601,7 @@ class Visualizer
                 /**
                  * @brief Copies text data to GPU.
                  */
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass,
                               DataSource& data_source)
                 {
                     if (vertices.empty() || indices.empty())
@@ -623,8 +623,8 @@ class Visualizer
                                                         .size = static_cast<Uint32>(index_buffer_size)};
                     index_buffer = SDL_CreateGPUBuffer(gpu_device, &ibf_info);
 
-                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
-                    upload_buffer.upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
+                    transfer_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
+                    transfer_buffer.upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
                 }
 
                 /**
@@ -757,7 +757,7 @@ class Visualizer
                 {
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass,
                               DataSource& data_source)
                 {
                 }
@@ -777,7 +777,7 @@ class Visualizer
 
         // GPU
         SDL_GPUDevice *gpu_device = nullptr;
-        UploadBuffer upload_buffer;
+        TransferBuffer transfer_buffer;
 
         GridRenderer *grid_renderer = nullptr;
         PointsRenderer *points_renderer = nullptr;
@@ -791,7 +791,7 @@ class Visualizer
          */
         Visualizer(GPUDevice& gpu_device)
             : gpu_device(gpu_device.get_SDL_device()),
-              upload_buffer(gpu_device.get_SDL_device())
+              transfer_buffer(gpu_device.get_SDL_device())
         {
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 

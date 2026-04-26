@@ -9,8 +9,6 @@
 #include "render/DigitalCodedExposure.hh"
 #include "render/GPUDevice.hh"
 #include "render/RenderTarget.hh"
-#include "render/SpinningCube.hh"
-#include "render/UploadBuffer.hh"
 #include "ui/Windows.hh"
 #include "render/Visualizer.hh"
 #include "ui/GUI.hh"
@@ -114,46 +112,47 @@ struct Application
 };
 
 
-//! TESTING PURPOSES ONLY, uncomment '#define SDL_MAIN_USE_CALLBACKS 1' and 
-//! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
+// ! TESTING PURPOSES ONLY, uncomment '#define SDL_MAIN_USE_CALLBACKS 1' and 
+// ! '#include <SDL3/SDL_main.h>' at top of file and comment this out to run application normally
 int main() {
-
+    
     // Initialize GPU device
     GPUDevice gpu;
     
     // Initialize data source
     DataSource source1(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/hand_spinner.raw");
-    DataSource source2(gpu, "C:/Users/Peanu/OneDrive/Desktop/Recording/pedestrians.raw");
-
-    // Read all data from file first
     source1.read_all();
-    source2.read_all();
 
-    // Configure scrubber 
-    Scrubber::State& state1 = source1.scrubber.state;
-    state1.time_window = 10000.0f;
-    state1.time_step = 20000.0f;    
-    state1.mode = Scrubber::Mode::PLAYING;  
-    state1.loop = true;
+    // Configure scrubber
+    Scrubber::State& state = source1.scrubber.state;
+    state.current_time = 10000.0f;
+    state.time_window = 10000.0f;
+    state.time_step = 20000.0f;    
+    state.mode = Scrubber::Mode::PLAYING;  
+    state.loop = false;
 
-    Scrubber::State& state2 = source2.scrubber.state;
-    state2.time_window = 10000.0f;
-    state2.time_step = 20000.0f;    
-    state2.mode = Scrubber::Mode::PLAYING;  
-    state2.loop = true;
-
-    // Initialize displays
-    DCEDisplay dce_display(gpu, 1280, 720, "DCE Demo");    
-    VisualizerDisplay visualizer_display(gpu, 1280, 720, "Visualizer Demo");
+    // Initialize renderer
+    Visualizer vis(gpu);
     
-    // Play windows concurrently
-    Window::show_all({&dce_display, &visualizer_display}, {&source1, &source2}, 30);
+    int i=0;
+    while (!state.is_eof() && ++i < 300) {
+        std::cout << i << ": " << std::endl;
+        
+        source1.update();
+        vis.render(source1);
+        
+        cv::Mat frame = source1.save_visualizer_output();
+        imshow("DCE", frame);
+        cv::waitKey(0);
+    }
 
+    std::cout << "Exiting Loop" << std::endl;
+    cv::destroyAllWindows();
     return 0;
 }
 
 //////////////////////////////////////
-/**
+/** 
  * NOVA consists of a single instance of the Application struct passed between the different 
  * SDL methods by the 'appstate' pointer. These callback functions are handled by SDL and will be 
  * called at the appropriate times to manage the Application. These probably shouldn't be changed.

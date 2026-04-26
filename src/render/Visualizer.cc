@@ -146,10 +146,10 @@ void Visualizer::render(DataSource& data_source)
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     // Copy pass phase
-    grid_renderer->copy_pass(upload_buffer, copy_pass);
-    points_renderer->copy_pass(upload_buffer, copy_pass, data_source);
-    text_renderer->copy_pass(upload_buffer, copy_pass, data_source);
-    frames_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+    grid_renderer->copy_pass(transfer_buffer, copy_pass);
+    points_renderer->copy_pass(transfer_buffer, copy_pass, data_source);
+    text_renderer->copy_pass(transfer_buffer, copy_pass, data_source);
+    frames_renderer->copy_pass(transfer_buffer, copy_pass, data_source);
 
     // End copy pass
     SDL_EndGPUCopyPass(copy_pass);
@@ -186,8 +186,8 @@ void Visualizer::render(DataSource& data_source)
 
     SDL_EndGPURenderPass(render_pass);
 
-
-    // Submit the command buffer
-    SDL_SubmitGPUCommandBuffer(command_buffer);
-    SDL_WaitForGPUIdle(gpu_device);
+    // Stalls CPU until this particular command is finished
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+    SDL_WaitForGPUFences(gpu_device, true, &fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, fence);
 }

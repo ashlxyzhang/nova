@@ -10,7 +10,10 @@
 #include <random>
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
-	: gpu_device(gpu_device), type(Type::FILE), state(State::PAUSED), scrubber(gpu_device)
+	: gpu_device(gpu_device), 
+    transfer_buffer(gpu_device), 
+    type(Type::FILE), state(State::PAUSED), 
+    scrubber(gpu_device)
 {
 	std::unique_lock da_read_write_lock(mutex);
     std::filesystem::path path(file_path);
@@ -73,8 +76,10 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
 }
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera)
-	: gpu_device(gpu_device), name(camera.serial.empty() ? std::string("Prophesee (first available)") : camera.serial),
-	  type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
+	: gpu_device(gpu_device), 
+    transfer_buffer(gpu_device), 
+    name(camera.serial.empty() ? std::string("Prophesee (first available)") : camera.serial), 
+    type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
 {
 	std::unique_lock read_write_lock(mutex);
 
@@ -108,7 +113,12 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::L
 }
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera)
-	: gpu_device(gpu_device), name(camera.serialNumber), type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
+	: gpu_device(gpu_device),
+    transfer_buffer(gpu_device),
+    name(camera.serialNumber), 
+    type(Type::CAMERA), 
+    state(State::PAUSED), 
+    scrubber(gpu_device)
 {
 	std::unique_lock read_write_lock(mutex);
 
@@ -173,9 +183,9 @@ DataSource::~DataSource()
     event_data.clear();
 }
 
-void DataSource::update_scrubber()
+void DataSource::update()
 {
-    scrubber.update(event_data);
+    scrubber.update(event_data, transfer_buffer);
 }
 
 bool DataSource::is_open()
@@ -267,6 +277,8 @@ void DataSource::read_all() {
         get_batch_event_data();
         get_batch_frame_data();
     }
+
+    scrubber.state.update_bounds(event_data);
 }
 
 void DataSource::start_reading_thread() {
@@ -277,6 +289,7 @@ void DataSource::start_reading_thread() {
         while (reading_thread_running) {
             get_batch_event_data();
             get_batch_frame_data();
+            scrubber.state.update_bounds(event_data);
         }
     });
 }
@@ -292,4 +305,25 @@ void DataSource::wait_reading_thread() {
     if (reading_thread.joinable()) {
         reading_thread.join();
     }
+}
+
+cv::Mat DataSource::save_dce_output() {
+    return texture_to_cvmat(dce_render_targets.output.texture, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, resolution.width, resolution.height);
+}
+
+cv::Mat DataSource::save_visualizer_output() {
+    return texture_to_cvmat(visualizer_render_targets.color.texture, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM, 1920, 1080);
+}
+
+cv::Mat DataSource::texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureFormat texture_format, int width, int height) {
+    // Upload data to the new buffer
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu_device);
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+    cv::Mat result = transfer_buffer.download_to_cv_mat(copy_pass, texture, texture_format, width, height);
+
+    SDL_EndGPUCopyPass(copy_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+    SDL_WaitForGPUIdle(gpu_device);
+    return result;
 }

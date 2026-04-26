@@ -147,7 +147,7 @@ void Window::show(DataSource& data_source, int fps) {
 	while (running) {
 		render(data_source);
 		poll_events();        
-		data_source.update_scrubber();
+		data_source.update();
 		
 		SDL_Delay(delay);
 	}
@@ -238,7 +238,7 @@ void Window::show_all(std::vector<Window*> windows, DataSource& data_source, int
 			}
 		}
 
-		data_source.update_scrubber();
+		data_source.update();
 		SDL_Delay(delay);
 	}
 }
@@ -257,7 +257,7 @@ void Window::show_all(std::vector<Window*> windows, std::vector<DataSource*> dat
 	}
 
 	// show_all() supports the same data source in multiple windows but it needs to make sure that
-	// update_scrubber() is only called once per source
+	// update() is only called once per source
 	std::vector<DataSource*> unique_sources;
 	for (DataSource* data_source: data_sources) {
 		if (!data_source->is_open()) {
@@ -295,7 +295,7 @@ void Window::show_all(std::vector<Window*> windows, std::vector<DataSource*> dat
 
 		// Update all unique data sources
 		for (DataSource* data_source: unique_sources) {
-			data_source->update_scrubber();
+			data_source->update();
 		}
 
 		SDL_Delay(delay);

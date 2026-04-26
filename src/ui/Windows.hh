@@ -14,6 +14,7 @@ class Window {
 		Window(GPUDevice& gpu_device, int width, int height, std::string title="");
 		~Window();
 		
+		// Currently all blocking
 		void show(DataSource& data_source, int fps=60);	
 		static void show_all(std::vector<Window*> windows, DataSource& data_source, int fps=60);
 		static void show_all(std::vector<Window*> windows, std::vector<DataSource*> data_sources, int fps=60);
