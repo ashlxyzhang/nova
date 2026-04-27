@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <iterator>
 #include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/imgproc.hpp>  
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
@@ -445,10 +445,8 @@ class EventData
 
             if (path.ends_with(".aedat4")) {
                 writer = std::make_unique<DVEventWriter>(path, resolution.x, resolution.y);
-            } else if (path.ends_with(".raw")) {
-                // writer = std::make_unique<MetavisionEventWriter>(path, resolution.x, resolution.y);
             } else {
-                std::cout << "save_to_file() only supports saving to .aedat for now" << std::endl;
+                std::cout << "save_to_file() only supports saving to .aedat4 at the moment" << std::endl;
                 return;
             }
 

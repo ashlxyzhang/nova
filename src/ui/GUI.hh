@@ -62,12 +62,11 @@ class GUI
         ViewMode view_mode = ViewMode::SINGLE;
         SyncMode sync_mode = SyncMode::START;
         int selected_source_index = 0;
+        bool is_mouse_dragging = false;
+        Visualizer::TIME scrubber_ui_time_units = Visualizer::TIME::UNIT_MS;
 
         // Save settings
         SaveConfig save_config;
-
-        // Camera control state
-        bool is_mouse_dragging = false;
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -192,22 +191,19 @@ class GUI
             // Draw double slider bar to control 
             if (save_config.mode == SaveConfig::Mode::TIME) {
                 ImGui::SetNextItemWidth(200);
-                ImGui::InputFloat("Start Time", &save_config.save_time_bounds.first);
+                ImGui::InputFloat("Start Time", &save_config.save_time_bounds.first, 0, 0);
                 ImGui::SetNextItemWidth(200);
-                ImGui::InputFloat("End Time", &save_config.save_time_bounds.second);
+                ImGui::InputFloat("End Time", &save_config.save_time_bounds.second, 0, 0);
             } else if (save_config.mode == SaveConfig::Mode::EVENT) {
                 ImGui::SetNextItemWidth(200);
-                ImGui::InputInt("Start Index", &save_config.save_index_bounds.first);
+                ImGui::InputInt("Start Index", &save_config.save_index_bounds.first, 0, 0);
                 ImGui::SetNextItemWidth(200);
-                ImGui::InputInt("End Index", &save_config.save_index_bounds.second);
+                ImGui::InputInt("End Index", &save_config.save_index_bounds.second, 0, 0);
             }
 
             // Connect save button to callback function
             if (ImGui::Button("Save")) {
-                static SDL_DialogFileFilter filters[] = {
-                    {"AEDAT4 Files", "aedat4"}
-                };
-                SDL_ShowSaveFileDialog(save_file_callback, &save_config, window, filters, 1, "");
+                SDL_ShowSaveFileDialog(save_file_callback, &save_config, window, nullptr, 0, "");
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
@@ -234,6 +230,9 @@ class GUI
                 // Scrubber parameters
                 ImGui::Begin("Scrubber Parameters");
                 ImGui::SliderFloat("Event Discard Odds", &(data_source->event_discard_odds), 0.0f, 1.0f);
+                int32_t selection = static_cast<int32_t>(scrubber_ui_time_units);
+                ImGui::Combo("Scrubber Time Unit", &selection, "s\0ms\0us\0");
+                scrubber_ui_time_units = static_cast<Visualizer::TIME>(selection);
                 ImGui::End();
 
                 // Visualizer controls
@@ -622,8 +621,17 @@ class GUI
         }
 
 
-        void draw_scrubber_controls(Scrubber::State& state, Visualizer::TIME unit_time)
+        void draw_scrubber_controls(Scrubber::State& state)
         {
+            
+            const float drag_speed = 5.0;
+            const size_t slider_max_index_window = 100000;
+            const size_t slider_max_index_step = 100000;
+            const float slider_max_time_window = 100000;
+            const float slider_max_time_step = 100000;
+
+
+
             // Type selection via tab bar
             Scrubber::Type prev_type = state.type;
             if (ImGui::BeginTabBar("##TypeTabs"))
@@ -644,21 +652,14 @@ class GUI
             {
                 state.mode = Scrubber::Mode::PAUSED;
             }
-
             ImGui::Separator();
 
-            // Cap mode
-            static int cap_mode_int = 0;
-            const char *cap_mode_names[] = {"Capped", "Uncapped"};
-            ImGui::Combo("Scrubber Cap", &cap_mode_int, cap_mode_names, 2);
-            int window_div_factor = (cap_mode_int == 0) ? 100 : 2;
-            int step_div_factor = (cap_mode_int == 0) ? 100 : 10;
 
             // If in sync mode, create drop down to select which type of synchronization 
             if (view_mode == ViewMode::SYNCED) 
             {
                 static int sync_mode_int = 0;
-                const char *sync_mode_names[] = {"Start", "End"};
+                const char *sync_mode_names[] = {"Sync to Start", "Sync to End"};
                 ImGui::Combo("Sync Mode", &sync_mode_int, sync_mode_names, 2);
                 sync_mode = sync_mode_int == 0 ? SyncMode::START : SyncMode::END;
             }
@@ -694,8 +695,16 @@ class GUI
 
                     ImGui::Separator();
 
+                    // Manual window input
+                    size_t win_input = state.index_window;
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Window Input", ImGuiDataType_U64, &win_input, drag_speed, NULL, &state.max_index)) {
+                        state.index_window = win_input;
+                    }
+                    ImGui::SameLine();
+
                     // Window slider
-                    size_t max_window = 1000000; // (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
+                    size_t max_window = (std::min)(slider_max_index_window, state.max_index); 
                     float max_window_f = static_cast<float>(max_window);
                     float win_slider = win_f;
                     if (ImGui::SliderFloat("Window", &win_slider, 1.0f, max_window_f, "%.0f"))
@@ -704,9 +713,21 @@ class GUI
                         state.index_window = static_cast<std::size_t>(win_slider);
                     }
                     ImGui::SetItemTooltip("Number of events behind position to display");
+                    
 
-                    // Step slider
-                    size_t max_step = 1000000; // (state.max_index - state.min_index) / step_div_factor;
+                    
+
+                    // Manual step size input
+                    // Manual window input
+                    size_t step_input = state.index_step;
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Step Size", ImGuiDataType_U64, &step_input, drag_speed, NULL, &state.max_index)) {
+                        state.index_step = step_input;
+                    }
+                    ImGui::SameLine(); 
+
+                    // Step size slider
+                    size_t max_step = (std::min)(slider_max_index_step, state.max_index); 
                     float max_step_f = static_cast<float>(max_step);
                     float step_f = static_cast<float>(state.index_step);
                     if (ImGui::SliderFloat("Step", &step_f, 0.0f, max_step_f, "%.0f"))
@@ -718,13 +739,14 @@ class GUI
                         }
                     }
                     ImGui::SetItemTooltip("Events to advance per frame during playback");
+                    
                 }
             }
             else // TIME
             {
-                std::string time_unit_suffix = time_units[static_cast<int>(unit_time)];
+                std::string time_unit_suffix = time_units[static_cast<int>(scrubber_ui_time_units)];
                 std::string time_format_str;
-                switch (unit_time)
+                switch (scrubber_ui_time_units)
                 {
                 case Visualizer::TIME::UNIT_US:
                     time_format_str = "%.2f";
@@ -738,12 +760,12 @@ class GUI
                 }
 
                 const float units[] = {1000000.0f, 1000.0f, 1.0f};
-                float unit_time_conversion_factor = units[(int) unit_time];
-
+                float unit_time_conversion_factor = units[(int) scrubber_ui_time_units];
                 float current_time_adj = state.current_time / unit_time_conversion_factor;
                 float min_time_adj = state.min_time / unit_time_conversion_factor;
                 float max_time_adj = state.max_time / unit_time_conversion_factor;
                 float time_window_adj = state.time_window / unit_time_conversion_factor;
+                float time_step_adj = state.time_step / unit_time_conversion_factor;
 
                 if (max_time_adj <= min_time_adj)
                 {
@@ -772,10 +794,19 @@ class GUI
 
                     ImGui::Separator();
 
-                    // Window slider
-                    float max_window_time = 1000000; // (std::max)(0.00001f, (state.max_time - state.min_time) / window_div_factor);
+
+                    // Window size input options
+                    float max_window_time = (std::min)(slider_max_time_window, state.max_time); ;
                     float max_window_adj = max_window_time / unit_time_conversion_factor;
 
+                    // Manual window input
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Time Window Input", ImGuiDataType_Float, &time_window_adj, drag_speed, &min_time_adj, &max_time_adj)) {
+                        state.time_window = time_window_adj * unit_time_conversion_factor;
+                    }
+                    ImGui::SameLine();
+
+                    // Window slider
                     if (ImGui::SliderFloat("Window", &time_window_adj, 0.00001f, max_window_adj,
                                            time_format_str.c_str()))
                     {
@@ -787,10 +818,19 @@ class GUI
                     }
                     ImGui::SetItemTooltip("Time window behind position to display");
 
-                    // Step slider
-                    float time_step_adj = state.time_step / unit_time_conversion_factor;
-                    float max_step_time = 1000000; // (state.max_time - state.min_time) / step_div_factor;
+
+                    // Step size input options
+                    float max_step_time = (std::min)(slider_max_time_step, state.max_time); 
                     float max_step_time_adj = max_step_time / unit_time_conversion_factor;
+
+                    // Manual step size input
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Time Step Input", ImGuiDataType_Float, &time_step_adj, drag_speed, &min_time_adj, &max_time_adj)) {
+                        state.time_step = time_step_adj * unit_time_conversion_factor;
+                    }
+                    ImGui::SameLine();
+
+                    // Step slider
                     if (ImGui::SliderFloat("Step", &time_step_adj, 0.00001f, max_step_time_adj,
                                            time_format_str.c_str()))
                     {
@@ -857,7 +897,7 @@ class GUI
             ImGui::Separator();
             
             // Draw scrubber controls
-            draw_scrubber_controls(scrubber_state, Visualizer::TIME::UNIT_MS);
+            draw_scrubber_controls(scrubber_state);
 
             
             // Write back potentially updated state to appropriate data_sources
@@ -1303,7 +1343,7 @@ inline void SDLCALL save_file_callback(void *user_data, const char *const *data_
     if (data_file_list && *data_file_list && save_config->source) {
         std::string path = *data_file_list;
         if (!path.ends_with(".aedat4")) {
-            path += ".aedat4";
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Path must end in .aedat4 or .raw", SDL_GetError(), NULL);
         }
 
         // Time saving mode
@@ -1320,7 +1360,7 @@ inline void SDLCALL save_file_callback(void *user_data, const char *const *data_
 
         save_config->source.reset();
     } else {
-        std::cout << "Error occured when selecting save destination" << std::endl;
+        
     }
 }
 

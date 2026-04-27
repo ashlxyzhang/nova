@@ -346,7 +346,7 @@ void DataSource::save_to_file_by_time(const std::string& path, float start_time,
 
 void DataSource::save_to_file_by_index(const std::string& path, size_t start_index, size_t end_index) {
     if (writing_thread_running) {
-        wait_writing_thread();
+        std::cout << "Writer already running, wait for finish before calling save again" << std::endl;
     }
 
     writing_thread_running = true;
