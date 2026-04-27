@@ -843,11 +843,6 @@ class GUI
                     ImGui::SetItemTooltip("Time to advance per frame during playback");
                 }
             }
-
-            ImGui::Separator();
-
-            // Show Frame Data checkbox
-            ImGui::Checkbox("Show Frame Data", &state.show_frame_data);
         }
 
 
@@ -1308,15 +1303,18 @@ class GUI
             ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom,
                                         &dock_id_right_top_top);
 
-            ImGui::DockBuilderDockWindow("Scrubber Parameters", dock_id_right_top_bottom);
-            ImGui::DockBuilderDockWindow("DCE Parameters", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("DCE Parameters", dock_id_right_top_bottom);  
             ImGui::DockBuilderDockWindow("Visualizer Parameters", dock_id_right_top_bottom);
-            ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
-            ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
-            ImGui::DockBuilderDockWindow("Frame", dock_id_main);
-            ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_right_bottom);
-            ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
 
+            ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
+            ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
+
+            ImGui::DockBuilderDockWindow("Frame", dock_id_main);
+            ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
+
+            ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
+            ImGui::DockBuilderDockWindow("Scrubber Parameters", dock_id_left_bottom);
+            
             ImGui::DockBuilderFinish(dockspace_id);
         }
 };

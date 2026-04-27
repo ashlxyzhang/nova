@@ -44,7 +44,7 @@ class Scrubber
             // TIME-based scrubbing -----
             float time_window = 10000.0f;   // Size of window (10ms default) (set by GUI)
             float time_step = 33333.0f;     // How much current_time is incremented each frame (~30fps default) (set by GUI)
-            float current_time = 0.0f;      // End of window (set by GUI)
+            float current_time = 10000.0f;      // End of window (set by GUI)
         
             float min_time = 0.0f;          // Relative timestamp of first event (pretty much always zero)
             float max_time = 0.0f;          // Relative timestamp of most recent event
@@ -62,7 +62,6 @@ class Scrubber
             // --------------------------
 
             // Flags
-            bool show_frame_data = false; // Currently unused
             bool loop = false;  
 
             // Resets every value except for TYPE and MODE
@@ -75,12 +74,11 @@ class Scrubber
                 max_index = 0;
                 lower_index = 0;
                 lower_time = 0.0f;
-                current_time = 0.0f;
+                current_time = 10000.0f;
                 time_window = 10000.0f;
                 time_step = 33333.0f;
                 min_time = 0.0f;
                 max_time = 0.0f;
-                show_frame_data = false;
                 loop = false;
             }
 
