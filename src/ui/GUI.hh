@@ -28,14 +28,14 @@ class GUI
     public:
         enum class ViewMode
         {
-            SINGLE,  // View and scrub a single selected data source
-            SYNCED   // View all data sources synced to a single scrubber state
+            SINGLE, // View and scrub a single selected data source
+            SYNCED  // View all data sources synced to a single scrubber state
         };
 
         enum class SyncMode
         {
-            START,  // Aligns start of data sources when sync scrubbing
-            END     // Aligns end of data sources when sync scrubbing
+            START, // Aligns start of data sources when sync scrubbing
+            END    // Aligns end of data sources when sync scrubbing
         };
 
         // Container for all save data
@@ -63,12 +63,17 @@ class GUI
         SyncMode sync_mode = SyncMode::START;
         Visualizer::TIME scrubber_ui_time_units = Visualizer::TIME::UNIT_MS;
         int selected_source_index = 0;
-        bool is_mouse_dragging = false;
         SaveConfig save_config;
         float event_discard_odds = 0.0f;
 
+        // Camera control state
+        bool cursor_captured = false;
+        float cursor_capture_x = 0.0f;
+        float cursor_capture_y = 0.0f;
 
-        static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
+
+        static inline const std::string time_units[] = {"s", "ms", "us"};
+        static inline const std::string freq_units[] = {"Hz", "mHz", "uHz"};
 
         // Timeline visual constants
         static constexpr ImU32 kTrackColor = IM_COL32(60, 60, 60, 255);
@@ -220,12 +225,13 @@ class GUI
          */
         void draw_info_window()
         {
-            if (selected_source_index < data_acquisition.size()) {
+            if (selected_source_index < data_acquisition.size())
+            {
                 std::shared_ptr<DataSource> data_source = data_acquisition.at(selected_source_index);
 
-                DigitalCodedExposure::Parameters& dce_params = data_source->dce_parameters;
-                Visualizer::Parameters& vis_params = data_source->visualizer_parameters;
-                Scrubber::State& scrubber_state = data_source->scrubber.state;
+                DigitalCodedExposure::Parameters &dce_params = data_source->dce_parameters;
+                Visualizer::Parameters &vis_params = data_source->visualizer_parameters;
+                Scrubber::State &scrubber_state = data_source->scrubber.state;
 
                 // Visualizer controls
                 ImGui::Begin("Visualizer Parameters");
@@ -249,7 +255,7 @@ class GUI
                 ImGui::Checkbox("Positive Events Only", &dce_params.shutter_is_positive_only);
                 ImGui::Separator();
                 ImGui::Combo("Digital Exposure Color", &dce_params.dce_color,
-                            "High/Low\0Tricolor\0Use Visualizer Colors\0");
+                             "High/Low\0Tricolor\0Use Visualizer Colors\0");
                 if (dce_params.dce_color < 2)
                 {
                     ImGui::ColorEdit3("Negative Color", (float *)&dce_params.polarity_neg_color);
@@ -321,7 +327,7 @@ class GUI
 
             // Add new sources
             ImGui::Text("Add New Source:");
-            
+
             if (ImGui::Button("Add File Source"))
             {
                 SDL_ShowOpenFileDialog(open_file_callback, &data_acquisition, window, nullptr, 0, nullptr, 0);
@@ -338,14 +344,15 @@ class GUI
             if (!camera_names.empty())
             {
                 static int camera_selection = 0;
-                std::vector<const char*> camera_names_cstr;
+                std::vector<const char *> camera_names_cstr;
                 for (const auto &name : camera_names)
                 {
                     camera_names_cstr.push_back(name.c_str());
                 }
-                
-                ImGui::Combo("Available Cameras", &camera_selection, camera_names_cstr.data(), camera_names_cstr.size());
-                
+
+                ImGui::Combo("Available Cameras", &camera_selection, camera_names_cstr.data(),
+                             camera_names_cstr.size());
+
                 if (ImGui::Button("Add Selected Camera"))
                 {
                     std::shared_ptr<DataSource> new_source = data_acquisition.add_camera_source(camera_selection);
@@ -422,10 +429,116 @@ class GUI
                     }
                     ImGui::PopID();
                 }
+                
                 ImGui::Unindent();
             }
 
             ImGui::End();
+        }
+
+        /**
+         * @brief Dual-handle range slider for selecting a [t1, t2] window on a track.
+         * @param min_val,max_val Track extent.
+         * @param t1,t2 Current handle positions (in [min_val,max_val]), modified in place.
+         * @param format printf format for value labels.
+         * @param unit_suffix Unit string shown in tooltip/readout.
+         */
+        void draw_range_bar(float min_val, float max_val, float *t1, float *t2, const char *format,
+                            const char *unit_suffix, const char *freq_suffix)
+        {
+            ImDrawList *draw_list = ImGui::GetWindowDrawList();
+            float frame_h = ImGui::GetFrameHeight();
+            float track_h = frame_h * 1.2f;
+            float avail_w = ImGui::GetContentRegionAvail().x;
+
+            char min_buf[64], max_buf[64];
+            snprintf(min_buf, sizeof(min_buf), format, min_val);
+            snprintf(max_buf, sizeof(max_buf), format, max_val);
+            ImVec2 min_sz = ImGui::CalcTextSize(min_buf);
+            ImVec2 max_sz = ImGui::CalcTextSize(max_buf);
+            float label_w = (std::max)(min_sz.x, max_sz.x) + 4.0f;
+            float track_w = (std::max)(avail_w - 2.0f * label_w, 20.0f);
+
+            ImVec2 cursor = ImGui::GetCursorScreenPos();
+            draw_list->AddText(ImVec2(cursor.x, cursor.y + (track_h - min_sz.y) * 0.5f), IM_COL32(200, 200, 200, 255),
+                               min_buf);
+
+            ImVec2 tl = ImVec2(cursor.x + label_w, cursor.y);
+            ImVec2 br = ImVec2(tl.x + track_w, tl.y + track_h);
+            draw_list->AddRectFilled(tl, br, kTrackColor);
+            draw_list->AddRect(tl, br, kBorderColor);
+
+            float range = max_val - min_val;
+            if (range > 0.0f)
+            {
+                float f1 = (*t1 - min_val) / range;
+                float f2 = (*t2 - min_val) / range;
+                float x1 = tl.x + f1 * track_w;
+                float x2 = tl.x + f2 * track_w;
+
+                // Highlight region between handles
+                draw_list->AddRectFilled(ImVec2(x1, tl.y), ImVec2(x2, br.y), kWindowHighlight);
+
+                // t1 handle (blue)
+                constexpr ImU32 kT1Color = IM_COL32(100, 180, 255, 255);
+                draw_list->AddLine(ImVec2(x1, tl.y), ImVec2(x1, br.y), kT1Color, 2.0f);
+                float tri = 6.0f;
+                draw_list->AddTriangleFilled({x1 - tri, tl.y - 1.0f}, {x1 + tri, tl.y - 1.0f}, {x1, tl.y + tri},
+                                             kT1Color);
+
+                // t2 handle (orange)
+                constexpr ImU32 kT2Color = IM_COL32(255, 160, 60, 255);
+                draw_list->AddLine(ImVec2(x2, tl.y), ImVec2(x2, br.y), kT2Color, 2.0f);
+                draw_list->AddTriangleFilled({x2 - tri, tl.y - 1.0f}, {x2 + tri, tl.y - 1.0f}, {x2, tl.y + tri},
+                                             kT2Color);
+            }
+
+            draw_list->AddText(ImVec2(br.x + 4.0f, cursor.y + (track_h - max_sz.y) * 0.5f),
+                               IM_COL32(200, 200, 200, 255), max_buf);
+
+            ImGui::SetCursorScreenPos(tl);
+            ImGui::InvisibleButton("##range_track", ImVec2(track_w, track_h));
+
+            static int active_handle = -1;
+            if (range > 0.0f)
+            {
+                if (ImGui::IsItemActivated())
+                {
+                    float mx = ImGui::GetIO().MousePos.x;
+                    float ax = tl.x + (*t1 - min_val) / range * track_w;
+                    float bx = tl.x + (*t2 - min_val) / range * track_w;
+                    active_handle = (std::abs(mx - ax) <= std::abs(mx - bx)) ? 0 : 1;
+                }
+                if (ImGui::IsItemActive())
+                {
+                    float frac = std::clamp((ImGui::GetIO().MousePos.x - tl.x) / track_w, 0.0f, 1.0f);
+                    float val = min_val + frac * range;
+                    if (active_handle == 0)
+                        *t1 = std::clamp(val, min_val, *t2);
+                    else if (active_handle == 1)
+                        *t2 = std::clamp(val, *t1, max_val);
+                }
+                if (ImGui::IsItemDeactivated())
+                    active_handle = -1;
+
+                if (ImGui::IsItemHovered())
+                {
+                    float frac = std::clamp((ImGui::GetIO().MousePos.x - tl.x) / track_w, 0.0f, 1.0f);
+                    char tip[128];
+                    snprintf(tip, sizeof(tip), format, min_val + frac * range);
+                    ImGui::SetTooltip("%s %s", tip, unit_suffix);
+                }
+            }
+
+            ImGui::SetCursorScreenPos(ImVec2(cursor.x, br.y + 2.0f));
+            char buf1[64], buf2[64], buf_period[64], buf_freq[64];
+            snprintf(buf1, sizeof(buf1), format, *t1);
+            snprintf(buf2, sizeof(buf2), format, *t2);
+            snprintf(buf_period, sizeof(buf_period), format, *t2 - *t1);
+            snprintf(buf_freq, sizeof(buf_freq), format, 1 / (*t2 - *t1));
+            ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "t1: %s %s", buf1, unit_suffix);
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.63f, 0.24f, 1.0f), "  t2: %s %s", buf2, unit_suffix);
         }
 
         /**
@@ -528,8 +641,7 @@ class GUI
         /**
          * @brief Draw a row of playback control buttons.
          */
-        void draw_playback_controls(Scrubber::Mode current_mode, Scrubber::Type scrubber_type,
-                                    Scrubber::State &state)
+        void draw_playback_controls(Scrubber::Mode current_mode, Scrubber::Type scrubber_type, Scrubber::State &state)
         {
             float button_w = ImGui::GetFrameHeight() * 2.0f;
             float button_h = ImGui::GetFrameHeight();
@@ -660,8 +772,6 @@ class GUI
             const float slider_max_time_window = 100000;
             const float slider_max_time_step = 100000;
 
-
-
             // Type selection via tab bar
             Scrubber::Type prev_type = state.type;
             if (ImGui::BeginTabBar("##TypeTabs"))
@@ -685,8 +795,8 @@ class GUI
             ImGui::Separator();
 
 
-            // If in sync mode, create drop down to select which type of synchronization 
-            if (view_mode == ViewMode::SYNCED) 
+            // If in sync mode, create drop down to select which type of synchronization
+            if (view_mode == ViewMode::SYNCED)
             {
                 static int sync_mode_int = 0;
                 const char *sync_mode_names[] = {"Sync to Start", "Sync to End"};
@@ -875,30 +985,29 @@ class GUI
             }
         }
 
-
         /**
          * @brief Draws scrubber window with controls for scrubbing through event data.
          */
         void draw_scrubber_window()
         {
             std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            int num_sources = (int) sources.size();
+            int num_sources = (int)sources.size();
 
             ImGui::Begin("Scrubber");
-
 
             // Get state and status message depending on view mode
             Scrubber::State scrubber_state;
             std::string scrubber_message;
 
             if (view_mode == ViewMode::SINGLE)
-            {       
+            {
                 if (selected_source_index < num_sources)
                 {
                     std::shared_ptr<DataSource> data_source = sources[selected_source_index];
                     scrubber_state = data_source->scrubber.state;
                     scrubber_message = "Single Source Scrubbing - " + data_source->name;
-                } else 
+                }
+                else
                 {
                     ImGui::End();
                     return;
@@ -906,12 +1015,12 @@ class GUI
             }
             else if (view_mode == ViewMode::SYNCED)
             {
-                if (num_sources > 0) 
+                if (num_sources > 0)
                 {
                     scrubber_state = data_acquisition.get_state();
                     scrubber_message = "Synced Scrubbing";
                 }
-                else 
+                else
                 {
                     ImGui::End();
                     return;
@@ -920,13 +1029,13 @@ class GUI
 
             ImGui::Text("%s", scrubber_message.c_str());
             ImGui::Separator();
-            
+
             // Draw scrubber controls
             draw_scrubber_controls(scrubber_state);
 
             // Write back potentially updated state to appropriate data_sources
             if (view_mode == ViewMode::SINGLE)
-            {       
+            {
                 if (selected_source_index >= 0 && selected_source_index < num_sources)
                 {
                     sources[selected_source_index]->scrubber.state = scrubber_state;
@@ -936,8 +1045,10 @@ class GUI
             {
                 data_acquisition.set_state(scrubber_state);
 
-                if (sync_mode == SyncMode::END)         data_acquisition.sync_end();
-                else if (sync_mode == SyncMode::START)  data_acquisition.sync_start();
+                if (sync_mode == SyncMode::END)
+                    data_acquisition.sync_end();
+                else if (sync_mode == SyncMode::START)
+                    data_acquisition.sync_start();
             }
 
             if (scrubber_state.type == Scrubber::Type::TIME) {
@@ -958,14 +1069,50 @@ class GUI
             if (selected_source_index < data_acquisition.size())
             {
                 std::shared_ptr<DataSource> data_source = data_acquisition.at(selected_source_index);
-                RenderTarget& color_target = data_source->visualizer_render_targets.color;
+                RenderTarget &color_target = data_source->visualizer_render_targets.color;
 
                 ImGui::Begin("3D Visualizer");
+                ImGui::Checkbox("Show Oscilloscope", &data_source->visualizer_parameters.show_oscilloscope);
+
+                if (data_source->visualizer_parameters.show_oscilloscope)
+                {
+                    Visualizer::Parameters &vis_params = data_source->visualizer_parameters;
+                    float lower = data_source->scrubber.get_lower_depth();
+                    float upper = data_source->scrubber.get_upper_depth();
+                    float depth_range = upper - lower;
+
+                    if (depth_range > 0.0f)
+                    {
+                        float ucf = vis_params.unit_time_conversion_factor;
+                        int unit_type = static_cast<int>(vis_params.unit_type);
+                        float t1_disp = (lower + vis_params.osc_t1 * depth_range) / ucf;
+                        float t2_disp = (lower + vis_params.osc_t2 * depth_range) / ucf;
+                        const char *fmt = (vis_params.unit_type == Visualizer::TIME::UNIT_US)   ? "%.2f"
+                                          : (vis_params.unit_type == Visualizer::TIME::UNIT_MS) ? "%.4f"
+                                                                                                : "%.8f";
+                        draw_range_bar(lower / ucf, upper / ucf, &t1_disp, &t2_disp, fmt, time_units[unit_type].c_str(),
+                                       freq_units[unit_type].c_str());
+                        vis_params.osc_t1 = std::clamp((t1_disp * ucf - lower) / depth_range, 0.0f, 1.0f);
+                        vis_params.osc_t2 = std::clamp((t2_disp * ucf - lower) / depth_range, 0.0f, 1.0f);
+
+                        float period_s = (vis_params.osc_t2 - vis_params.osc_t1) * depth_range / 1e6f;
+                        float freq_hz = (period_s > 1e-10f) ? 1.0f / period_s : 0.0f;
+                        ImGui::Text("  Period: %.6f s", period_s);
+                        ImGui::SameLine();
+                        ImGui::Text("  Frequency: %.2f Hz", freq_hz);
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("No data loaded");
+                    }
+                    ImGui::Separator();
+                }
+
                 if (color_target.texture)
                 {
-                    
+
                     ImVec2 pane_size = ImGui::GetContentRegionAvail();
-                    float tex_aspect = (float)color_target.width / (float) color_target.height;
+                    float tex_aspect = (float)color_target.width / (float)color_target.height;
                     ImVec2 display_size = pane_size;
                     float pane_aspect = pane_size.x / pane_size.y;
                     if (tex_aspect > pane_aspect)
@@ -980,7 +1127,7 @@ class GUI
                     float y_pad = (pane_size.y - display_size.y) * 0.5f;
                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
-                    ImGui::Image((ImTextureID) color_target.texture, display_size);
+                    ImGui::Image((ImTextureID)color_target.texture, display_size);
                     color_target.is_focused = ImGui::IsItemHovered();
                 }
                 else
@@ -990,11 +1137,11 @@ class GUI
 
                 ImGui::End();
             }
-            
         }
 
-        void draw_single_dce(std::shared_ptr<DataSource> data_source, bool centered) {
-            RenderTarget& output = data_source->dce_render_targets.output;
+        void draw_single_dce(std::shared_ptr<DataSource> data_source, bool centered)
+        {
+            RenderTarget &output = data_source->dce_render_targets.output;
 
             if (output.texture)
             {
@@ -1003,7 +1150,7 @@ class GUI
                 {
                     ImVec2 pane_size = ImGui::GetContentRegionAvail();
                     display_size = pane_size;
-                    
+
                     float aspect_ratio = output.width / (float)output.height;
                     float pane_aspect = pane_size.x / pane_size.y;
                     if (aspect_ratio > pane_aspect)
@@ -1019,15 +1166,15 @@ class GUI
                     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + x_pad);
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + y_pad);
                 }
-                else 
+                else
                 {
                     float available_width = ImGui::GetContentRegionAvail().x;
-                    float aspect_ratio = output.width / (float) output.height;
+                    float aspect_ratio = output.width / (float)output.height;
                     display_size = {available_width, available_width / aspect_ratio};
                 }
 
                 // Draw image
-                ImGui::Image((ImTextureID) output.texture, display_size);
+                ImGui::Image((ImTextureID)output.texture, display_size);
                 output.is_focused = ImGui::IsItemHovered();
             }
             else
@@ -1043,28 +1190,30 @@ class GUI
         {
             // Get all data sources
             std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            int num_sources = (int) sources.size();
-            if (num_sources == 0) return;
+            int num_sources = (int)sources.size();
+            if (num_sources == 0)
+                return;
 
             // Setup ImGui frame
-            ImGuiStyle& style = ImGui::GetStyle();
+            ImGuiStyle &style = ImGui::GetStyle();
             ImGui::Begin("Frame");
             ImGui::Text("Digital Coded Exposure");
 
             // Single view fills entire window
-            if (view_mode == ViewMode::SINGLE) 
+            if (view_mode == ViewMode::SINGLE)
             {
-                if (selected_source_index >= 0 && selected_source_index < num_sources) {
+                if (selected_source_index >= 0 && selected_source_index < num_sources)
+                {
                     draw_single_dce(sources[selected_source_index], true);
-                }   
+                }
             }
 
             // Shared view drawn in 2xN grid
             else if (view_mode == ViewMode::SYNCED)
-            {       
+            {
                 // Set table size
                 int num_cols = 2;
-                int num_rows = std::ceil(num_sources / (double) num_cols);
+                int num_rows = std::ceil(num_sources / (double)num_cols);
 
                 // Make table fill horizontally and scroll vertically
                 ImGuiTableFlags flags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
@@ -1074,27 +1223,28 @@ class GUI
                     float col_width = (ImGui::GetContentRegionAvail().x - style.ScrollbarSize) / num_cols;
                     ImGui::TableSetupColumn("col0", ImGuiTableColumnFlags_WidthFixed, col_width);
                     ImGui::TableSetupColumn("col1", ImGuiTableColumnFlags_WidthFixed, col_width);
-    
+
                     // Draw individual DCE textures
-                    for (int row=0; row < num_rows; row++) {
+                    for (int row = 0; row < num_rows; row++)
+                    {
                         ImGui::TableNextRow();
-                        for (int col=0; col<num_cols; col++) {
+                        for (int col = 0; col < num_cols; col++)
+                        {
                             ImGui::TableSetColumnIndex(col);
-                            
-                            int source_index = row*num_cols + col;
+
+                            int source_index = row * num_cols + col;
                             if (source_index < num_sources)
                             {
                                 draw_single_dce(sources[source_index], false);
                             }
                         }
                     }
-    
+
                     ImGui::EndTable();
                 }
             }
 
             ImGui::End();
-            
         }
 
         /**
@@ -1114,15 +1264,17 @@ class GUI
             {
                 ImGui::BeginChild("QSContent", ImVec2(0, -50), true, ImGuiWindowFlags_HorizontalScrollbar);
 
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                   "You can view this popup again by clicking the 'Quickstart Guide' button in the debug window.");
+                ImGui::TextColored(
+                    ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+                    "You can view this popup again by clicking the 'Quickstart Guide' button in the debug window.");
 
                 ImGui::Separator();
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Data Sources");
                 ImGui::Separator();
-                ImGui::TextWrapped(
-                    "The application now supports multiple data sources. Use the Data Sources window to add files or cameras. "
-                    "You can switch between Single Source mode (view one at a time) or Synced mode (view all sources with a shared scrubber).");
+                ImGui::TextWrapped("The application now supports multiple data sources. Use the Data Sources window to "
+                                   "add files or cameras. "
+                                   "You can switch between Single Source mode (view one at a time) or Synced mode "
+                                   "(view all sources with a shared scrubber).");
 
                 ImGui::Spacing();
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Camera Controls");
@@ -1147,8 +1299,15 @@ class GUI
          * @brief Constructor for GUI.
          */
         GUI(DataAcquisition &data_acquisition, Visualizer &visualizer, ErrorQueue &error_queue, SDL_Window *window, GPUDevice& gpu_device)
-            : data_acquisition(data_acquisition), visualizer(visualizer), error_queue(error_queue), window(window), gpu_device(gpu_device.get_SDL_device()), fps_history_buf(100, 0.0f), 
-              fps_buf_index(0), check_for_layout_file(true), show_quickstart(false)
+            : data_acquisition(data_acquisition), 
+            visualizer(visualizer), 
+            error_queue(error_queue), 
+            window(window), 
+            gpu_device(gpu_device.get_SDL_device()), 
+            fps_history_buf(100, 0.0f), 
+            fps_buf_index(0), 
+            check_for_layout_file(true), 
+            show_quickstart(false)
         {
 
             // Setup Dear ImGui context
@@ -1201,61 +1360,57 @@ class GUI
         {
             ImGui_ImplSDL3_ProcessEvent(event);
 
-            // Handle camera controls for visualizer
-            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            int num_sources = (int) sources.size();
-            if (selected_source_index >= num_sources) return;
+            auto sources = data_acquisition.get_data_sources();
+            bool hovered = std::any_of(sources.begin(), sources.end(),
+                                       [](const auto &s) { return s->visualizer_render_targets.color.is_focused; });
 
-            // Check if selected visualizer output is focused
-            bool focused = false;
-            focused = sources[selected_source_index]->visualizer_render_targets.color.is_focused;
-            
-            // Start a click, scrolling, and dragging must be done while focused
-            if (focused) {
-                if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_LEFT) 
-                {
-                    is_mouse_dragging = true;
-                }
+            if (!hovered && !cursor_captured)
+                return;
 
-                // Drags mouse
-                else if (event->type == SDL_EVENT_MOUSE_MOTION && is_mouse_dragging) 
-                {
-                    float x_offset = -event->motion.xrel;
-                    float y_offset = event->motion.yrel;
-                    visualizer.rotate_camera(x_offset, y_offset);	
-                }
+            auto release_cursor = [&]() {
+                SDL_SetWindowRelativeMouseMode(window, false);
+                SDL_WarpMouseInWindow(window, cursor_capture_x, cursor_capture_y);
+                cursor_captured = false;
+            };
 
-                // Scrolls
-                else if (event->type == SDL_EVENT_MOUSE_WHEEL) 
-                {	
-                    float scroll_delta = event->wheel.y;
-                    if (event->wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
-                    {
-                        scroll_delta = -scroll_delta;
-                    }
-
-                    if (scroll_delta != 0.0f)
-                    {
-                        visualizer.zoom_camera(scroll_delta * 0.1f);
-                    }
-                }
-            }
-
-            // Releasing should be possible when not in focus
-            // Releases click
-            if (event->type == SDL_EVENT_MOUSE_BUTTON_UP && event->button.button == SDL_BUTTON_LEFT) 
+            switch (event->type)
             {
-                is_mouse_dragging = false;
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (hovered && event->button.button == SDL_BUTTON_LEFT)
+                {
+                    SDL_GetMouseState(&cursor_capture_x, &cursor_capture_y);
+                    SDL_SetWindowRelativeMouseMode(window, true);
+                    cursor_captured = true;
+                }
+                break;
+
+            case SDL_EVENT_MOUSE_BUTTON_UP:
+                if (cursor_captured && event->button.button == SDL_BUTTON_LEFT)
+                    release_cursor();
+                break;
+
+            case SDL_EVENT_MOUSE_MOTION:
+                if (cursor_captured)
+                    visualizer.rotate_camera(-event->motion.xrel, event->motion.yrel);
+                break;
+
+            case SDL_EVENT_MOUSE_WHEEL: {
+                float scroll = event->wheel.y;
+                if (event->wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
+                    scroll = -scroll;
+                if (scroll != 0.0f)
+                    visualizer.zoom_camera(scroll * 0.1f);
+                break;
             }
 
-            // Window loses focus or mouse leaves area
-            else if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST || event->type == SDL_EVENT_WINDOW_MOUSE_LEAVE ) 
-            {
-                is_mouse_dragging = false;
+            case SDL_EVENT_WINDOW_FOCUS_LOST:
+                if (cursor_captured)
+                    release_cursor();
+                break;
             }
 
-            // Reset focused flag
-            sources[selected_source_index]->visualizer_render_targets.color.is_focused = false;
+            for (auto &source : sources)
+                source->visualizer_render_targets.color.is_focused = false;
         }
 
         /**
@@ -1357,7 +1512,7 @@ class GUI
 // Callback functions
 inline void SDLCALL open_file_callback(void *user_data, const char *const *data_file_list, int filter)
 {
-    DataAcquisition *data_acq = static_cast<DataAcquisition*>(user_data);
+    DataAcquisition *data_acq = static_cast<DataAcquisition *>(user_data);
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};

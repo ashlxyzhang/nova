@@ -12,11 +12,61 @@ class TransferBuffer
     private:
         SDL_GPUDevice* gpu_device = nullptr;
 
-        SDL_GPUTransferBuffer* upload_buffer = nullptr; 
+        SDL_GPUTransferBuffer* upload_buffer = nullptr;
+        Uint32 upload_capacity = 0;
+        
         SDL_GPUTransferBuffer* download_buffer = nullptr;
+        Uint32 download_capacity;
 
-        constexpr static unsigned upload_buffer_size = 1 << 20;
-        constexpr static unsigned download_buffer_size = 1 << 23; 
+        constexpr static Uint32 initial_upload_capacity = 1 << 20;    
+        constexpr static Uint32 initial_download_capacity = 0; // Not all users need downloading, lazily allocate
+
+        static Uint32 next_pow2(Uint32 v)
+        {
+            Uint32 r = 1;
+            while (r < v)
+                r <<= 1;
+            return r;
+        }
+
+        /**
+         * @brief Grows the upload buffer if the current capacity is too small.
+         * @param nbyte Required capacity in bytes.
+         */
+        void ensure_upload_capacity(size_t nbyte)
+        {
+            if (nbyte <= upload_capacity) {
+                return;
+            }
+
+            if (upload_buffer) {   
+                SDL_ReleaseGPUTransferBuffer(gpu_device, upload_buffer);
+            }
+
+            upload_capacity = next_pow2(static_cast<Uint32>(nbyte));
+            SDL_GPUTransferBufferCreateInfo info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = upload_capacity};
+            upload_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &info);
+        }
+
+
+        /**
+         * @brief Grows the download buffer if the current capacity is too small.
+         * @param nbyte Required capacity in bytes.
+         */
+        void ensure_download_capacity(size_t nbyte) 
+        {
+            if (nbyte <= download_capacity) {
+                return;
+            }
+
+            if (download_buffer) {
+                SDL_ReleaseGPUTransferBuffer(gpu_device, download_buffer);
+            }
+            
+            download_capacity = next_pow2(static_cast<Uint32>(nbyte));
+            SDL_GPUTransferBufferCreateInfo info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD, .size = download_capacity};
+            download_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &info);
+        }
 
     public:
         /**
@@ -25,13 +75,8 @@ class TransferBuffer
          */
         TransferBuffer(SDL_GPUDevice *gpu_device): gpu_device(gpu_device)
         {
-            SDL_GPUTransferBufferCreateInfo upload_buffer_create_info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-                                                                        .size = upload_buffer_size};
-            SDL_GPUTransferBufferCreateInfo download_buffer_create_info = {.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD,
-                                                                        .size = download_buffer_size};
-
-            upload_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &upload_buffer_create_info);
-            download_buffer = SDL_CreateGPUTransferBuffer(gpu_device, &download_buffer_create_info);
+            ensure_upload_capacity(initial_upload_capacity);
+            ensure_download_capacity(initial_download_capacity);
         }
 
         /**
@@ -39,8 +84,13 @@ class TransferBuffer
          */
         ~TransferBuffer()
         {
-            SDL_ReleaseGPUTransferBuffer(gpu_device, upload_buffer);
-            SDL_ReleaseGPUTransferBuffer(gpu_device, download_buffer);
+            if (upload_buffer) {
+                SDL_ReleaseGPUTransferBuffer(gpu_device, upload_buffer);
+            }
+
+            if (download_buffer) {
+                SDL_ReleaseGPUTransferBuffer(gpu_device, download_buffer);
+            }
         }
 
         /**
@@ -52,26 +102,19 @@ class TransferBuffer
          */
         void upload_to_gpu(SDL_GPUCopyPass *pass, SDL_GPUBuffer *dst, const void *src, size_t nbyte)
         {
-            size_t offset = 0;
-            while (nbyte > 0)
-            {
-                size_t num = nbyte;
-                if (num > upload_buffer_size)
-                    num = upload_buffer_size;
-
-                void *ptr = SDL_MapGPUTransferBuffer(gpu_device, upload_buffer, true);
-                SDL_memcpy(ptr, (const char *)src + offset, num);
-                SDL_UnmapGPUTransferBuffer(gpu_device, upload_buffer);
-
-                SDL_GPUTransferBufferLocation transfer_location = {.transfer_buffer = upload_buffer};
-                SDL_GPUBufferRegion buffer_region = {
-                    .buffer = dst, .offset = static_cast<Uint32>(offset), .size = static_cast<Uint32>(num)};
-
-                SDL_UploadToGPUBuffer(pass, &transfer_location, &buffer_region, false);
-
-                nbyte -= num;
-                offset += num;
+            if (nbyte == 0) {
+                return;
             }
+
+            ensure_upload_capacity(nbyte);
+
+            void *ptr = SDL_MapGPUTransferBuffer(gpu_device, upload_buffer, true);
+            SDL_memcpy(ptr, src, nbyte);
+            SDL_UnmapGPUTransferBuffer(gpu_device, upload_buffer);
+
+            SDL_GPUTransferBufferLocation transfer_location = {.transfer_buffer = upload_buffer};
+            SDL_GPUBufferRegion buffer_region = {.buffer = dst, .offset = 0, .size = static_cast<Uint32>(nbyte)};
+            SDL_UploadToGPUBuffer(pass, &transfer_location, &buffer_region, false);
         }
 
         //
@@ -92,8 +135,11 @@ class TransferBuffer
             cv::Mat rgba;
             cv::cvtColor(mat, rgba, cv::COLOR_BGR2RGBA);
 
+            size_t nbyte = rgba.total() * rgba.elemSize();
+            ensure_upload_capacity(nbyte);
+
             void *ptr = SDL_MapGPUTransferBuffer(gpu_device, upload_buffer, true);
-            std::memcpy(ptr, rgba.data, rgba.total() * rgba.elemSize());
+            std::memcpy(ptr, rgba.data, nbyte);
             SDL_UnmapGPUTransferBuffer(gpu_device, upload_buffer);
 
             SDL_GPUTextureTransferInfo source_texture_transfer_info = {};
@@ -101,6 +147,7 @@ class TransferBuffer
             source_texture_transfer_info.offset = 0;
             source_texture_transfer_info.pixels_per_row = rgba.cols;
             source_texture_transfer_info.rows_per_layer = rgba.rows;
+
             SDL_GPUTextureRegion dest_texture_region = {};
             dest_texture_region.texture = texture;
             dest_texture_region.mip_level = 0;
@@ -111,6 +158,7 @@ class TransferBuffer
             dest_texture_region.w = rgba.cols;
             dest_texture_region.h = rgba.rows;
             dest_texture_region.d = 1;
+
             SDL_UploadToGPUTexture(pass, &source_texture_transfer_info, &dest_texture_region, false);
         }
 
@@ -127,22 +175,10 @@ class TransferBuffer
                                     uint32_t width, uint32_t height, uint32_t layer = 0)
         {
             // Calculate required buffer size (RGBA8: 4 bytes per pixel)
-            const uint32_t bytes_per_pixel = 4;
-            const uint64_t required_bytes = static_cast<uint64_t>(width) * height * bytes_per_pixel;
+            const Uint32 bytes_per_pixel = 4;
+            const Uint32 required_bytes = static_cast<uint64_t>(width) * height * bytes_per_pixel;
             
-            // Validate buffer size
-            if (required_bytes > download_buffer_size) {
-                std::cout << (
-                    "Texture too large for download buffer:\n"
-                    "  Texture size: " + std::to_string(width) + "x" + std::to_string(height) + 
-                    " (" + std::to_string(required_bytes) + " bytes)\n"
-                    "  Buffer size: " + std::to_string(download_buffer_size) + " bytes\n"
-                    "  Increase download_buffer_size to at least " + 
-                    std::to_string(required_bytes) + " bytes"
-                ) << std::endl;
-
-                return cv::Mat();
-            }
+            ensure_download_capacity(required_bytes);
 
             // Download to cpu buffer
             SDL_GPUTextureRegion source_region = {
