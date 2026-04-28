@@ -6,7 +6,7 @@ void DigitalCodedExposure::render(DataSource& data_source)
     // Read parameters, rendering textures, and resolution from data source
     Parameters params = data_source.dce_parameters;
     RenderTargets render_targets = data_source.dce_render_targets;
-    cv::Size resolution = data_source.resolution;
+    cv::Size resolution = data_source.get_resolution();
 
 
     // Format parameters to send to the GPU

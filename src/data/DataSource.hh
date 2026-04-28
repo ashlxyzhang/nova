@@ -17,74 +17,92 @@
 #include <dv-processing/io/camera/usb_device.hpp>
 
 struct DataSource {
-	mutable std::shared_mutex mutex;
-	SDL_GPUDevice* gpu_device;
+	private:
 
-	// Metadata
-    std::string name; 
-	cv::Size resolution;
-    enum Type { CAMERA, FILE } type;
+		friend class DataAcqusition;
+		friend class GUI;
 
-	// Data Management
-	std::unique_ptr<IEventReader> reader; 	// Input
-    EventData event_data; 					// Storage
-	Scrubber scrubber;						// Selection
-	TransferBuffer transfer_buffer;			// GPU transfering
-    float event_discard_odds = 0.0f;		
+		SDL_GPUDevice* gpu_device;
 
-	// Helper threaders
-	std::thread reading_thread;
-	std::thread writing_thread;
+		// Metadata
+		std::string name; 
+		cv::Size resolution;
+		enum Type { CAMERA, FILE } type;
+		bool is_open_ = false;
+		std::atomic<bool> read_to_end = false;
+
+		// Helper threads
+		std::thread reading_thread;
+		std::thread writing_thread;
+		std::atomic<bool> reading = false;
+		std::atomic<bool> writing = false;
+		
+		// Data management
+		std::unique_ptr<IEventReader> reader; 	// Data input
+		TransferBuffer transfer_buffer;			// GPU reading and writing
+		EventData event_data; 					// Event storage
+
+		// Internal helpers
+		cv::Mat texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureFormat texture_format, int width, int height);
+		void init_render_targets();
+		void reading_loop(float event_discard_odds=0.0f);
+
+	public:
+
+		// Data Management
+		Scrubber scrubber;						// Data selection (made public b/c I trust you 😁)
+
+		// Rendering parameters
+		DigitalCodedExposure::Parameters dce_parameters;
+		Visualizer::Parameters visualizer_parameters;
 	
-	// State
-    enum State { PAUSED, ACTIVE, FAILED_TO_OPEN } state = State::PAUSED; 
-	std::atomic<bool> reading_thread_running = false;
-	std::atomic<bool> writing_thread_running = false;
+		// Rendering
+		DigitalCodedExposure::RenderTargets dce_render_targets;
+		Visualizer::RenderTargets visualizer_render_targets;
 
-	// Rendering 
-	DigitalCodedExposure::Parameters dce_parameters;
-	DigitalCodedExposure::RenderTargets dce_render_targets;
-	Visualizer::Parameters visualizer_parameters;
-	Visualizer::RenderTargets visualizer_render_targets;
-    
-	// Internal Constructors
-	DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);
-	DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
-	DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera);
+		// Constructors
+		DataSource(GPUDevice& gpu_device, const std::string& file_path);
+		DataSource(GPUDevice& gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
+		DataSource(GPUDevice& gpu_device, const MetavisionEventReader::LiveCamera& camera);
+		DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);
+		DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
+		DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera);
+		~DataSource();
 
-	// External API Constructors
-	DataSource(GPUDevice& gpu_device, const std::string& file_path);
-	DataSource(GPUDevice& gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
-	DataSource(GPUDevice& gpu_device, const MetavisionEventReader::LiveCamera& camera);
-	
-	~DataSource();
+		// Updates scrubber
+		void update();
+		
+		// Single batches
+		size_t get_batch_event_data(float event_discard_odds=0.0f);
+		size_t get_batch_frame_data();
 
-	// Initialization
-	bool is_open();
-	void init_render_targets();
-	
-	// Updates scrubber
-	void update();
-	
-	// Reading utility
-	size_t get_batch_event_data();
-	size_t get_batch_frame_data();
-	void read_all(); 				// Blocking
-	void wait_reading_thread();		// Blocking
-	void start_reading_thread();	
-	void stop_reading_thread();		
+		// Reading 
+		void read(float event_discard_odds=0.0f, bool blocking=true);		
+		void stop_reading_thread();		
+		void wait_reading_thread();		
 
-	// Writing utility
-	void save_to_file(const std::string& path);
-	void save_to_file_by_time(const std::string& path, float start_time, float end_time);
-	void save_to_file_by_index(const std::string& path, size_t start_index, size_t end_index);
-	void stop_writing_thread();
-	void wait_writing_thread();				
+		// Writing 
+		void save_to_file(const std::string& path, bool blocking=true);
+		void save_to_file_by_time(const std::string& path, float start_time, float end_time, bool blocking=true);
+		void save_to_file_by_index(const std::string& path, size_t start_index, size_t end_index, bool blocking=true);
+		void stop_writing_thread();
+		void wait_writing_thread();				
 
-	// cv::Mat utility
-	cv::Mat save_dce_output();
-	cv::Mat save_visualizer_output();
-	cv::Mat texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureFormat texture_format, int width, int height);
+		// cv::Mat outputs
+		cv::Mat save_dce_output();
+		cv::Mat save_visualizer_output();
+		
+		// Status
+		bool is_open();
+		bool is_eof();
+		bool is_reading();
+		bool is_writing();
+
+		// Other
+		std::string get_name();
+		Type get_type();
+		cv::Size get_resolution();
+		size_t size();
 };
 
 

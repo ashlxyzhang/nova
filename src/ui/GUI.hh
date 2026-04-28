@@ -58,15 +58,15 @@ class GUI
         SDL_GPUDevice *gpu_device = nullptr;
         ImDrawData *draw_data = nullptr;
 
-        // View mode and selection
+        // State
         ViewMode view_mode = ViewMode::SINGLE;
         SyncMode sync_mode = SyncMode::START;
+        Visualizer::TIME scrubber_ui_time_units = Visualizer::TIME::UNIT_MS;
         int selected_source_index = 0;
         bool is_mouse_dragging = false;
-        Visualizer::TIME scrubber_ui_time_units = Visualizer::TIME::UNIT_MS;
-
-        // Save settings
         SaveConfig save_config;
+        float event_discard_odds = 0.0f;
+
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -227,14 +227,6 @@ class GUI
                 Visualizer::Parameters& vis_params = data_source->visualizer_parameters;
                 Scrubber::State& scrubber_state = data_source->scrubber.state;
 
-                // Scrubber parameters
-                ImGui::Begin("Scrubber Parameters");
-                ImGui::SliderFloat("Event Discard Odds", &(data_source->event_discard_odds), 0.0f, 1.0f);
-                int32_t selection = static_cast<int32_t>(scrubber_ui_time_units);
-                ImGui::Combo("Scrubber Time Unit", &selection, "s\0ms\0us\0");
-                scrubber_ui_time_units = static_cast<Visualizer::TIME>(selection);
-                ImGui::End();
-
                 // Visualizer controls
                 ImGui::Begin("Visualizer Parameters");
                 ImGui::SliderFloat("Particle Scale", &vis_params.particle_scale, 0.1f, 6.0f);
@@ -356,43 +348,81 @@ class GUI
                 
                 if (ImGui::Button("Add Selected Camera"))
                 {
-                    data_acquisition.add_camera_source(camera_selection);
-                    selected_source_index = ((int) data_acquisition.size()) - 1;
+                    std::shared_ptr<DataSource> new_source = data_acquisition.add_camera_source(camera_selection);
+                    if (new_source) {
+                        selected_source_index = ((int) data_acquisition.size()) - 1;
+                    }
                 }
             }
 
             ImGui::Separator();
 
             // List existing sources
-            ImGui::Text("Existing Sources:");
-            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            
-            for (size_t i = 0; i < sources.size(); ++i)
-            {
-                ImGui::PushID(i);
+            if (data_acquisition.size() > 0) {
+                ImGui::SliderFloat("Event Discard Odds", &event_discard_odds, 0.0f, 1.0f);
+                ImGui::SetItemTooltip("Will be applied to source when 'read' is pressed. To change, 'stop' a source first.");
+
+                ImGui::Text("Existing Sources:");
+                ImGui::Indent();
+                std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
                 
-                bool is_selected = (static_cast<int>(i) == selected_source_index);
-                if (ImGui::Selectable(sources[i]->name.c_str(), is_selected))
+                for (size_t i = 0; i < sources.size(); ++i)
                 {
-                    selected_source_index = static_cast<int>(i);
-                }
-                
-                if (ImGui::SmallButton("Delete"))
-                {
-                    data_acquisition.remove_data_source(i);
-                    if (selected_source_index >= static_cast<int>(sources.size() - 1))
+                    ImGui::PushID(i);
+                    std::shared_ptr<DataSource> source = sources[i];
+                    
+                    bool is_selected = (static_cast<int>(i) == selected_source_index);
+                    std::string source_name = std::to_string(i+1) + ". " + source->name;
+                    if (ImGui::Selectable(source_name.c_str(), is_selected))
                     {
-                        selected_source_index = (std::max)(0, static_cast<int>(sources.size()) - 2);
+                        selected_source_index = static_cast<int>(i);
                     }
+                    
+                    if (ImGui::SmallButton("Delete"))
+                    {
+                        data_acquisition.remove_data_source(i);
+                        if (selected_source_index >= static_cast<int>(sources.size() - 1))
+                        {
+                            selected_source_index = (std::max)(0, static_cast<int>(sources.size()) - 2);
+                        }
+                    }
+    
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Save")) {
+                        save_config.source = source;
+                        save_config.save_time_bounds = {0, source->scrubber.state.max_time};
+                        save_config.save_index_bounds = {0, source->scrubber.state.max_index};
+                    }
+                    
+                    ImGui::SameLine();
+                    if (source->is_reading()) {
+                        if (ImGui::SmallButton("Stop")) {
+                            source->stop_reading_thread();
+                        }
+                    } else {
+                        if (!source->is_eof()) {
+                            if (ImGui::SmallButton("Read")) {
+                                source->read(event_discard_odds, false);
+                            }
+                        }
+                    }
+    
+                    if (source->is_reading()) {
+                        ImGui::SameLine();
+                        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Reading...");
+                    } 
+    
+                    if (source->is_writing()) {
+                        if (source->is_reading()) {
+                            ImGui::SameLine(0, 10);
+                        } else {
+                            ImGui::SameLine();
+                        }
+                        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Writing...");
+                    }
+                    ImGui::PopID();
                 }
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Save")) {
-                    std::shared_ptr<DataSource> source = sources[selected_source_index];
-                    save_config.source = source;
-                    save_config.save_time_bounds = {0, source->scrubber.state.max_time};
-                    save_config.save_index_bounds = {0, source->scrubber.state.max_index};
-                }
-                ImGui::PopID();
+                ImGui::Unindent();
             }
 
             ImGui::End();
@@ -894,7 +924,6 @@ class GUI
             // Draw scrubber controls
             draw_scrubber_controls(scrubber_state);
 
-            
             // Write back potentially updated state to appropriate data_sources
             if (view_mode == ViewMode::SINGLE)
             {       
@@ -909,6 +938,13 @@ class GUI
 
                 if (sync_mode == SyncMode::END)         data_acquisition.sync_end();
                 else if (sync_mode == SyncMode::START)  data_acquisition.sync_start();
+            }
+
+            if (scrubber_state.type == Scrubber::Type::TIME) {
+                int32_t selection = static_cast<int32_t>(scrubber_ui_time_units);
+                ImGui::SetNextItemWidth(100);
+                ImGui::Combo("Time Units", &selection, "s\0ms\0us\0");
+                scrubber_ui_time_units = static_cast<Visualizer::TIME>(selection);
             }
 
             ImGui::End();
@@ -1313,7 +1349,6 @@ class GUI
             ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
 
             ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
-            ImGui::DockBuilderDockWindow("Scrubber Parameters", dock_id_left_bottom);
             
             ImGui::DockBuilderFinish(dockspace_id);
         }
@@ -1326,7 +1361,7 @@ inline void SDLCALL open_file_callback(void *user_data, const char *const *data_
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};
-        data_acq->add_file_source(file_name);
+        std::shared_ptr<DataSource> new_source = data_acq->add_file_source(file_name);
     }
     else
     {
@@ -1341,19 +1376,19 @@ inline void SDLCALL save_file_callback(void *user_data, const char *const *data_
     if (data_file_list && *data_file_list && save_config->source) {
         std::string path = *data_file_list;
         if (!path.ends_with(".aedat4")) {
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Path must end in .aedat4 or .raw", SDL_GetError(), NULL);
+            path += ".aedat4";
         }
 
         // Time saving mode
         if (save_config->mode == GUI::SaveConfig::Mode::TIME) {
             auto bounds = save_config->save_time_bounds;
-            save_config->source->save_to_file_by_time(path, bounds.first, bounds.second);
+            save_config->source->save_to_file_by_time(path, bounds.first, bounds.second, false);
 
         } 
         // Event saving mode
         else {
             auto bounds = save_config->save_index_bounds;
-            save_config->source->save_to_file_by_index(path, bounds.first, bounds.second);
+            save_config->source->save_to_file_by_index(path, bounds.first, bounds.second, false);
         }
 
         save_config->source.reset();

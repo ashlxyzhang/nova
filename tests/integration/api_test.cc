@@ -34,15 +34,14 @@ TEST(API, RawToAedatTest) {
 	
 	// Read .raw file
 	DataSource raw_source(gpu, input_file);
-	raw_source.read_all();
+	raw_source.read();
 
 	// Write data to .aedat4 file
 	raw_source.save_to_file(output_file);
-	raw_source.wait_writing_thread();
 
 	// Read back .aedat file
 	DataSource aedat_source(gpu, output_file);
-	aedat_source.read_all();
+	aedat_source.read();
 
 	// Configure scrubber
 	Scrubber::State& state = aedat_source.scrubber.state;

@@ -49,13 +49,14 @@ std::vector<std::string> DataAcquisition::get_scanned_camera_names()
     return scanned_camera_names;
 }
 
-void DataAcquisition::add_camera_source(int camera_index)
+std::shared_ptr<DataSource> DataAcquisition::add_camera_source(int camera_index)
 {
     std::unique_lock da_read_write_lock(mutex);
+    std::shared_ptr<DataSource> new_source;
+    
     if (camera_index >= 0 && camera_index < (int)scanned_cameras.size())
     {
         const auto &entry = scanned_cameras[camera_index];
-        std::shared_ptr<DataSource> new_source;
         if (entry.vendor == ScannedCamera::Vendor::DV)
         {
             new_source = std::make_shared<DataSource>(gpu_device, entry.dv_descriptor);
@@ -75,9 +76,11 @@ void DataAcquisition::add_camera_source(int camera_index)
             std::cerr << "Failed to open camera source: " << scanned_camera_names[camera_index] << std::endl;
         }
     }
+
+    return new_source;
 }
 
-void DataAcquisition::add_file_source(const std::string &file_path)
+std::shared_ptr<DataSource> DataAcquisition::add_file_source(const std::string &file_path)
 {
     std::unique_lock da_read_write_lock(mutex);
 
@@ -91,6 +94,8 @@ void DataAcquisition::add_file_source(const std::string &file_path)
     {
         std::cerr << "Failed to open file source: " << file_path << std::endl;
     }
+
+    return new_source;
 }
 
 void DataAcquisition::remove_data_source(size_t index)

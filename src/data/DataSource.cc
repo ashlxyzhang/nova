@@ -12,10 +12,10 @@
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
 	: gpu_device(gpu_device), 
     transfer_buffer(gpu_device), 
-    type(Type::FILE), state(State::PAUSED), 
+    type(Type::FILE), 
+    is_open_(true),
     scrubber(gpu_device)
 {
-	std::unique_lock da_read_write_lock(mutex);
     std::filesystem::path path(file_path);
     name = path.filename().string(); 
 
@@ -30,7 +30,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
         catch (const std::exception &e)
         {
             std::cerr << "aedat4 reader error: " + std::string(e.what()) << std::endl;
-            state = State::FAILED_TO_OPEN;
+            is_open_ = false;
             return;
         }
     }
@@ -43,14 +43,14 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
         catch (const std::exception &e)
         {
             std::cerr << "Metavision reader error: " + std::string(e.what()) << std::endl;
-            state = State::FAILED_TO_OPEN;
+            is_open_ = false;
             return;
         }
     }
     else
     {
         std::cerr << "Unsupported file extension. Supported formats: .aedat4, .raw, .dat" << std::endl;
-        state = State::FAILED_TO_OPEN;
+        is_open_ = false;
         return;
     }
 
@@ -66,7 +66,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
     }
     else {
         std::cerr << "File does not have an event stream available." << std::endl;
-        state = State::FAILED_TO_OPEN;
+        is_open_ = false;
         return;
     }
 
@@ -79,10 +79,10 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::L
 	: gpu_device(gpu_device), 
     transfer_buffer(gpu_device), 
     name(camera.serial.empty() ? std::string("Prophesee (first available)") : camera.serial), 
-    type(Type::CAMERA), state(State::PAUSED), scrubber(gpu_device)
+    type(Type::CAMERA), 
+    is_open_(true), 
+    scrubber(gpu_device)
 {
-	std::unique_lock read_write_lock(mutex);
-
     try
     {
         reader = std::make_unique<MetavisionEventReader>(camera);
@@ -90,7 +90,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::L
     catch (const std::exception &e)
     {
         std::cerr << "Prophesee camera reader initialization error: " << e.what() << std::endl;
-        state = State::FAILED_TO_OPEN;
+        is_open_ = false;
         return;
     }
 
@@ -105,7 +105,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::L
     else
     {
         std::cerr << "Prophesee camera does not have an event stream available." << std::endl;
-        state = State::FAILED_TO_OPEN;
+        is_open_ = false;
         return;
     }
 
@@ -117,11 +117,9 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevic
     transfer_buffer(gpu_device),
     name(camera.serialNumber), 
     type(Type::CAMERA), 
-    state(State::PAUSED), 
+    is_open_(true),
     scrubber(gpu_device)
 {
-	std::unique_lock read_write_lock(mutex);
-
     // Attempt to initialize camera reader (currently only DVEventReader is supported)
     try
     {
@@ -131,7 +129,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevic
     {
         // If camera reader initialization fails, log the error and return without initializing render targets
         std::cerr << "Camera reader initialization error: " << e.what() << std::endl;
-        state = State::FAILED_TO_OPEN;
+        is_open_ = false;
         return;
     }
 
@@ -146,7 +144,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevic
     }
     else {
         std::cerr << "Camera does not have an event stream available." << std::endl;
-        state = State::FAILED_TO_OPEN;
+        is_open_ = false;
         return;
     }
 
@@ -196,15 +194,11 @@ void DataSource::update()
 
 bool DataSource::is_open()
 {
-    std::shared_lock read_lock(mutex);
-    return state != State::FAILED_TO_OPEN;
+    return is_open_;
 }
 
-size_t DataSource::get_batch_event_data()
+size_t DataSource::get_batch_event_data(float event_discard_odds)
 {
-    // reader is being changed here but it could possibility be switched to a shared_lock if it's too slow
-    std::unique_lock read_write_lock(mutex);
-
     // Ensure a reader has been initialized
     if (!reader) return 0;
 
@@ -219,18 +213,24 @@ size_t DataSource::get_batch_event_data()
 
     try
     {
-        if (reader->isEventStreamAvailable() && reader->isEventsRunning())
+        if (reader->isEventStreamAvailable())
         {
-            if (const auto events = reader->getNextEventBatch(); events.has_value())
-            {
-                for (const auto &evt : *events)
+            if (reader->isEventsRunning()) {
+                if (const auto events = reader->getNextEventBatch(); events.has_value())
                 {
-                    if (discard_enabled && dist(rng) < event_discard_odds)
-                        continue;
+                    for (const auto &evt : *events)
+                    {
+                        if (discard_enabled && dist(rng) < event_discard_odds)
+                            continue;
 
-                    event_data.write_evt_data(evt);
-                    events_read++;
+                        event_data.write_evt_data(evt);
+                        events_read++;
+                    }
                 }
+            } 
+            else 
+            {
+                read_to_end = true;
             }
         }
     }
@@ -245,8 +245,6 @@ size_t DataSource::get_batch_event_data()
 
 size_t DataSource::get_batch_frame_data()
 {
-    std::unique_lock da_read_write_lock(mutex);
-
     // Ensure a reader has been initialized
     if (!reader) return 0;
 
@@ -278,30 +276,29 @@ size_t DataSource::get_batch_frame_data()
     return frames_read;
 }
 
-void DataSource::read_all() {
-    while (reader->isEventsRunning()) {
-        get_batch_event_data();
+void DataSource::reading_loop(float event_discard_odds) {
+    while (reading && !read_to_end) {
+        get_batch_event_data(event_discard_odds);
         get_batch_frame_data();
+        scrubber.state.update_bounds(event_data);
     }
 
-    scrubber.state.update_bounds(event_data);
+    reading = false;
 }
 
-void DataSource::start_reading_thread() {
-    if (reading_thread_running) return; 
+void DataSource::read(float event_discard_odds, bool blocking) {
+    if (reading) return;
 
-    reading_thread_running = true;
-    reading_thread = std::thread([this]() {
-        while (reading_thread_running && reader->isEventsRunning()) {
-            get_batch_event_data();
-            get_batch_frame_data();
-            scrubber.state.update_bounds(event_data);
-        }
-    });
+    reading = true;
+    if (blocking) {
+        reading_loop(event_discard_odds);
+    } else {
+        reading_thread = std::thread([this, event_discard_odds]() {this->reading_loop(event_discard_odds); });
+    }
 }
 
 void DataSource::stop_reading_thread() {
-    reading_thread_running = false;
+    reading = false;
     if (reading_thread.joinable()) {
         reading_thread.join();
     }
@@ -330,33 +327,41 @@ cv::Mat DataSource::texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureForm
 
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
-    SDL_WaitForGPUIdle(gpu_device);
+
+    // Sync and return
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+    SDL_WaitForGPUFences(gpu_device, true, &fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, fence);
     return result;
 }
 
-void DataSource::save_to_file(const std::string& path) {
-    save_to_file_by_index(path, 0, event_data.size()-1);
+void DataSource::save_to_file(const std::string& path, bool blocking) {
+    save_to_file_by_index(path, 0, event_data.size()-1, blocking);
 }
 
-void DataSource::save_to_file_by_time(const std::string& path, float start_time, float end_time) {
+void DataSource::save_to_file_by_time(const std::string& path, float start_time, float end_time, bool blocking) {
     size_t start_index = event_data.get_event_index_from_relative_timestamp(start_time);
     size_t end_index = event_data.get_event_index_from_relative_timestamp(end_time);
-    save_to_file_by_index(path, start_index, end_index);
+    save_to_file_by_index(path, start_index, end_index, blocking);
 }
 
-void DataSource::save_to_file_by_index(const std::string& path, size_t start_index, size_t end_index) {
-    if (writing_thread_running) {
+void DataSource::save_to_file_by_index(const std::string& path, size_t start_index, size_t end_index, bool blocking) {
+    if (writing) {
         std::cout << "Writer already running, wait for finish before calling save again" << std::endl;
     }
 
-    writing_thread_running = true;
-    writing_thread = std::thread([this, path, start_index, end_index]() {
-        this->event_data.save_to_file(path, start_index, end_index, this->writing_thread_running);
-    });
+    writing = true;
+    if (blocking) {
+        event_data.save_to_file(path, start_index, end_index, writing);
+    } else {
+        writing_thread = std::thread([this, path, start_index, end_index]() {
+            this->event_data.save_to_file(path, start_index, end_index, this->writing);
+        });
+    }
 }
 
 void DataSource::stop_writing_thread() {
-    writing_thread_running = false;
+    writing = false;
     if (writing_thread.joinable()) {
         writing_thread.join();
     }
@@ -366,4 +371,32 @@ void DataSource::wait_writing_thread() {
     if (writing_thread.joinable()) {
         writing_thread.join();
     }
+}
+
+std::string DataSource::get_name() {
+    return name;
+}
+
+bool DataSource::is_reading() {
+    return reading;
+}
+
+bool DataSource::is_writing() {
+    return writing;
+}
+
+bool DataSource::is_eof() {
+    return read_to_end;
+}
+
+cv::Size DataSource::get_resolution() {
+    return resolution;
+}
+
+DataSource::Type DataSource::get_type() {
+    return type;
+}
+
+size_t DataSource::size() {
+    return event_data.size();
 }

@@ -427,12 +427,6 @@ class EventData
 
         void save_to_file(const std::string& path, size_t start_index, size_t end_index, std::atomic<bool>& running) {
 
-            /*
-            To avoid blocking it too much, I'd like to just load it all into memory but the whole point of using 
-            boost mapped file is to avoid that so I gotta do it in batches and make copies kind of like the scrubber
-            does... 
-            */
-
             // Make sure bounds are OK
             if (start_index > end_index || end_index >= size()) {
                 std::cout << "Invalid indices passed to save_to_file()" << std::endl;  
@@ -497,12 +491,6 @@ class EventData
 
             evt_data_latest_timestamp = -1;
             frame_data_latest_timestamp = -1;
-
-            camera_event_width = 0;
-            camera_event_height = 0;
-
-            camera_frame_width = 0;
-            camera_frame_height = 0;
 
             evt_lock_ul.unlock();
         }

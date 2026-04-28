@@ -54,8 +54,8 @@ class DataAcquisition
     public:
         DataAcquisition(GPUDevice& gpu_device);
 
-        void add_camera_source(int camera_index);
-        void add_file_source(const std::string &file_path);
+        std::shared_ptr<DataSource> add_camera_source(int camera_index);
+        std::shared_ptr<DataSource> add_file_source(const std::string &file_path);
         void remove_data_source(size_t index);
 
         void discover_cameras();
