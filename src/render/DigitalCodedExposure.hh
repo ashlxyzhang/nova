@@ -3,8 +3,6 @@
 #define DIGITAL_CODED_EXPOSURE_HH
 
 #include "util/pch.hh"
-
-#include "data/DataAcquisition.hh"
 #include "data/EventData.hh"
 #include "render/Camera.hh"
 #include "render/RenderTarget.hh"
@@ -111,7 +109,6 @@ class DigitalCodedExposure
     public:
         /**
          * @brief Constructor. Initializes compute pipelines.
-         * @param data_acq DataAcquisition object used to access event data for processing
          * @param gpu_device SDL_GPUDevice to create texture on
          */
         DigitalCodedExposure(GPUDevice& gpu_device)

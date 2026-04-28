@@ -4,6 +4,7 @@
 #include "data/DVEventReader.hh"
 #include "data/MetavisionEventReader.hh"
 
+#include <metavision/hal/device/device_discovery.h>
 #include <memory>
 #include <optional>
 #include <filesystem>
@@ -55,24 +56,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
     }
 
 
-    // Attempt to read resolution of events
-    if (reader->isEventStreamAvailable())
-    {
-        auto evt_resolution = reader->getEventResolution();
-        if (evt_resolution.has_value())
-        {
-            resolution = cv::Size(evt_resolution->width, evt_resolution->height);
-        }
-    }
-    else {
-        std::cerr << "File does not have an event stream available." << std::endl;
-        is_open_ = false;
-        return;
-    }
-
-
-    // If initialization is successful, initialize render targets
-	init_render_targets();
+    init();
 }
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera)
@@ -94,22 +78,7 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::L
         return;
     }
 
-    if (reader->isEventStreamAvailable())
-    {
-        auto evt_resolution = reader->getEventResolution();
-        if (evt_resolution.has_value())
-        {
-            resolution = cv::Size(evt_resolution->width, evt_resolution->height);
-        }
-    }
-    else
-    {
-        std::cerr << "Prophesee camera does not have an event stream available." << std::endl;
-        is_open_ = false;
-        return;
-    }
-
-	init_render_targets();
+    init();
 }
 
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera)
@@ -133,23 +102,34 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevic
         return;
     }
 
-    // Attempt to read resolution of events
-    if (reader->isEventStreamAvailable())
-    {
-        auto evt_resolution = reader->getEventResolution();
-        if (evt_resolution.has_value())
-        {
-            resolution = cv::Size(evt_resolution->width, evt_resolution->height);
+    
+    init();
+}
+
+DataSource::DataSource(GPUDevice& gpu_device, const ScannedCamera& scanned_camera)
+	: gpu_device(gpu_device.get_SDL_device()),
+    transfer_buffer(gpu_device.get_SDL_device()), 
+    type(Type::CAMERA), 
+    is_open_(true),
+    scrubber(gpu_device.get_SDL_device())
+{
+
+    try {
+         if (scanned_camera.vendor == DataSource::Vendor::DV) {
+            reader = std::make_unique<DVEventReader>(dv::io::camera::open(scanned_camera.dv_descriptor));
+        } else {
+            reader = std::make_unique<MetavisionEventReader>(MetavisionEventReader::LiveCamera{scanned_camera.prophesee_serial});
         }
     }
-    else {
-        std::cerr << "Camera does not have an event stream available." << std::endl;
+    catch (const std::exception &e)
+    {
+        std::cerr << "Camera reader initialization error: " << e.what() << std::endl;
         is_open_ = false;
         return;
     }
+   
 
-    // If initialization is successful, initialize render targets
-	init_render_targets();
+    init();
 }
 
 DataSource::DataSource(GPUDevice& gpu_device, const std::string& file_path): 
@@ -160,6 +140,25 @@ DataSource::DataSource(GPUDevice& gpu_device, const dv::io::camera::USBDevice::D
 
 DataSource::DataSource(GPUDevice& gpu_device, const MetavisionEventReader::LiveCamera& camera): 
     DataSource(gpu_device.get_SDL_device(), camera) {}
+
+void DataSource::init() {
+    // Attempt to read resolution of events
+    if (reader->isEventStreamAvailable())
+    {
+        auto evt_resolution = reader->getEventResolution();
+        if (evt_resolution.has_value())
+        {
+            resolution = cv::Size(evt_resolution->width, evt_resolution->height);
+        }
+    }
+    else {
+        std::cerr << "Source does not have an event stream available." << std::endl;
+        is_open_ = false;
+        return;
+    }
+
+    init_render_targets();
+}
 
 void DataSource::init_render_targets()
 {
@@ -399,4 +398,35 @@ DataSource::Type DataSource::get_type() {
 
 size_t DataSource::size() {
     return event_data.size();
+}
+
+DataSource::Vendor DataSource::get_vendor() {
+    return vendor;
+}
+
+std::vector<DataSource::ScannedCamera> DataSource::get_attached_cameras() {
+    
+    std::vector<DataSource::ScannedCamera> scanned_cameras;
+
+    // Inivation cameras
+    const auto discovered_cameras{dv::io::camera::discover()};
+    for (const auto &camera : discovered_cameras)
+    {
+        scanned_cameras.push_back(DataSource::ScannedCamera{DataSource::Vendor::DV, camera, {}});
+    }
+
+    // Prophesee cameras
+    try
+    {
+        const auto prophesee_cameras = Metavision::DeviceDiscovery::list_available_sources();
+        for (const auto &desc : prophesee_cameras)
+        {
+            DataSource::ScannedCamera entry{DataSource::Vendor::PROPHESEE, {}, desc.serial_};
+            scanned_cameras.push_back(std::move(entry));
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Prophesee discovery failed: " << e.what() << std::endl;
+    }
 }

@@ -17,37 +17,26 @@
 #include <dv-processing/io/camera/usb_device.hpp>
 
 struct DataSource {
-	private:
-
-		friend class DataAcqusition;
-		friend class GUI;
-
-		SDL_GPUDevice* gpu_device;
-
-		// Metadata
-		std::string name; 
-		cv::Size resolution;
-		enum Type { CAMERA, FILE } type;
-		bool is_open_ = false;
-		std::atomic<bool> read_to_end = false;
-
-		// Helper threads
-		std::thread reading_thread;
-		std::thread writing_thread;
-		std::atomic<bool> reading = false;
-		std::atomic<bool> writing = false;
-		
-		// Data management
-		std::unique_ptr<IEventReader> reader; 	// Data input
-		TransferBuffer transfer_buffer;			// GPU reading and writing
-		EventData event_data; 					// Event storage
-
-		// Internal helpers
-		cv::Mat texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureFormat texture_format, int width, int height);
-		void init_render_targets();
-		void reading_loop(float event_discard_odds=0.0f);
+	friend class DataAcqusition;
+	friend class GUI;
 
 	public:
+		enum class Vendor {
+			DV, 
+			PROPHESEE
+		};
+		
+		enum class Type {
+			CAMERA, 
+			FILE
+		};
+		
+		struct ScannedCamera {
+			Vendor vendor;
+			dv::io::camera::USBDevice::DeviceDescriptor dv_descriptor{};
+			std::string prophesee_serial; 
+        };
+
 
 		// Data Management
 		Scrubber scrubber;						// Data selection (made public b/c I trust you 😁)
@@ -64,6 +53,7 @@ struct DataSource {
 		DataSource(GPUDevice& gpu_device, const std::string& file_path);
 		DataSource(GPUDevice& gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
 		DataSource(GPUDevice& gpu_device, const MetavisionEventReader::LiveCamera& camera);
+		DataSource(GPUDevice& gpu_device, const ScannedCamera& scanned_camera);
 		DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path);
 		DataSource(SDL_GPUDevice* gpu_device, const dv::io::camera::USBDevice::DeviceDescriptor& camera);
 		DataSource(SDL_GPUDevice* gpu_device, const MetavisionEventReader::LiveCamera& camera);
@@ -103,6 +93,39 @@ struct DataSource {
 		Type get_type();
 		cv::Size get_resolution();
 		size_t size();
+		Vendor get_vendor();
+		static std::vector<ScannedCamera> get_attached_cameras();
+
+
+	private:
+		SDL_GPUDevice* gpu_device;
+
+		// Metadata
+		std::string name; 
+		cv::Size resolution;
+		Type type;
+		Vendor vendor;
+
+		// Helper threads
+		std::thread reading_thread;
+		std::thread writing_thread;
+		
+		// State
+		std::atomic<bool> reading = false;
+		std::atomic<bool> writing = false;
+		std::atomic<bool> read_to_end = false;
+		bool is_open_ = false;
+		
+		// Data management
+		std::unique_ptr<IEventReader> reader; 	// Data input
+		TransferBuffer transfer_buffer;			// GPU reading and writing
+		EventData event_data; 					// Event storage
+
+		// Internal helpers
+		cv::Mat texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureFormat texture_format, int width, int height);
+		void init_render_targets();
+		void reading_loop(float event_discard_odds=0.0f);
+		void init();
 };
 
 
