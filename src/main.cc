@@ -185,6 +185,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // Update SLAM based on its scrubbers's events
     app->slam->send_events();
     app->visualizer->set_slam_pointcloud(app->slam->get_viz_pointcloud());
+    app->visualizer->set_slam_global_pointcloud(app->slam->get_viz_global_pointcloud());
+    app->visualizer->set_slam_pc_changed(app->slam->were_pointclouds_updated());
 
     // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();

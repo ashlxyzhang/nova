@@ -994,19 +994,12 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
     DLOG("timeSurfaceCallback  TS_history.size=" << TS_history_.size()
          << "  t=" << esvo2_core::timePointToSec(time_surface_left.header_stamp));
     cv::Mat cv_ptr_left, cv_ptr_right, cv_ptr_AA_map_left, cv_ptr_negative, cv_ptr_negative_dx, cv_ptr_negative_dy;
-    cv_ptr_left =
-        *(time_surface_left.image); // cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
-    cv_ptr_right =
-        *(time_surface_right.image); // cv_bridge::toCvCopy(time_surface_right, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_left = *(time_surface_left.image); // cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_right = *(time_surface_right.image); // cv_bridge::toCvCopy(time_surface_right, sensor_msgs::image_encodings::MONO8);
     cv_ptr_AA_map_left = *(AA_map.image); // cv_bridge::toCvCopy(AA_map, sensor_msgs::image_encodings::MONO8);
-    cv_ptr_negative = *(time_surface_negative
-                            .image); // cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
-    cv_ptr_negative_dx =
-        *(time_surface_negative_dx
-              .image); // cv_bridge::toCvCopy(time_surface_negative_dx, sensor_msgs::image_encodings::TYPE_16SC1);
-    cv_ptr_negative_dy =
-        *(time_surface_negative_dy
-              .image); // cv_bridge::toCvCopy(time_surface_negative_dy, sensor_msgs::image_encodings::TYPE_16SC1);
+    cv_ptr_negative = *(time_surface_negative.image); // cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
+    cv_ptr_negative_dx = *(time_surface_negative_dx.image); // cv_bridge::toCvCopy(time_surface_negative_dx, sensor_msgs::image_encodings::TYPE_16SC1);
+    cv_ptr_negative_dy = *(time_surface_negative_dy.image); // cv_bridge::toCvCopy(time_surface_negative_dy, sensor_msgs::image_encodings::TYPE_16SC1);
 
     // push back the new time surface map
     timePoint t_new_TS = time_surface_left.header_stamp;
@@ -1202,7 +1195,7 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
     std::cout << "publishong mapping results Mapping!" << std::endl;
     cv::Mat invDepthImage, stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
 
-    std::cout<<"ts is empty bruh"<<TS_obs_ptr_->second.img_left_.empty()<<std::endl;
+    // std::cout<<"ts is empty bruh"<<TS_obs_ptr_->second.img_left_.empty()<<std::endl;
     invDepthImage = TS_obs_ptr_->second.img_left_.clone();
     visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
                          stdVar_vis_threshold_, age_vis_threshold_);
@@ -1319,6 +1312,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
         std::cout<<"set pc filtered!"<<std::endl;
         std::lock_guard<std::mutex> lock(viz_pc_mutex_);
         viz_pc_ = pc_filtered_;
+        pointclouds_updated = true;
     }
 
     // publish global pointcloud
@@ -1349,8 +1343,10 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
             // VIZ PUBLISH -> not publishing anything right now
             // Should just pass reference to pc_global_ to visualizer in the constructor and it will auto update gg
             // timestamp is t if want to add to a queue
-
-            t_last_pub_pc_ = esvo2_core::timePointToSec(t);
+            std::lock_guard<std::mutex> lock(viz_pc_mutex_);
+            viz_pc_global_ = pc_global_;
+            pointclouds_updated = true;
+            // t_last_pub_pc_ = esvo2_core::timePointToSec(t);
         }
     }
 }

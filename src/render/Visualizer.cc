@@ -104,7 +104,9 @@ void Visualizer::SlamRenderer::render_pass(SDL_GPUCommandBuffer *command_buffer,
 
     SDL_BindGPUGraphicsPipeline(render_pass, slam_pipeline);
 
-    SDL_GPUBufferBinding binding = {vertex_buffer, 0};
+    SDL_GPUBufferBinding binding;
+    binding.buffer = vertex_buffer;
+    binding.offset = 0;
     SDL_BindGPUVertexBuffers(render_pass, 0, &binding, 1);
 
     struct Uniforms
@@ -155,7 +157,9 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     bool slam_active = slam_pointcloud_ != nullptr;
 
     // CPU Update phase
-    slam_renderer->cpu_update(slam_pointcloud_);
+    // slam_renderer->cpu_update(slam_pointcloud_);
+    if(slam_pc_changed)
+        slam_renderer->cpu_update_global(slam_global_pointcloud_, camera.getPosition());
     if (!slam_active)
     {
         grid_renderer->cpu_update(params);
@@ -169,7 +173,8 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     // Copy pass phase
-    slam_renderer->copy_pass(upload_buffer, copy_pass);
+    if(slam_pc_changed)
+        slam_renderer->copy_pass(upload_buffer, copy_pass);
     if (!slam_active)
     {
         grid_renderer->copy_pass(upload_buffer, copy_pass);

@@ -57,6 +57,22 @@ class SlamManager
             return mapping->get_viz_pointcloud();
         }
 
+        // Get the PCL global point cloud for NOVA Visualizer
+        // points to pc_filtered_global_ (the global point cloud)
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> get_viz_global_pointcloud()
+        {
+            if (!mapping_running || !mapping)
+                return nullptr;
+            return mapping->get_viz_global_pointcloud();
+        }
+
+        bool were_pointclouds_updated()
+        {
+            if (!mapping_running || !mapping)
+                return false;
+            return mapping->were_pointclouds_updated();
+        }
+
     private:
         // Sends events to the SLAM threads based on one scrubber
         void sendEventsPerScrubber(EventData &event_data, Scrubber &scrubber, bool is_left);

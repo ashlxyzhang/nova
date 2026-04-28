@@ -100,6 +100,19 @@ class esvo2_Mapping
             return viz_pc_;
         }
 
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> get_viz_global_pointcloud()
+        {
+            std::lock_guard<std::mutex> lock(viz_pc_mutex_);
+            return viz_pc_global_;
+        }
+
+        bool were_pointclouds_updated()
+        {
+            bool answer = pointclouds_updated;
+            pointclouds_updated = false;
+            return answer;
+        }
+
         /*** event processing ***/
         void createEdgeMask(std::vector<esvo2_core::Event *> &vEventsPtr, PerspectiveCamera::Ptr &camPtr, cv::Mat &edgeMap,
                             std::vector<std::pair<std::size_t, std::size_t>> &vEdgeletCoordinates, bool bUndistortEvents = true,
@@ -130,6 +143,8 @@ class esvo2_Mapping
         // visualization
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> viz_pc_;
         std::mutex viz_pc_mutex_;
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> viz_pc_global_;
+        std::atomic<bool> pointclouds_updated = false;
 
         // Running variable
         std::atomic<bool> &is_running;

@@ -24,8 +24,11 @@
 
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/common/common.h>
 
 #include "fonts/CascadiaCode.ttf.h"
+
+#include "SLAM/esvo2_core/include/esvo2_core/tools/Visualization.h"
 
 #include <memory>
 struct DataSource;
@@ -795,6 +798,9 @@ class Visualizer
                     vs_create_info.entrypoint = "main";
                     vs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
                     vs_create_info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+                    vs_create_info.num_samplers = 0;
+                    vs_create_info.num_storage_textures = 0;
+                    vs_create_info.num_storage_buffers = 0;
                     vs_create_info.num_uniform_buffers = 1;
                     SDL_GPUShader *vs = SDL_CreateGPUShader(gpu_device, &vs_create_info);
 
@@ -804,6 +810,10 @@ class Visualizer
                     fs_create_info.entrypoint = "main";
                     fs_create_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
                     fs_create_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+                    fs_create_info.num_samplers = 0;
+                    fs_create_info.num_storage_textures = 0;
+                    fs_create_info.num_storage_buffers = 0;
+                    fs_create_info.num_uniform_buffers = 0;
                     SDL_GPUShader *fs = SDL_CreateGPUShader(gpu_device, &fs_create_info);
 
                     SDL_GPUVertexBufferDescription vertex_buffer_desc = {0, sizeof(SlamVertex),
@@ -853,6 +863,43 @@ class Visualizer
                                             glm::vec4(pt.r / 255.0f, pt.g / 255.0f, pt.b / 255.0f, 1.0f)});
                 }
 
+                void cpu_update_global(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pc, glm::vec3 cameraPos)
+                {
+                    vertices.clear();
+                    if (!pc)
+                        return;
+                    
+                    vertices.reserve(pc->size());
+                    
+                    // glm::vec3 cameraPos = camera.getPosition();
+                    cameraPos.y = 0.0f;
+                    pcl::PointXYZ minPt, maxPt;
+                    pcl::getMinMax3D(*pc, minPt, maxPt);
+                    double min_range = glm::length(glm::vec3(minPt.x, 0.0f, minPt.z) - cameraPos);
+                    // double min_range = 10.0;
+                    double max_range = glm::length(glm::vec3(maxPt.x, 0.0f, maxPt.z) - cameraPos);
+                    std::cout<<"min point is: "<<minPt.x<<" "<<minPt.y<<" "<<minPt.z<<std::endl;
+                    std::cout<<"max point is: "<<maxPt.x<<" "<<maxPt.y<<" "<<maxPt.z<<std::endl;
+                    std::cout<<"ranges: "<<min_range<<" "<<max_range<<std::endl;
+                    std::cout<<"camera is: "<<cameraPos.x<<" "<<cameraPos.y<<" "<<cameraPos.z<<std::endl<<std::endl;
+                    
+                    for (const auto &pt : *pc)
+                    {
+                        double dist = glm::length(glm::vec3(pt.x, 0.0f, pt.z) - cameraPos);
+                        int index =
+                        floor((1 / dist - min_range) / (max_range - min_range) * 255.0f);
+                        if (index > 255)
+                            index = 255;
+                        if (index < 0)
+                            index = 0;
+                        double r = esvo2_core::tools::Visualization::r[index];
+                        double g = esvo2_core::tools::Visualization::g[index];
+                        double b = esvo2_core::tools::Visualization::b[index];
+                        vertices.push_back({glm::vec4(pt.x, -pt.y, pt.z, 1.0f),
+                                            glm::vec4(r, g, b, 1.0f)});
+                        }
+                }
+
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     if (vertices.empty())
@@ -892,6 +939,8 @@ class Visualizer
         SlamRenderer *slam_renderer = nullptr;
 
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> slam_pointcloud_;
+        std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> slam_global_pointcloud_;
+        bool slam_pc_changed = false;
 
     public:
         /**
@@ -950,6 +999,16 @@ class Visualizer
         void set_slam_pointcloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pc)
         {
             slam_pointcloud_ = std::move(pc);
+        }
+
+        void set_slam_global_pointcloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pc)
+        {
+            slam_global_pointcloud_ = std::move(pc);
+        }
+
+        void set_slam_pc_changed(bool value)
+        {
+            slam_pc_changed = value;
         }
 
         /**
