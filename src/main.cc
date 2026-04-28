@@ -14,7 +14,6 @@
 #include "ui/GUI.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
-#include "util/threads.hh"
 
 struct Application
 {
@@ -29,10 +28,6 @@ struct Application
     std::unique_ptr<Visualizer> visualizer;
     std::unique_ptr<DigitalCodedExposure> digital_coded_exposure;
     std::unique_ptr<GUI> gui;
-
-    // Worker threads
-    std::atomic<bool> data_acquisition_running = true;
-    std::thread data_acquisition_thread;
 
     // Initializes graphics of entire application
     SDL_AppResult init() {
@@ -52,19 +47,7 @@ struct Application
         digital_coded_exposure = std::make_unique<DigitalCodedExposure>(gpu_device);
         gui = std::make_unique<GUI>(*data_acq, *visualizer, *error_queue, window, gpu_device);
 
-        // Spawn separate thread to manage the DataAcquisition
-        data_acquisition_thread = std::thread(program_thread::data_acquisition_thread,
-                                                    std::ref(data_acquisition_running),
-                                                    std::ref(*data_acq));
-
         return SDL_APP_CONTINUE;
-    }
-
-    ~Application() {
-        data_acquisition_running = false;
-        if (data_acquisition_thread.joinable()) {
-            data_acquisition_thread.join();
-        }
     }
 
     void update() {

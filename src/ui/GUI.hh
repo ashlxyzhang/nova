@@ -14,8 +14,11 @@
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
 
+
+
 // Forward declarations for callbacks
-inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused);
+inline void SDLCALL open_file_callback(void *user_data, const char *const *data_file_list, int filter);
+inline void SDLCALL save_file_callback(void *user_data, const char *const *data_file_list, int filter);
 
 /**
  * @brief This class provides functions to draw the GUI.
@@ -35,6 +38,15 @@ class GUI
             END     // Aligns end of data sources when sync scrubbing
         };
 
+        // Container for all save data
+        struct SaveConfig {
+            std::shared_ptr<DataSource> source;
+            enum Mode {TIME, EVENT} mode = Mode::TIME;
+            
+            std::pair<float, float> save_time_bounds = {0, 0};
+            std::pair<int, int> save_index_bounds = {0, 0};
+        };
+
     private:
         // Modules
         DataAcquisition &data_acquisition;
@@ -46,13 +58,15 @@ class GUI
         SDL_GPUDevice *gpu_device = nullptr;
         ImDrawData *draw_data = nullptr;
 
-        // View mode and selection
+        // State
         ViewMode view_mode = ViewMode::SINGLE;
         SyncMode sync_mode = SyncMode::START;
+        Visualizer::TIME scrubber_ui_time_units = Visualizer::TIME::UNIT_MS;
         int selected_source_index = 0;
-
-        // Camera control state
         bool is_mouse_dragging = false;
+        SaveConfig save_config;
+        float event_discard_odds = 0.0f;
+
 
         static inline const std::string time_units[] = {"(s)", "(ms)", "(us)"};
 
@@ -146,6 +160,61 @@ class GUI
             }
         }
 
+        void draw_save_popup_window() {
+
+            // Only continue if there is a set save source
+            if (!save_config.source) return;
+            std::shared_ptr<DataSource> source = save_config.source;
+
+            ImGui::OpenPopup("Save Menu");
+            
+            const ImGuiViewport *viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            ImVec2 windowSize = ImVec2(viewport->Size.x * 0.75f, viewport->Size.y * 0.75f);
+            ImGui::SetNextWindowSize(windowSize, ImGuiCond_Appearing);
+            
+            ImGui::BeginPopup("Save Menu");
+
+            // Toggle between specifying time bounds and events bounds
+            ImGui::Text("Mode:");
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Time", save_config.mode == SaveConfig::Mode::TIME)) {
+                save_config.mode = SaveConfig::Mode::TIME;
+            }
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Event", save_config.mode == SaveConfig::Mode::EVENT)) {
+                save_config.mode = SaveConfig::Mode::EVENT;
+            }
+            ImGui::Separator();
+
+
+            // Draw double slider bar to control 
+            if (save_config.mode == SaveConfig::Mode::TIME) {
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputFloat("Start Time", &save_config.save_time_bounds.first, 0, 0);
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputFloat("End Time", &save_config.save_time_bounds.second, 0, 0);
+            } else if (save_config.mode == SaveConfig::Mode::EVENT) {
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputInt("Start Index", &save_config.save_index_bounds.first, 0, 0);
+                ImGui::SetNextItemWidth(200);
+                ImGui::InputInt("End Index", &save_config.save_index_bounds.second, 0, 0);
+            }
+
+            // Connect save button to callback function
+            if (ImGui::Button("Save")) {
+                SDL_ShowSaveFileDialog(save_file_callback, &save_config, window, nullptr, 0, "");
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Close")) {
+                save_config.source.reset();
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
         /**
          * @brief Draws the info window and visualizer/DCE controls.
          */
@@ -157,11 +226,6 @@ class GUI
                 DigitalCodedExposure::Parameters& dce_params = data_source->dce_parameters;
                 Visualizer::Parameters& vis_params = data_source->visualizer_parameters;
                 Scrubber::State& scrubber_state = data_source->scrubber.state;
-
-                // Scrubber parameters
-                ImGui::Begin("Scrubber Parameters");
-                ImGui::SliderFloat("Event Discard Odds", &(data_source->event_discard_odds), 0.0f, 1.0f);
-                ImGui::End();
 
                 // Visualizer controls
                 ImGui::Begin("Visualizer Parameters");
@@ -260,7 +324,7 @@ class GUI
             
             if (ImGui::Button("Add File Source"))
             {
-                SDL_ShowOpenFileDialog(stream_file_handle_callback, &data_acquisition, window, nullptr, 0, nullptr, 0);
+                SDL_ShowOpenFileDialog(open_file_callback, &data_acquisition, window, nullptr, 0, nullptr, 0);
             }
 
             ImGui::SameLine();
@@ -284,37 +348,81 @@ class GUI
                 
                 if (ImGui::Button("Add Selected Camera"))
                 {
-                    data_acquisition.add_camera_source(camera_selection);
-                    selected_source_index = ((int) data_acquisition.size()) - 1;
+                    std::shared_ptr<DataSource> new_source = data_acquisition.add_camera_source(camera_selection);
+                    if (new_source) {
+                        selected_source_index = ((int) data_acquisition.size()) - 1;
+                    }
                 }
             }
 
             ImGui::Separator();
 
             // List existing sources
-            ImGui::Text("Existing Sources:");
-            std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
-            
-            for (size_t i = 0; i < sources.size(); ++i)
-            {
-                ImGui::PushID(i);
+            if (data_acquisition.size() > 0) {
+                ImGui::SliderFloat("Event Discard Odds", &event_discard_odds, 0.0f, 1.0f);
+                ImGui::SetItemTooltip("Will be applied to source when 'read' is pressed. To change, 'stop' a source first.");
+
+                ImGui::Text("Existing Sources:");
+                ImGui::Indent();
+                std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
                 
-                bool is_selected = (static_cast<int>(i) == selected_source_index);
-                if (ImGui::Selectable(sources[i]->name.c_str(), is_selected))
+                for (size_t i = 0; i < sources.size(); ++i)
                 {
-                    selected_source_index = static_cast<int>(i);
-                }
-                
-                if (ImGui::SmallButton("Delete"))
-                {
-                    data_acquisition.remove_data_source(i);
-                    if (selected_source_index >= static_cast<int>(sources.size() - 1))
+                    ImGui::PushID(i);
+                    std::shared_ptr<DataSource> source = sources[i];
+                    
+                    bool is_selected = (static_cast<int>(i) == selected_source_index);
+                    std::string source_name = std::to_string(i+1) + ". " + source->name;
+                    if (ImGui::Selectable(source_name.c_str(), is_selected))
                     {
-                        selected_source_index = (std::max)(0, static_cast<int>(sources.size()) - 2);
+                        selected_source_index = static_cast<int>(i);
                     }
+                    
+                    if (ImGui::SmallButton("Delete"))
+                    {
+                        data_acquisition.remove_data_source(i);
+                        if (selected_source_index >= static_cast<int>(sources.size() - 1))
+                        {
+                            selected_source_index = (std::max)(0, static_cast<int>(sources.size()) - 2);
+                        }
+                    }
+    
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Save")) {
+                        save_config.source = source;
+                        save_config.save_time_bounds = {0, source->scrubber.state.max_time};
+                        save_config.save_index_bounds = {0, source->scrubber.state.max_index};
+                    }
+                    
+                    ImGui::SameLine();
+                    if (source->is_reading()) {
+                        if (ImGui::SmallButton("Stop")) {
+                            source->stop_reading_thread();
+                        }
+                    } else {
+                        if (!source->is_eof()) {
+                            if (ImGui::SmallButton("Read")) {
+                                source->read(event_discard_odds, false);
+                            }
+                        }
+                    }
+    
+                    if (source->is_reading()) {
+                        ImGui::SameLine();
+                        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Reading...");
+                    } 
+    
+                    if (source->is_writing()) {
+                        if (source->is_reading()) {
+                            ImGui::SameLine(0, 10);
+                        } else {
+                            ImGui::SameLine();
+                        }
+                        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Writing...");
+                    }
+                    ImGui::PopID();
                 }
-                
-                ImGui::PopID();
+                ImGui::Unindent();
             }
 
             ImGui::End();
@@ -543,8 +651,17 @@ class GUI
         }
 
 
-        void draw_scrubber_controls(Scrubber::State& state, Visualizer::TIME unit_time)
+        void draw_scrubber_controls(Scrubber::State& state)
         {
+            
+            const float drag_speed = 5.0;
+            const size_t slider_max_index_window = 100000;
+            const size_t slider_max_index_step = 100000;
+            const float slider_max_time_window = 100000;
+            const float slider_max_time_step = 100000;
+
+
+
             // Type selection via tab bar
             Scrubber::Type prev_type = state.type;
             if (ImGui::BeginTabBar("##TypeTabs"))
@@ -565,21 +682,14 @@ class GUI
             {
                 state.mode = Scrubber::Mode::PAUSED;
             }
-
             ImGui::Separator();
 
-            // Cap mode
-            static int cap_mode_int = 0;
-            const char *cap_mode_names[] = {"Capped", "Uncapped"};
-            ImGui::Combo("Scrubber Cap", &cap_mode_int, cap_mode_names, 2);
-            int window_div_factor = (cap_mode_int == 0) ? 100 : 2;
-            int step_div_factor = (cap_mode_int == 0) ? 100 : 10;
 
             // If in sync mode, create drop down to select which type of synchronization 
             if (view_mode == ViewMode::SYNCED) 
             {
                 static int sync_mode_int = 0;
-                const char *sync_mode_names[] = {"Start", "End"};
+                const char *sync_mode_names[] = {"Sync to Start", "Sync to End"};
                 ImGui::Combo("Sync Mode", &sync_mode_int, sync_mode_names, 2);
                 sync_mode = sync_mode_int == 0 ? SyncMode::START : SyncMode::END;
             }
@@ -615,8 +725,16 @@ class GUI
 
                     ImGui::Separator();
 
+                    // Manual window input
+                    size_t win_input = state.index_window;
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Window Input", ImGuiDataType_U64, &win_input, drag_speed, NULL, &state.max_index)) {
+                        state.index_window = win_input;
+                    }
+                    ImGui::SameLine();
+
                     // Window slider
-                    size_t max_window = 1000000; // (std::max)(static_cast<size_t>(1), (state.max_index - state.min_index + 1) / window_div_factor);
+                    size_t max_window = (std::min)(slider_max_index_window, state.max_index); 
                     float max_window_f = static_cast<float>(max_window);
                     float win_slider = win_f;
                     if (ImGui::SliderFloat("Window", &win_slider, 1.0f, max_window_f, "%.0f"))
@@ -625,9 +743,21 @@ class GUI
                         state.index_window = static_cast<std::size_t>(win_slider);
                     }
                     ImGui::SetItemTooltip("Number of events behind position to display");
+                    
 
-                    // Step slider
-                    size_t max_step = 1000000; // (state.max_index - state.min_index) / step_div_factor;
+                    
+
+                    // Manual step size input
+                    // Manual window input
+                    size_t step_input = state.index_step;
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Step Size", ImGuiDataType_U64, &step_input, drag_speed, NULL, &state.max_index)) {
+                        state.index_step = step_input;
+                    }
+                    ImGui::SameLine(); 
+
+                    // Step size slider
+                    size_t max_step = (std::min)(slider_max_index_step, state.max_index); 
                     float max_step_f = static_cast<float>(max_step);
                     float step_f = static_cast<float>(state.index_step);
                     if (ImGui::SliderFloat("Step", &step_f, 0.0f, max_step_f, "%.0f"))
@@ -639,13 +769,14 @@ class GUI
                         }
                     }
                     ImGui::SetItemTooltip("Events to advance per frame during playback");
+                    
                 }
             }
             else // TIME
             {
-                std::string time_unit_suffix = time_units[static_cast<int>(unit_time)];
+                std::string time_unit_suffix = time_units[static_cast<int>(scrubber_ui_time_units)];
                 std::string time_format_str;
-                switch (unit_time)
+                switch (scrubber_ui_time_units)
                 {
                 case Visualizer::TIME::UNIT_US:
                     time_format_str = "%.2f";
@@ -659,12 +790,12 @@ class GUI
                 }
 
                 const float units[] = {1000000.0f, 1000.0f, 1.0f};
-                float unit_time_conversion_factor = units[(int) unit_time];
-
+                float unit_time_conversion_factor = units[(int) scrubber_ui_time_units];
                 float current_time_adj = state.current_time / unit_time_conversion_factor;
                 float min_time_adj = state.min_time / unit_time_conversion_factor;
                 float max_time_adj = state.max_time / unit_time_conversion_factor;
                 float time_window_adj = state.time_window / unit_time_conversion_factor;
+                float time_step_adj = state.time_step / unit_time_conversion_factor;
 
                 if (max_time_adj <= min_time_adj)
                 {
@@ -693,10 +824,19 @@ class GUI
 
                     ImGui::Separator();
 
-                    // Window slider
-                    float max_window_time = 1000000; // (std::max)(0.00001f, (state.max_time - state.min_time) / window_div_factor);
+
+                    // Window size input options
+                    float max_window_time = (std::min)(slider_max_time_window, state.max_time); ;
                     float max_window_adj = max_window_time / unit_time_conversion_factor;
 
+                    // Manual window input
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Time Window Input", ImGuiDataType_Float, &time_window_adj, drag_speed, &min_time_adj, &max_time_adj)) {
+                        state.time_window = time_window_adj * unit_time_conversion_factor;
+                    }
+                    ImGui::SameLine();
+
+                    // Window slider
                     if (ImGui::SliderFloat("Window", &time_window_adj, 0.00001f, max_window_adj,
                                            time_format_str.c_str()))
                     {
@@ -708,10 +848,19 @@ class GUI
                     }
                     ImGui::SetItemTooltip("Time window behind position to display");
 
-                    // Step slider
-                    float time_step_adj = state.time_step / unit_time_conversion_factor;
-                    float max_step_time = 1000000; // (state.max_time - state.min_time) / step_div_factor;
+
+                    // Step size input options
+                    float max_step_time = (std::min)(slider_max_time_step, state.max_time); 
                     float max_step_time_adj = max_step_time / unit_time_conversion_factor;
+
+                    // Manual step size input
+                    ImGui::SetNextItemWidth(200);
+                    if (ImGui::DragScalar("##Manual Time Step Input", ImGuiDataType_Float, &time_step_adj, drag_speed, &min_time_adj, &max_time_adj)) {
+                        state.time_step = time_step_adj * unit_time_conversion_factor;
+                    }
+                    ImGui::SameLine();
+
+                    // Step slider
                     if (ImGui::SliderFloat("Step", &time_step_adj, 0.00001f, max_step_time_adj,
                                            time_format_str.c_str()))
                     {
@@ -724,11 +873,6 @@ class GUI
                     ImGui::SetItemTooltip("Time to advance per frame during playback");
                 }
             }
-
-            ImGui::Separator();
-
-            // Show Frame Data checkbox
-            ImGui::Checkbox("Show Frame Data", &state.show_frame_data);
         }
 
 
@@ -778,9 +922,8 @@ class GUI
             ImGui::Separator();
             
             // Draw scrubber controls
-            draw_scrubber_controls(scrubber_state, Visualizer::TIME::UNIT_MS);
+            draw_scrubber_controls(scrubber_state);
 
-            
             // Write back potentially updated state to appropriate data_sources
             if (view_mode == ViewMode::SINGLE)
             {       
@@ -795,6 +938,13 @@ class GUI
 
                 if (sync_mode == SyncMode::END)         data_acquisition.sync_end();
                 else if (sync_mode == SyncMode::START)  data_acquisition.sync_start();
+            }
+
+            if (scrubber_state.type == Scrubber::Type::TIME) {
+                int32_t selection = static_cast<int32_t>(scrubber_ui_time_units);
+                ImGui::SetNextItemWidth(100);
+                ImGui::Combo("Time Units", &selection, "s\0ms\0us\0");
+                scrubber_ui_time_units = static_cast<Visualizer::TIME>(selection);
             }
 
             ImGui::End();
@@ -1133,6 +1283,7 @@ class GUI
             }
 
             draw_error_popup_window();
+            draw_save_popup_window();
             draw_info_window();
             draw_debug_window(fps);
             draw_data_sources_window();
@@ -1188,31 +1339,61 @@ class GUI
             ImGui::DockBuilderSplitNode(dock_id_right_top_top, ImGuiDir_Down, 0.45f, &dock_id_right_top_bottom,
                                         &dock_id_right_top_top);
 
-            ImGui::DockBuilderDockWindow("Scrubber Parameters", dock_id_right_top_bottom);
-            ImGui::DockBuilderDockWindow("DCE Parameters", dock_id_right_top_bottom);
+            ImGui::DockBuilderDockWindow("DCE Parameters", dock_id_right_top_bottom);  
             ImGui::DockBuilderDockWindow("Visualizer Parameters", dock_id_right_top_bottom);
-            ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
-            ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
-            ImGui::DockBuilderDockWindow("Frame", dock_id_main);
-            ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_right_bottom);
-            ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
 
+            ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
+            ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
+
+            ImGui::DockBuilderDockWindow("Frame", dock_id_main);
+            ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
+
+            ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
+            
             ImGui::DockBuilderFinish(dockspace_id);
         }
 };
 
 // Callback functions
-inline void SDLCALL stream_file_handle_callback(void *user_data, const char *const *data_file_list, int filter_unused)
+inline void SDLCALL open_file_callback(void *user_data, const char *const *data_file_list, int filter)
 {
     DataAcquisition *data_acq = static_cast<DataAcquisition*>(user_data);
     if (data_file_list && *data_file_list)
     {
         std::string file_name{*data_file_list};
-        data_acq->add_file_source(file_name);
+        std::shared_ptr<DataSource> new_source = data_acq->add_file_source(file_name);
     }
     else
     {
         std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
+    }
+}
+
+inline void SDLCALL save_file_callback(void *user_data, const char *const *data_file_list, int filter)
+{   
+    // Ensure source and destination are valid
+    GUI::SaveConfig* save_config = static_cast<GUI::SaveConfig*>(user_data);
+    if (data_file_list && *data_file_list && save_config->source) {
+        std::string path = *data_file_list;
+        if (!path.ends_with(".aedat4")) {
+            path += ".aedat4";
+        }
+
+        // Time saving mode
+        if (save_config->mode == GUI::SaveConfig::Mode::TIME) {
+            auto bounds = save_config->save_time_bounds;
+            save_config->source->save_to_file_by_time(path, bounds.first, bounds.second, false);
+
+        } 
+        // Event saving mode
+        else {
+            auto bounds = save_config->save_index_bounds;
+            save_config->source->save_to_file_by_index(path, bounds.first, bounds.second, false);
+        }
+
+        save_config->source.reset();
+    } else {
+        
     }
 }
 
