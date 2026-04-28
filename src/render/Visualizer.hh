@@ -7,7 +7,8 @@
 #include "data/EventData.hh"
 #include "render/Camera.hh"
 #include "render/RenderTarget.hh"
-#include "render/UploadBuffer.hh"
+#include "render/TransferBuffer.hh"
+#include "render/GPUDevice.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 
@@ -249,10 +250,10 @@ class Visualizer
 
                 /**
                  * @brief Uploads updated grid lines to GPU.
-                 * @param upload_buffer UploadBuffer object for uploading data to GPU
+                 * @param transfer_buffer TransferBuffer object for uploading data to GPU
                  * @param copy_pass SDL_GPU_CopyPass for copying data to GPU
                  */
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     if (lines.empty())
                         return;
@@ -268,7 +269,7 @@ class Visualizer
                     vertex_buffer_create_info.size = lines.size() * sizeof(glm::vec3);
                     vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &vertex_buffer_create_info);
 
-                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
+                    transfer_buffer.upload_to_gpu(copy_pass, vertex_buffer, lines.data(),
                                                 lines.size() * sizeof(glm::vec3));
                 }
 
@@ -386,7 +387,7 @@ class Visualizer
                 {
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                 }
 
@@ -498,13 +499,13 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
+                void cpu_update(DataSource& data_source, const Parameters &params)
                 {
                     // No CPU updates needed for points
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                               std::shared_ptr<DataSource> data_source)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass, 
+                              DataSource& data_source)
                 {
                     // No copy operations needed - points buffer managed by scrubber
                 }
@@ -518,7 +519,7 @@ class Visualizer
                  * @param params Visualizer parameters
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                 const glm::mat4 &vp, DataSource& data_source,
                                  const Parameters &params);
         };
 
@@ -639,7 +640,15 @@ class Visualizer
                  */
                 ~TextRenderer()
                 {
-                    cpu_update(nullptr, {});
+                    vertices.clear();
+                    indices.clear();
+                    draw_calls.clear();
+
+                    for (TTF_Text *text_obj : managed_text_objects)
+                    {
+                        TTF_DestroyText(text_obj);
+                    }
+                    managed_text_objects.clear();
 
                     if (sampler)
                         SDL_ReleaseGPUSampler(gpu_device, sampler);
@@ -722,13 +731,13 @@ class Visualizer
                 /**
                  * @brief Clears text and generates labels for depth axis.
                  */
-                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params);
+                void cpu_update(DataSource& data_source, const Parameters &params);
 
                 /**
                  * @brief Copies text data to GPU.
                  */
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                               std::shared_ptr<DataSource> data_source)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass,
+                              DataSource& data_source)
                 {
                     if (vertices.empty() || indices.empty())
                         return;
@@ -749,15 +758,15 @@ class Visualizer
                                                         .size = static_cast<Uint32>(index_buffer_size)};
                     index_buffer = SDL_CreateGPUBuffer(gpu_device, &ibf_info);
 
-                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
-                    upload_buffer.upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
+                    transfer_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(), vertex_buffer_size);
+                    transfer_buffer.upload_to_gpu(copy_pass, index_buffer, indices.data(), index_buffer_size);
                 }
 
                 /**
                  * @brief Renders the text.
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source, const Parameters &params)
+                                 const glm::mat4 &vp, DataSource& data_source, const Parameters &params)
                 {
                     if (draw_calls.empty() || !vertex_buffer || !index_buffer || !text_pipeline)
                         return;
@@ -878,12 +887,11 @@ class Visualizer
                     }
                 }
 
-                void cpu_update(std::shared_ptr<DataSource> data_source, const Parameters &params)
+                void cpu_update(DataSource& data_source, const Parameters &params)
                 {
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass,
-                               std::shared_ptr<DataSource> data_source)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass, DataSource& data_source)
                 {
                 }
 
@@ -891,7 +899,7 @@ class Visualizer
                  * @brief Renders the frames.
                  */
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
-                                 const glm::mat4 &vp, std::shared_ptr<DataSource> data_source,
+                                 const glm::mat4 &vp, DataSource& data_source,
                                  const Parameters &params);
         };
 
@@ -902,7 +910,7 @@ class Visualizer
 
         // GPU
         SDL_GPUDevice *gpu_device = nullptr;
-        UploadBuffer upload_buffer;
+        TransferBuffer transfer_buffer;
 
         GridRenderer *grid_renderer = nullptr;
         PointsRenderer *points_renderer = nullptr;
@@ -915,7 +923,7 @@ class Visualizer
          * @brief Constructor. Initializes pipelines only.
          * @param gpu_device SDL_GPUDevice to create texture on
          */
-        Visualizer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device), upload_buffer(gpu_device)
+        Visualizer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device), transfer_buffer(gpu_device)
         {
             camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), 4.0f, 45.0f, 1920.0f / 1200.0f, 0.1f, 1000.0f);
 
@@ -925,6 +933,8 @@ class Visualizer
             frames_renderer = new FramesRenderer(gpu_device);
             osc_renderer = new OscilloscopeRenderer(gpu_device);
         }
+        
+        Visualizer(GPUDevice& gpu_device): Visualizer(gpu_device.get_SDL_device()) {}
 
         /**
          * @brief Destructor, release necessary resources.
@@ -969,6 +979,7 @@ class Visualizer
          * @param data_source Shared pointer to DataSource containing event data and scrubber
          */
         void render(std::shared_ptr<DataSource> data_source);
-};
+        void render(DataSource& data_source);
+    };
 
 #endif

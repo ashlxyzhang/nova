@@ -1,12 +1,12 @@
 #include "render/DigitalCodedExposure.hh"
 #include "data/DataSource.hh"
 
-void DigitalCodedExposure::render(std::shared_ptr<DataSource> data_source)
+void DigitalCodedExposure::render(DataSource& data_source)
 {
     // Read parameters, rendering textures, and resolution from data source
-    Parameters params = data_source->dce_parameters;
-    RenderTargets render_targets = data_source->dce_render_targets;
-    cv::Size resolution = data_source->resolution;
+    Parameters params = data_source.dce_parameters;
+    RenderTargets render_targets = data_source.dce_render_targets;
+    cv::Size resolution = data_source.get_resolution();
 
 
     // Format parameters to send to the GPU
@@ -51,14 +51,14 @@ void DigitalCodedExposure::render(std::shared_ptr<DataSource> data_source)
     SDL_EndGPUComputePass(clear_pass);
 
     // Get points buffer; run passes B and C only if there are points to process
-    SDL_GPUBuffer *points_buffer = data_source->scrubber.get_points_buffer();
-    int point_count = data_source->scrubber.get_points_buffer_size();
-
+    SDL_GPUBuffer *points_buffer = data_source.scrubber.get_points_buffer();
+    int point_count = data_source.scrubber.get_points_buffer_size();
+    
     if (points_buffer && point_count > 0)
     {
         // Calculate time_center from scrubber and pass using pass_data.morletParams.z (see dce.comp for usage
         // in shader)
-        Scrubber::State scrubber_state = data_source->scrubber.state;
+        Scrubber::State scrubber_state = data_source.scrubber.state;
 
         float time_center = (scrubber_state.current_time + scrubber_state.lower_time) / 2000.0f;
         pass_data.morletParams.z = time_center;
@@ -81,6 +81,12 @@ void DigitalCodedExposure::render(std::shared_ptr<DataSource> data_source)
         SDL_EndGPUComputePass(process_pass);
     }
 
-    SDL_SubmitGPUCommandBuffer(command_buffer);
-    SDL_WaitForGPUIdle(gpu_device);
+    // Stalls CPU until this particular command is finished
+    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+    SDL_WaitForGPUFences(gpu_device, true, &fence, 1);
+    SDL_ReleaseGPUFence(gpu_device, fence);
+}
+
+void DigitalCodedExposure::render(std::shared_ptr<DataSource> data_source) {
+    render(*data_source);
 }

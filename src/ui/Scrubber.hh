@@ -3,7 +3,7 @@
 #define SCRUBBER_HH
 
 #include "data/EventData.hh"
-#include "render/UploadBuffer.hh"
+#include "render/TransferBuffer.hh"
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
 #include <array>
@@ -44,7 +44,7 @@ class Scrubber
             // TIME-based scrubbing -----
             float time_window = 10000.0f;   // Size of window (10ms default) (set by GUI)
             float time_step = 33333.0f;     // How much current_time is incremented each frame (~30fps default) (set by GUI)
-            float current_time = 0.0f;      // End of window (set by GUI)
+            float current_time = 10000.0f;      // End of window (set by GUI)
         
             float min_time = 0.0f;          // Relative timestamp of first event (pretty much always zero)
             float max_time = 0.0f;          // Relative timestamp of most recent event
@@ -61,8 +61,8 @@ class Scrubber
             std::size_t lower_index = 0;
             // --------------------------
 
-            // Currently UNUSED
-            bool show_frame_data = false;
+            // Flags
+            bool loop = false;  
 
             // Resets every value except for TYPE and MODE
             void clear()
@@ -74,12 +74,12 @@ class Scrubber
                 max_index = 0;
                 lower_index = 0;
                 lower_time = 0.0f;
-                current_time = 0.0f;
+                current_time = 10000.0f;
                 time_window = 10000.0f;
                 time_step = 33333.0f;
                 min_time = 0.0f;
                 max_time = 0.0f;
-                show_frame_data = false;
+                loop = false;
             }
 
             // Update min and max indices based on event_data
@@ -150,6 +150,8 @@ class Scrubber
                             time_step = std::clamp(time_step, 0.0f, max_time - min_time);
                             lower_time = (std::max)(min_time, current_time - time_window);
                         }
+
+                        if (loop && current_time >= max_time) current_time = min_time;
                     }
 
                     // Event-based Updates
@@ -177,20 +179,51 @@ class Scrubber
                             index_step = std::clamp(index_step, size_t(0), max_index);
                             lower_index = (std::max)(size_t(0), current_index - index_window);
                         }
+
+                        if (loop && current_index >= max_index) current_index = 0;
                     }
                 }
+        
+            void set_time_window(float start_time, float end_time) {
+                if (end_time < start_time) {
+                    std::cout << "set_time_window() given invalid time window" << std::endl;
+                    return;
+                }
+
+                time_window = end_time - start_time;
+                current_time = end_time;
+            }
+
+            void set_event_window(size_t start_index, size_t end_index) {
+                if (end_index < start_index) {
+                    std::cout << "set_event_window() given invalid index window" << std::endl;
+                    return;
+                }
+
+                index_window = end_index - start_index;
+                current_index = end_index;
+            }
+        
+            bool is_eof() {
+                if (type == Type::TIME) {
+                    return abs(current_time - max_time) < 1.0e-4;
+                } else {
+                    return current_index >= max_index;
+                }
+            }
         };
 
     private:
+
     
         SDL_GPUDevice *gpu_device;
-        UploadBuffer upload_buffer;
         SDL_GPUBuffer *points_buffer = nullptr;
 
         std::size_t points_buffer_size = 0;
         float lower_depth = 0.0f;
         float upper_depth = 0.0f;
         glm::vec2 camera_resolution = glm::vec2(0.0f, 0.0f);
+    
         SDL_GPUTexture *frames = nullptr;
         std::array<float, 2> frame_timestamps = {-1.0, -1.0};
         std::size_t frame_width = 0, frame_height = 0;
@@ -203,17 +236,7 @@ class Scrubber
          * @brief Constructor. Initializes scrubber with default values.
          * @param gpu_device SDL_GPUDevice to upload event data points to
          */
-        Scrubber(SDL_GPUDevice *gpu_device): gpu_device(gpu_device), upload_buffer(gpu_device)
-        {
-            // Initialize with Prophesee metavision_viewer defaults:
-            //   accumulation time = 10 ms  (time_window = 10 000 us)
-            //   display rate      = 30 fps (time_step   ~ 33 333 us)
-            //   time-based, playing mode
-            state.type = Type::TIME;
-            state.mode = Mode::PLAYING;
-            state.time_window = 10000.0f;
-            state.time_step = 33333.0f;
-        }
+        Scrubber(SDL_GPUDevice *gpu_device): gpu_device(gpu_device) {}
 
         /**
          * @brief Destructor. Releases event points buffer.
@@ -230,7 +253,7 @@ class Scrubber
             }
         }
 
-        void update(EventData &event_data)
+        void update(EventData &event_data, TransferBuffer& transfer_buffer)
         {
             // CPU Update
             state.update(event_data);
@@ -312,7 +335,7 @@ class Scrubber
             SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
             const glm::vec4 *data_ptr = evt_vector.data() + lower_index;
-            upload_buffer.upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
+            transfer_buffer.upload_to_gpu(copy_pass, points_buffer, data_ptr, points_buffer_size);
 
             // Below is frame texture generation code, skip if user does not want frames
             const std::vector<std::pair<cv::Mat, float>> &frame_vector = event_data.get_frame_vector_ref();
@@ -433,12 +456,12 @@ class Scrubber
             // Upload frames and set timestamps
             if (found_valid_frames)
             {
-                upload_buffer.upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_0].first, 0);
+                transfer_buffer.upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_0].first, 0);
                 frame_timestamps[0] = frame_vector[frame_idx_0].second;
 
                 if (frame_idx_1 != frame_idx_0 && frame_idx_1 < frame_vector.size())
                 {
-                    upload_buffer.upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_1].first, 1);
+                    transfer_buffer.upload_cv_mat(copy_pass, frames, frame_vector[frame_idx_1].first, 1);
                     frame_timestamps[1] = frame_vector[frame_idx_1].second;
                 }
                 else
@@ -449,8 +472,11 @@ class Scrubber
 
             event_data.unlock_data_vectors();
             SDL_EndGPUCopyPass(copy_pass);
-            SDL_SubmitGPUCommandBuffer(command_buffer);
-            SDL_WaitForGPUIdle(gpu_device);
+            
+            // Stalls CPU until the work is done
+            SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+            SDL_WaitForGPUFences(gpu_device, true, &fence, 1);
+            SDL_ReleaseGPUFence(gpu_device, fence);
         }
 
         // Getters and setters
