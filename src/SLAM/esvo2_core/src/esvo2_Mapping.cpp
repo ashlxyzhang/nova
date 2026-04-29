@@ -1285,8 +1285,7 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
     DLOG("publishPointCloud  pc_color.size=" << pc_color_->size()
          << "  pc_filtered.size=" << pc_filtered_->size()
          << "  depthMap.size=" << depthMapPtr->size());
-    std::cout << "checking if pc color is empty! Size stuff: " << pc_color_->size() << " " << depthMapPtr->size()
-              << std::endl;
+    std::cout << "checking if pc color is empty! Size stuff: " << pc_color_->size() << " " << depthMapPtr->size()<<" "<<pc_color_->empty()<< std::endl;
     if (!pc_color_->empty())
     {
         // --Publishing the point cloud to tracking
@@ -1318,8 +1317,10 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
     // publish global pointcloud
     if (bVisualizeGlobalPC_)
     {
+        std::cout<<"trying to viz global"<<std::endl;
         if (esvo2_core::timePointToSec(t) - t_last_pub_pc_ > visualizeGPC_interval_)
         {
+            std::cout<<"are vizing global"<<std::endl;
             PointCloud::Ptr pc_filtered(new PointCloud());
             pcl::VoxelGrid<pcl::PointXYZ> sor;
             sor.setInputCloud(pc_near_);
@@ -1343,10 +1344,11 @@ void esvo2_Mapping::publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation
             // VIZ PUBLISH -> not publishing anything right now
             // Should just pass reference to pc_global_ to visualizer in the constructor and it will auto update gg
             // timestamp is t if want to add to a queue
+            std::cout<<"set global"<<std::endl;
             std::lock_guard<std::mutex> lock(viz_pc_mutex_);
             viz_pc_global_ = pc_global_;
             pointclouds_updated = true;
-            // t_last_pub_pc_ = esvo2_core::timePointToSec(t);
+            t_last_pub_pc_ = esvo2_core::timePointToSec(t);
         }
     }
 }

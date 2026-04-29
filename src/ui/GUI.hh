@@ -1104,7 +1104,9 @@ class GUI
                         scroll_delta = -scroll_delta;
 
                     if (scroll_delta != 0.0f)
+                    {
                         visualizer.zoom_camera(scroll_delta * 0.1f);
+                    }
                     break;
                 }
 
@@ -1117,6 +1119,45 @@ class GUI
                         is_mouse_dragging = false;
                     }
                     break;
+                }
+
+                // Handle panning (translation) for the SLAM global point cloud. Have this outside of above switch statement
+                // because user might want to rotate camera and pan at the same time
+                if(event->type == SDL_EVENT_KEY_DOWN && visualizer.is_slam_running() && visualizer.is_global_pointcloud_displayed())
+                {
+                    const float pan_distance = 0.5;
+                    // X = left/right, Y = Up/Down, Z=forwards/backwards.
+                    glm::vec3 direction(0, 0, 0);
+                    // Setting direction. Don't use a switch because may want to hit multiple keys at once
+                    if(event->key.key == SDLK_W)
+                    {
+                        direction.z += 1;
+                    }
+                    if(event->key.key == SDLK_S)
+                    {
+                        direction.z -= 1;
+                    }
+                    if(event->key.key ==  SDLK_A)
+                    {
+                        direction.x += 1;
+                    }
+                    if(event->key.key ==  SDLK_D)
+                    {
+                        direction.x -= 1;
+                    }
+                    if(event->key.key ==  SDLK_Q)
+                    {
+                        direction.y += 1;
+                    }
+                    if(event->key.key ==  SDLK_E)
+                    {
+                        direction.y -= 1;
+                    }
+                    // Panning the camera
+                    if(direction.x !=0 || direction.y !=0 || direction.z != 0)
+                    {
+                        visualizer.pan_camera(direction, pan_distance);
+                    }
                 }
 
                 // Clear focus flags

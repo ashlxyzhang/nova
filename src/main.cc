@@ -132,7 +132,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     if (event->type == SDL_EVENT_QUIT)
         return SDL_APP_SUCCESS;
 
-    if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_ESCAPE))
+    if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_BACKSPACE))
     {
         if (app->slam->isRunning())
         {
@@ -164,6 +164,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
             std::cout << "Starting SLAM" << std::endl;
             app->slam->startSlam(params);
         }
+    }
+
+     if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_SPACE))
+    {
+        app->visualizer->toggle_display_global_pointcloud();
     }
 
     return SDL_APP_CONTINUE;

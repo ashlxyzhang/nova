@@ -185,8 +185,10 @@ class SlamManager
 // -------TODO---------
 /*
     - Visualization stuff
-       - get visualization working on Windows
-       - add toggle to view global point cloud vs just filtered
+       - Probably need to add pose visualization too because can be kinda confusing on where the path is for the camera
+            - just a thick line connecting the transform positions is probably fine
+       - There is a bug where filtered point cloud does not spawn in correct location once swap back from global.
+          The camera is like not in the correct spot for it and views it from the side instead of from the front.
        
     - Controls/GUI
         - add start slam button that shows up if have two data sources

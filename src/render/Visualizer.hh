@@ -871,23 +871,29 @@ class Visualizer
                     
                     vertices.reserve(pc->size());
                     
-                    // glm::vec3 cameraPos = camera.getPosition();
+                    cameraPos.x = 0.0f;
                     cameraPos.y = 0.0f;
-                    pcl::PointXYZ minPt, maxPt;
-                    pcl::getMinMax3D(*pc, minPt, maxPt);
-                    double min_range = glm::length(glm::vec3(minPt.x, 0.0f, minPt.z) - cameraPos);
-                    // double min_range = 10.0;
-                    double max_range = glm::length(glm::vec3(maxPt.x, 0.0f, maxPt.z) - cameraPos);
-                    std::cout<<"min point is: "<<minPt.x<<" "<<minPt.y<<" "<<minPt.z<<std::endl;
-                    std::cout<<"max point is: "<<maxPt.x<<" "<<maxPt.y<<" "<<maxPt.z<<std::endl;
-                    std::cout<<"ranges: "<<min_range<<" "<<max_range<<std::endl;
-                    std::cout<<"camera is: "<<cameraPos.x<<" "<<cameraPos.y<<" "<<cameraPos.z<<std::endl<<std::endl;
+                    cameraPos.z = 0.0f;
+                    // Alternate way to find min/max that doesn't super work
+                    // pcl::PointXYZ minPt, maxPt;
+                    // pcl::getMinMax3D(*pc, minPt, maxPt);
+                    // double min_range = glm::length(glm::vec3(minPt.x, 0.0f, minPt.z) - cameraPos);
+                    // double max_range = glm::length(glm::vec3(maxPt.x, 0.0f, maxPt.z) - cameraPos);
+                    double min_range = 100000; 
+                    double max_range = 0; 
+                    for (const auto &pt : *pc)
+                    {
+                        double dist = glm::length(glm::vec3(pt.x, 0, pt.z) - cameraPos);
+                        min_range = std::min(min_range, dist);
+                        max_range = std::max(max_range, dist);
+                    }
                     
                     for (const auto &pt : *pc)
                     {
                         double dist = glm::length(glm::vec3(pt.x, 0.0f, pt.z) - cameraPos);
+                        // double dist = pt.z - cameraPos.z;
                         int index =
-                        floor((1 / dist - min_range) / (max_range - min_range) * 255.0f);
+                        floor((dist - min_range) / (max_range - min_range) * 255.0f);
                         if (index > 255)
                             index = 255;
                         if (index < 0)
@@ -941,6 +947,8 @@ class Visualizer
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> slam_pointcloud_;
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> slam_global_pointcloud_;
         bool slam_pc_changed = false;
+        std::atomic<bool> display_global_pointcloud = false;
+        // glm::vec3 original_camera_center;
 
     public:
         /**
@@ -996,6 +1004,16 @@ class Visualizer
             camera.processMouseScroll(scroll_delta);
         }
 
+        void pan_camera(float scroll_delta)
+        {
+            camera.pan(scroll_delta);
+        }
+
+        void pan_camera(glm::vec3 direction, float offset)
+        {
+            camera.pan(direction, offset);
+        }
+
         void set_slam_pointcloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pc)
         {
             slam_pointcloud_ = std::move(pc);
@@ -1009,6 +1027,21 @@ class Visualizer
         void set_slam_pc_changed(bool value)
         {
             slam_pc_changed = value;
+        }
+
+        void toggle_display_global_pointcloud()
+        {
+            display_global_pointcloud = !display_global_pointcloud;
+        }
+
+        bool is_slam_running()
+        {
+            return slam_pointcloud_ != nullptr;
+        }
+
+        bool is_global_pointcloud_displayed()
+        {
+            return display_global_pointcloud;
         }
 
         /**

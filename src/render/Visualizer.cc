@@ -157,9 +157,17 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     bool slam_active = slam_pointcloud_ != nullptr;
 
     // CPU Update phase
-    // slam_renderer->cpu_update(slam_pointcloud_);
     if(slam_pc_changed)
-        slam_renderer->cpu_update_global(slam_global_pointcloud_, camera.getPosition());
+    {
+        if(display_global_pointcloud)
+            slam_renderer->cpu_update_global(slam_global_pointcloud_, camera.getPosition());
+        else
+        {
+            slam_renderer->cpu_update(slam_pointcloud_);
+            // Move camera back to default position
+            camera.setOrbitCenter(glm::vec3(0,0,0));
+        }
+    }
     if (!slam_active)
     {
         grid_renderer->cpu_update(params);
