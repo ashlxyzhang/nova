@@ -278,7 +278,7 @@ size_t DataSource::get_batch_frame_data()
 void DataSource::reading_loop(float event_discard_odds) {
     while (reading && !read_to_end) {
         get_batch_event_data(event_discard_odds);
-        get_batch_frame_data();
+        // get_batch_frame_data();
         scrubber.state.update_bounds(event_data);
     }
 
@@ -325,7 +325,6 @@ cv::Mat DataSource::texture_to_cvmat(SDL_GPUTexture* texture, SDL_GPUTextureForm
     cv::Mat result = transfer_buffer.download_to_cv_mat(copy_pass, texture, texture_format, width, height);
 
     SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
 
     // Sync and return
     SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
