@@ -14,6 +14,7 @@
 #include "ui/GUI.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
+#include "util/PluginBootstrap.hh"
 #include "util/threads.hh"
 
 struct Application
@@ -95,7 +96,10 @@ static void render_gui(void *appstate) {
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
-{  
+{
+    plugin_bootstrap::setup_metavision_plugin_path();
+    plugin_bootstrap::setup_vulkan_icd_path();
+
     // Initialize application and save to appstate so that it can be accessed in other functions
     auto *app = new Application();
     *appstate = app;

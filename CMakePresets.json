@@ -26,6 +26,20 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "BUILD_SHARED_LIBS": "OFF"
             }
+        },
+        {
+            "name": "packaging",
+            "inherits": "release",
+            "binaryDir": "${sourceDir}/build-packaging",
+            "cacheVariables": {
+                "NOVA_BUILD_TESTS": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "packaging",
+            "configurePreset": "packaging"
         }
     ]
 }

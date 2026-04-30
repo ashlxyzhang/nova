@@ -48,7 +48,19 @@ brew install pkg-config
    cmake --build ./build --parallel
    ```
 
-   Available presets: `debug`, `release`
+   Available presets: `debug`, `release`, `packaging`
+
+## Packaging
+
+To build a redistributable (`.dmg` on macOS, `.tar.gz` on Linux, `.zip` on Windows):
+
+```
+cmake --preset packaging
+cmake --build --preset packaging
+cd build-packaging && cpack
+```
+
+The package bundles the Metavision HAL plugins, and on macOS also bundles MoltenVK so end users don't need the Vulkan SDK. On Linux/Windows, a working GPU driver with Vulkan support is required (standard on any modern machine).
 
 <!--
 # NOVA PHASE 2

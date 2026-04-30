@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.26)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(NOVA LANGUAGES C CXX)
+project(NOVA VERSION 0.1.0 LANGUAGES C CXX)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.hh")
@@ -90,3 +92,5 @@ if(NOVA_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+include(Packaging)
