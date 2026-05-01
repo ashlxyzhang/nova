@@ -20,6 +20,13 @@ DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
     std::filesystem::path path(file_path);
     name = path.filename().string(); 
 
+    // Check if file exists first
+    if (!std::filesystem::exists(path)) {
+        std::cout << "File does not exist: " << file_path << std::endl;
+        is_open_ = false;
+        return;
+    }
+
     // Load file based on extension
     std::string ext = path.extension().string();
     if (ext == ".aedat4")
@@ -209,28 +216,24 @@ size_t DataSource::get_batch_event_data(float event_discard_odds)
 
     // Attempt to read data
     size_t events_read = 0;
-
+    
     try
     {
-        if (reader->isEventStreamAvailable())
+        if (reader->isEventStreamAvailable() && reader->isEventsRunning())
         {
-            if (reader->isEventsRunning()) {
-                if (const auto events = reader->getNextEventBatch(); events.has_value())
-                {
-                    for (const auto &evt : *events)
-                    {
-                        if (discard_enabled && dist(rng) < event_discard_odds)
-                            continue;
-
-                        event_data.write_evt_data(evt);
-                        events_read++;
-                    }
-                }
-            } 
-            else 
+            if (const auto events = reader->getNextEventBatch(); events.has_value())
             {
-                read_to_end = true;
+                for (const auto &evt : *events)
+                {
+                    if (discard_enabled && dist(rng) < event_discard_odds)
+                        continue;
+
+                    event_data.write_evt_data(evt);
+                    events_read++;
+                }
             }
+        } else {
+            read_to_end = true;
         }
     }
     catch (const std::exception &e)
@@ -278,7 +281,7 @@ size_t DataSource::get_batch_frame_data()
 void DataSource::reading_loop(float event_discard_odds) {
     while (reading && !read_to_end) {
         get_batch_event_data(event_discard_odds);
-        // get_batch_frame_data();
+        get_batch_frame_data();
         scrubber.state.update_bounds(event_data);
     }
 
@@ -287,6 +290,10 @@ void DataSource::reading_loop(float event_discard_odds) {
 
 void DataSource::read(float event_discard_odds, bool blocking) {
     if (reading) return;
+    if (!is_open_) {
+        std::cout << "Cannot read a file source that has failed to open!" << std::endl;
+        return;
+    }
 
     reading = true;
     if (blocking) {

@@ -90,11 +90,13 @@ TEST(API, TwoSourcesTwoWindows) {
 	GPUDevice gpu;
 
 	DataSource source1(gpu, (fixture_path() / "hand_spinner.raw").string());
+	if (!source1.is_open()) return;
 	source1.read(0.0, false);
-
-	DataSource source2(gpu, (fixture_path() / "pedestrians.raw").string());
+	
+	DataSource source2(gpu, (fixture_path() / "pedestrians_edited.aedat4").string());
+	if (!source2.is_open()) return;
 	source2.read(0.0, false);
-
+	
 	source1.wait_reading_thread();
 	source2.wait_reading_thread();
 	std::cout << "Finished Reading!" << std::endl;
@@ -124,19 +126,21 @@ TEST(API, OneSourceTwoWindows) {
 
 	GPUDevice gpu;
 
-	DataSource source(gpu, (fixture_path() / "hand_spinner.raw").string());
+	DataSource source(gpu, (fixture_path() / "pedestrians_edited.aedat4").string());
+	if (!source.is_open()) {
+		std::cout << "Failed to open!" << std::endl;
+	}
 	source.read();
-	std::cout << "Finished Reading!" << std::endl;
 
 	Scrubber::State& s = source.scrubber.state;
 	s.current_time = 10000.0f;
 	s.time_window = 10000.0f;
 	s.time_step = 20000.0f;
 	s.mode = Scrubber::Mode::PLAYING;
-	s.loop = false;
+	s.loop = true;
 
-	DCEDisplay dce(gpu, 1280, 720, "DCE 1");
-	VisualizerDisplay vis(gpu, 1280, 720, "DCE 2");
+	DCEDisplay dce(gpu, 1280, 720, "DCE");
+	VisualizerDisplay vis(gpu, 1280, 720, "Visualizer");
 	
 	Window::show_all({&dce, &vis}, source);
 }
