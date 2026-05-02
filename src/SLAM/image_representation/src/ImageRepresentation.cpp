@@ -131,7 +131,10 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
         beta[y * x_patches_ + x] = 1 / (1 + final_activity[y * x_patches_ + x] *
                                                 abs(esvo2_core::timePointToSec(e.timestamp) - last_event_time[y * x_patches_ + x])); // eq. 2
         if (y * x_patches_ + x >= x_patches_ * y_patches_)
+        {
+            std::cerr<<"something went wrong in ImageRepresentation.cpp AA_thread callback!"<<std::endl;
             exit(-1);
+        }
         final_activity[y * x_patches_ + x] = beta[y * x_patches_ + x] * final_activity[y * x_patches_ + x] + 1; // eq. 1
         last_event_time[y * x_patches_ + x] = esvo2_core::timePointToSec(e.timestamp);
         // nums_temp[y * x_patches_ + x]++;

@@ -473,21 +473,6 @@
                     tracking->VBaBgCallback(msg);
                 }
 
-                // checking the pointcloud_Map_to_Track
-                pointcloud_Map_to_Track.lock();
-                if(pointcloud_Map_to_Track.queueEmpty())
-                {
-                    pointcloud_Map_to_Track.unlock();
-                }
-                else
-                {
-                    gotOne=true;
-                    std::pair<std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>>, timePoint> result = pointcloud_Map_to_Track.getValue();
-                    pointcloud_Map_to_Track.unlock();
-
-                    tracking->refMapCallback(result);
-                }
-
                 //stamped_pose_Track_to_Track
                 stamped_pose_Track_to_Track.lock();
                 if(stamped_pose_Track_to_Track.queueEmpty())
@@ -502,6 +487,22 @@
 
                     std::shared_ptr<esvo2_core::PoseStamped> stamped_pose = result.first;
                     tracking->stampedPoseCallback(stamped_pose);
+                }
+
+                // checking the pointcloud_Map_to_Track. Needs to come after stamped pose callback because requires the 
+                //    transform from stamped pose to be added.
+                pointcloud_Map_to_Track.lock();
+                if(pointcloud_Map_to_Track.queueEmpty())
+                {
+                    pointcloud_Map_to_Track.unlock();
+                }
+                else
+                {
+                    gotOne=true;
+                    std::pair<std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>>, timePoint> result = pointcloud_Map_to_Track.getValue();
+                    pointcloud_Map_to_Track.unlock();
+
+                    tracking->refMapCallback(result);
                 }
             }
         }

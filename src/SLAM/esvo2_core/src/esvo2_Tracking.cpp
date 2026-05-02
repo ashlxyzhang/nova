@@ -436,10 +436,14 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
                                                  const esvo2_core::ImagePtr &time_surface_dy)
 {
     cv::Mat cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy;
-    cv_ptr_left = *(time_surface_left.image);
-    cv_ptr_negative = *(time_surface_negative.image);
-    cv_ptr_dx = *(time_surface_dx.image);
-    cv_ptr_dy = *(time_surface_dy.image); 
+    cv_ptr_left = (time_surface_left.image)->clone();
+    cv_ptr_negative = (time_surface_negative.image)->clone();
+    cv_ptr_dx = (time_surface_dx.image)->clone();
+    cv_ptr_dy = (time_surface_dy.image)->clone(); 
+    // cv_ptr_left = *(time_surface_left.image);
+    // cv_ptr_negative = *(time_surface_negative.image);
+    // cv_ptr_dx = *(time_surface_dx.image);
+    // cv_ptr_dy = *(time_surface_dy.image); 
     std::lock_guard<std::mutex> lock(data_mutex_);
     // push back the most current TS.
     timePoint t_new_ts = time_surface_left.header_stamp;
@@ -450,7 +454,8 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
     // keep TS_history_'s size constant
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
-        auto it = TS_history_.begin();
+        auto it = TS_history_.begin(); 
+        // std::cout<<"erasing ts history tracking with time: "<<esvo2_core::timePointToSec(it->first)<<std::endl;
         TS_history_.erase(it);
     }
 }

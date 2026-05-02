@@ -863,12 +863,19 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
     // DLOG("timeSurfaceCallback  TS_history.size=" << TS_history_.size()
         //  << "  t=" << esvo2_core::timePointToSec(time_surface_left.header_stamp));
     cv::Mat cv_ptr_left, cv_ptr_right, cv_ptr_AA_map_left, cv_ptr_negative, cv_ptr_negative_dx, cv_ptr_negative_dy;
-    cv_ptr_left = *(time_surface_left.image);
-    cv_ptr_right = *(time_surface_right.image);
-    cv_ptr_AA_map_left = *(AA_map.image);
-    cv_ptr_negative = *(time_surface_negative.image);
-    cv_ptr_negative_dx = *(time_surface_negative_dx.image);
-    cv_ptr_negative_dy = *(time_surface_negative_dy.image);
+    cv_ptr_left = (time_surface_left.image)->clone();
+    cv_ptr_right = (time_surface_right.image)->clone();
+    cv_ptr_AA_map_left = (AA_map.image)->clone();
+    cv_ptr_negative = (time_surface_negative.image)->clone();
+    cv_ptr_negative_dx = (time_surface_negative_dx.image)->clone();
+    cv_ptr_negative_dy = (time_surface_negative_dy.image)->clone();
+
+    // cv_ptr_left = *(time_surface_left.image);
+    // cv_ptr_right = *(time_surface_right.image);
+    // cv_ptr_AA_map_left = *(AA_map.image);
+    // cv_ptr_negative = *(time_surface_negative.image);
+    // cv_ptr_negative_dx = *(time_surface_negative_dx.image);
+    // cv_ptr_negative_dy = *(time_surface_negative_dy.image);
 
     // push back the new time surface map
     timePoint t_new_TS = time_surface_left.header_stamp;
@@ -885,6 +892,7 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin();
+        // std::cout<<"erasing ts history mapping with time: "<<esvo2_core::timePointToSec(it->first)<<std::endl;
         TS_history_.erase(it);
     }
 }
@@ -1055,13 +1063,19 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
     //      << "  dqvDepthPoints.size=" << dqvDepthPoints_.size());
     cv::Mat invDepthImage, stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
 
-    invDepthImage = TS_obs_ptr_->second.img_left_.clone();
-    visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
-                         stdVar_vis_threshold_, age_vis_threshold_);
-
-    // VIZ PUBLISH -> not publishing anything right now
-    // Skip publishing the inv depth map for now
-    publishImage(invDepthImage, t);
+    try{
+        invDepthImage = TS_obs_ptr_->second.img_left_.clone();
+        // visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
+        //                      stdVar_vis_threshold_, age_vis_threshold_);
+        // VIZ PUBLISH -> not publishing anything right now
+        // Skip publishing the inv depth map for now
+        publishImage(invDepthImage, t);
+    }
+    catch (...){
+        std::cerr<<"skipping publishing invDepth because TS_obs_ptr_->second.img_left is corrupted??? Prob from being erased..."<<std::endl;
+        std::cerr<<"Cols/rows/empty: "<<TS_obs_ptr_->second.img_left_.cols<<" "<<TS_obs_ptr_->second.img_left_.rows<<" "<<TS_obs_ptr_->second.img_left_.empty()<<std::endl;
+    }
+   
 
     if (getSystemStatus() == SystemStatus::INITIALIZATION)
     {

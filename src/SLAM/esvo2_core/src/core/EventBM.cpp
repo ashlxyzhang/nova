@@ -178,6 +178,8 @@ bool esvo2_core::core::EventBM::match_an_event2(const Event *pEvent, std::pair<s
         Tl_square = (patch_src.array().pow(2)).sum();
         if (x1_left_top(0) - (int)upDisparity < 0)
             return false;
+        // assert(pStampedTsObs_->second.TS_right_.rows()!=0ll && pStampedTsObs_->second.TS_right_.cols()!=0ll);
+        // std::cerr<<"185"<<pStampedTsObs_->second.TS_right_.rows()<<" "<<pStampedTsObs_->second.TS_right_.cols()<<std::endl;
         patch_r = pStampedTsObs_->second.TS_right_.block(x1_left_top(1), x1_left_top(0) - (int)upDisparity,
                                                          patch_size_Y_, patch_size_X_ + (int)upDisparity);
 
@@ -658,6 +660,8 @@ bool esvo2_core::core::EventBM::epipolarSearchingTwoFrames(double &min_cost, Eig
         if (use_zncc)
         {
             // zncc
+            // assert(pStampedTsObs_->second.TS_last_.rows()>0ll && pStampedTsObs_->second.TS_last_.cols()>0ll);
+            // std::cerr<<"667"<<pStampedTsObs_->second.TS_last_.rows()<<" "<<pStampedTsObs_->second.TS_last_.cols()<<std::endl;
             patch_dst =
                 pStampedTsObs_->second.TS_last_.block(x2_left_top(1), x2_left_top(0), patch_size_X_2_, patch_size_Y_2_);
             cost = zncc_cost2(patch_src, patch_dst, var_l, mean_l);
