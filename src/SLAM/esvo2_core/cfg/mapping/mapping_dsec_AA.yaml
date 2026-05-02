@@ -53,7 +53,7 @@ RegularizationRadius: 20
 RegularizationMinNeighbours: 32
 RegularizationMinCloseNeighbours: 32
 bVisualizeGlobalPC: True
-visualizeGPC_interval: 0.5 #2[second]
+visualizeGPC_interval: 0 #2[second]
 NumGPC_added_per_refresh: 10000
 visualize_range: 30
 

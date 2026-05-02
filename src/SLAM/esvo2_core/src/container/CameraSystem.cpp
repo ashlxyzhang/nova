@@ -101,7 +101,7 @@ void PerspectiveCamera::preComputeRectifiedCoordinate()
   }
   else
   {
-    std::cout << "wrong distortion model is provided.";
+    std::cout << "wrong distortion model is provided. in CameraSystem.cpp preComputeRectifiedCoordinate()"<<std::endl;
     exit(-1);
   }
 

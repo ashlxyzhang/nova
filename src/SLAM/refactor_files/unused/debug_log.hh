@@ -7,11 +7,11 @@
 // Simple file logger. Include this header and call DLOG("msg") anywhere.
 // Output goes to src/SLAM/refactor_files/unused/slam_debug.log
 // Thread-safe.
+const std::string logging_file = "/Users/ashley/Documents/repos/nova/src/SLAM/refactor_files/unused/slam_debug.log";
 
 inline std::ofstream& _dlog_stream()
 {
-    static std::ofstream f("/Users/ashley/Documents/repos/nova/src/SLAM/refactor_files/unused/slam_debug.log",
-                           std::ios::out | std::ios::trunc);
+    static std::ofstream f(logging_file, std::ios::out | std::ios::trunc);
     return f;
 }
 
@@ -27,6 +27,7 @@ inline double _dlog_now_sec()
         std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+#ifndef DLOG
 #define DLOG(msg)                                                        \
     do {                                                                 \
         std::lock_guard<std::mutex> _lg(_dlog_mutex());                 \
@@ -35,3 +36,4 @@ inline double _dlog_now_sec()
                        << msg << "\n";                                   \
         _dlog_stream().flush();                                          \
     } while (0)
+#endif

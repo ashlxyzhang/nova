@@ -1,18 +1,22 @@
+// FROM STD library
 #include <atomic>
 #include <condition_variable>
 #include <thread>
 
+// From NOVA
 #include "data/EventData.hh"
 #include "ui/Scrubber.hh"
 #include "util/pch.hh"
 
+// FROM SLAM
 #include "data_passing.hh"
+#include "multi_data_passing.hh"
 #include "esvo2_core/esvo2_Mapping.h"
 #include "esvo2_core/esvo2_Tracking.h"
 #include "esvo2_core/tools/types.h"
 #include "image_representation/ImageRepresentation.h"
-#include "multi_data_passing.hh"
 
+// From Dependencies
 #include <opencv2/core/mat.hpp>
 #include <pcl/point_types.h>
 
@@ -71,6 +75,21 @@ class SlamManager
             if (!mapping_running || !mapping)
                 return false;
             return mapping->were_pointclouds_updated();
+        }
+
+        // Get path info for the NOVA visualizer
+        std::shared_ptr<std::vector<esvo2_core::PoseStamped>> get_viz_path()
+        {
+            if (!tracking_running || !tracking)
+                return nullptr;
+            return tracking->get_viz_path();
+        }
+
+        bool was_path_updated()
+        {
+            if (!tracking_running || !tracking)
+                return false;
+            return tracking->was_path_updated();
         }
 
     private:
@@ -138,7 +157,7 @@ class SlamManager
 
         // Queues for data passing
         // ----From IR----
-        // DataPassingDeque<cv::Mat> time_surface_right_IR_to_Track; //unused :C
+        // DataPassingDeque<cv::Mat> time_surface_right_IR_to_Track; //unused in original implentation
         DataPassingDeque<cv::Mat> AA_left_IR_to_Map;
 
         // Multi Data Passing
@@ -200,40 +219,6 @@ class SlamManager
 /*
     - (10,10) for multi_data_passing queue sizes might be incorrect, but it should be fine
     - types.h toKindrTransformation is a bit sus
-    - ref_.vPointXYZPtr_.push_back(&(*PointXYZ_begin_it)); // Copy the pointer of the pointXYZ in Tracking.cpp is very
-   sus but I think it is correct
-    - Mapping.cpp does vEventsPtr_left_SGM_.push_back(&(*ev_begin_it)); because vEventsPtr_left_SGM_ holds pointers.
-   This replicates functionality of ESVO2 I think but is pretty sus.
-    - EventQueue was originally called EventBuffer and was a vector of Event* before started refactoring. I don't think
-   it affects anything but it might be an issue
-*/
-
-// ---------CONFIG NOTES----------
-/*
-- I don't think can do defaults? Because need the .yaml file in their file system somewhere
-
-Image Representation
-    - Does not depend on camera type. (If camera type has lots of pixels, may want the less expensive version though).
-    - More expensive, better results -> image_representation_fast_40hz.yaml
-    - Less expensive, worse results -> image_representation_fast.yaml
-    - _r means for right camera
-    - Default should be less expensive probably because NOVA as a whole is already expensive
-
-CameraSystem
-    - Depends on camera type
-    - Path is passed in constructor of image representaiton
-    - Stores left/right camera configurations
-
-Mapping
-    - Does not depend on camera type. (If camera type has lots of pixels, may want the less expensive version though).
-    - kinda up to you idk what all the settings do
-    - default should just be whichever of the given ones works best
-
-Tracking
-    - Does not depend on camera type. (If camera type has lots of pixels, may want the less expensive version though).
-    - kinda up to you idk what all the settings do
-    - default should just be whichever of the given ones works best
-    - Need to set USE_IMU  to false!
-
-
+    - EventQueue was originally called EventBuffer and was a vector of Event* before started refactoring. Now it is a deque of events.
+    I don't think it affects anything but it might be an issue
 */

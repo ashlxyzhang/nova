@@ -1,19 +1,7 @@
 #ifndef image_representation_H_
 #define image_representation_H_
 
-// #include <dynamic_reconfigure/server.h>
-#include "image_representation/TicToc.h"
-// #include <image_transport/image_transport.h>
-// #include <ros/ros.h>
-// #include <sensor_msgs/CameraInfo.h>
-// #include <sensor_msgs/Image.h>
-// #include <sensor_msgs/image_encodings.h>
-// #include <std_msgs/Time.h>
-
-#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
-#include <Eigen/Eigen>
+// From STD Library
 #include <algorithm>
 #include <deque>
 #include <mutex>
@@ -21,10 +9,17 @@
 #include <vector>
 #include <chrono>
 
-#include <yaml-cpp/yaml.h>
+// FROM SLAM
 #include "data_passing.hh"
 #include "multi_data_passing.hh"
 #include "esvo2_core/tools/types.h"
+#include "image_representation/TicToc.h"
+
+// From Dependencies
+#include <yaml-cpp/yaml.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <Eigen/Eigen>
 
 namespace image_representation
 {
@@ -116,19 +111,8 @@ class ImageRepresentation
         cv::Mat undistort_map1_, undistort_map2_;
         Eigen::Matrix2Xd precomputed_rectified_points_;
 
-        // sub & pub
-        // ros::Subscriber event_sub_;
-        // ros::Subscriber camera_info_sub_;
-
-        // image_transport::Publisher dx_image_pub_, dy_image_pub_;
-        // image_transport::Publisher image_representation_pub_TS_;
-        // image_transport::Publisher image_representation_pub_negative_TS_;
-        // image_transport::Publisher image_representation_pub_AA_frequency_;
-        // image_transport::Publisher image_representation_pub_AA_mat_;
-
         bool left_;
         cv::Mat negative_TS_img;
-        // cv_bridge::CvImage cv_dx_image, cv_dy_image;
         std::thread thread_sobel;
 
         // online parameters

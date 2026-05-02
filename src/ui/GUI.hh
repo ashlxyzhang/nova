@@ -1123,7 +1123,7 @@ class GUI
 
                 // Handle panning (translation) for the SLAM global point cloud. Have this outside of above switch statement
                 // because user might want to rotate camera and pan at the same time
-                if(event->type == SDL_EVENT_KEY_DOWN && visualizer.is_slam_running() && visualizer.is_global_pointcloud_displayed())
+                if(event->type == SDL_EVENT_KEY_DOWN && visualizer.is_slam_running())// && visualizer.is_global_pointcloud_displayed())
                 {
                     const float pan_distance = 0.5;
                     // X = left/right, Y = Up/Down, Z=forwards/backwards.

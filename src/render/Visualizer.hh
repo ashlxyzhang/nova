@@ -10,6 +10,7 @@
 #include "render/UploadBuffer.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
+#include "SLAM/esvo2_core/include/esvo2_core/tools/types.h"
 
 #include "shaders/visualizer/frames/frames_frag.h"
 #include "shaders/visualizer/frames/frames_vert.h"
@@ -247,6 +248,11 @@ class Visualizer
                 void cpu_update(const Parameters &params)
                 {
                     generate_grid_lines(params);
+                }
+
+                void cpu_update(std::vector<glm::vec3>& newLines)
+                {
+                    lines = std::move(newLines);
                 }
 
                 /**
@@ -784,10 +790,22 @@ class Visualizer
                         glm::vec4 color; // rgb = color [0, 1]
                 };
 
+                struct SlamPose
+                {
+                    glm::vec4 pos; // xyz = world position
+                    glm::quat rot; // rotation
+                };
+
                 SDL_GPUDevice *gpu_device = nullptr;
                 SDL_GPUGraphicsPipeline *slam_pipeline = nullptr;
                 SDL_GPUBuffer *vertex_buffer = nullptr;
                 std::vector<SlamVertex> vertices;
+                std::vector<SlamPose> poses; 
+
+                // Grid renderer can render black lines so are just using that to render the pose for now. If want to improve
+                //  in the future, I would recommend showing the full 3D axis at each point instead of just connecting their positions.
+                //  See cpu_update_path for slightly more info
+                GridRenderer* poseGridRenderer;
 
             public:
                 SlamRenderer(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device)
@@ -842,6 +860,8 @@ class Visualizer
                     slam_pipeline = SDL_CreateGPUGraphicsPipeline(gpu_device, &pipeline_info);
                     SDL_ReleaseGPUShader(gpu_device, vs);
                     SDL_ReleaseGPUShader(gpu_device, fs);
+
+                    poseGridRenderer = new GridRenderer(gpu_device);
                 }
 
                 ~SlamRenderer()
@@ -850,6 +870,18 @@ class Visualizer
                         SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
                     if (slam_pipeline)
                         SDL_ReleaseGPUGraphicsPipeline(gpu_device, slam_pipeline);
+                    delete poseGridRenderer;
+                }
+
+                void clear()
+                {
+                    vertices.clear();
+                    if (vertex_buffer)
+                    {
+                        SDL_ReleaseGPUBuffer(gpu_device, vertex_buffer);
+                        vertex_buffer = nullptr;
+                    }
+                    poseGridRenderer->cpu_update({});
                 }
 
                 void cpu_update(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pc)
@@ -863,35 +895,27 @@ class Visualizer
                                             glm::vec4(pt.r / 255.0f, pt.g / 255.0f, pt.b / 255.0f, 1.0f)});
                 }
 
-                void cpu_update_global(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pc, glm::vec3 cameraPos)
+                void cpu_update_global(std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> pc)
                 {
                     vertices.clear();
                     if (!pc)
                         return;
                     
                     vertices.reserve(pc->size());
-                    
-                    cameraPos.x = 0.0f;
-                    cameraPos.y = 0.0f;
-                    cameraPos.z = 0.0f;
-                    // Alternate way to find min/max that doesn't super work
-                    // pcl::PointXYZ minPt, maxPt;
-                    // pcl::getMinMax3D(*pc, minPt, maxPt);
-                    // double min_range = glm::length(glm::vec3(minPt.x, 0.0f, minPt.z) - cameraPos);
-                    // double max_range = glm::length(glm::vec3(maxPt.x, 0.0f, maxPt.z) - cameraPos);
+
+                    // Finding min/max range so that can update colors. Colors are relative to the origin (0,0,0).
                     double min_range = 100000; 
                     double max_range = 0; 
                     for (const auto &pt : *pc)
                     {
-                        double dist = glm::length(glm::vec3(pt.x, 0, pt.z) - cameraPos);
+                        double dist = glm::length(glm::vec3(pt.x, 0, pt.z));
                         min_range = std::min(min_range, dist);
                         max_range = std::max(max_range, dist);
                     }
                     
                     for (const auto &pt : *pc)
                     {
-                        double dist = glm::length(glm::vec3(pt.x, 0.0f, pt.z) - cameraPos);
-                        // double dist = pt.z - cameraPos.z;
+                        double dist = glm::length(glm::vec3(pt.x, 0.0f, pt.z));
                         int index =
                         floor((dist - min_range) / (max_range - min_range) * 255.0f);
                         if (index > 255)
@@ -903,7 +927,37 @@ class Visualizer
                         double b = esvo2_core::tools::Visualization::b[index];
                         vertices.push_back({glm::vec4(pt.x, -pt.y, pt.z, 1.0f),
                                             glm::vec4(r, g, b, 1.0f)});
-                        }
+                    }
+                }
+
+                void cpu_update_path(std::shared_ptr<std::vector<esvo2_core::PoseStamped>> path)
+                {
+                    poses.clear();
+                    if(!path)
+                    {
+                        // Set lines to nothing
+                        poseGridRenderer->cpu_update({});
+                        return;
+                    }
+
+                    // If want full pose info, can do the below to get the location/rotation. For now though, are just using the GridRender
+                    //    as an intermediary to render a simple black line to connect all the pose positions.
+                    // for (const auto &pose : *path)
+                    // {
+                    //     poses.push_back({glm::vec4(pose.position[0], pose.position[1], pose.position[2], 1.0f),
+                    //                     glm::quat(pose.orientation[3], pose.orientation[0], pose.orientation[1], pose.orientation[2])});
+                    // }
+
+                    std::vector<glm::vec3> new_lines;
+                    for (int i=0; i<path->size(); i++)
+                    {
+                        const auto &pose = (*path)[i];
+                        new_lines.push_back(glm::vec3(pose.position[0], pose.position[1], pose.position[2]));
+                        // Readd the point again so that the lines will be fully connected
+                        if(i!=0 && i!=path->size()-1)
+                            new_lines.push_back(new_lines.at(new_lines.size()-1));
+                    }
+                    poseGridRenderer->cpu_update(new_lines);
                 }
 
                 void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
@@ -923,6 +977,17 @@ class Visualizer
                     vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &buf_info);
                     upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(),
                                                 vertices.size() * sizeof(SlamVertex));
+                }
+
+                void copy_pass_path(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                {
+                    poseGridRenderer->copy_pass(upload_buffer, copy_pass);
+                }
+
+                void render_pass_path(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
+                                 const glm::mat4 &vp, const Parameters &params)
+                {
+                    poseGridRenderer->render_pass(command_buffer, render_pass, vp);
                 }
 
                 void render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
@@ -946,7 +1011,9 @@ class Visualizer
 
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> slam_pointcloud_;
         std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> slam_global_pointcloud_;
+        std::shared_ptr<std::vector<esvo2_core::PoseStamped>> slam_path_;
         bool slam_pc_changed = false;
+        bool slam_path_changed = false;
         std::atomic<bool> display_global_pointcloud = false;
         // glm::vec3 original_camera_center;
 
@@ -1024,9 +1091,21 @@ class Visualizer
             slam_global_pointcloud_ = std::move(pc);
         }
 
-        void set_slam_pc_changed(bool value)
+        void set_slam_path(std::shared_ptr<std::vector<esvo2_core::PoseStamped>> path)
+        {
+            slam_path_ = std::move(path);
+        }
+
+        bool set_slam_pc_changed(bool value)
         {
             slam_pc_changed = value;
+            return value;
+        }
+
+        bool set_slam_path_changed(bool value)
+        {
+            slam_path_changed = value;
+            return value;
         }
 
         void toggle_display_global_pointcloud()

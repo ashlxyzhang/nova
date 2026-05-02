@@ -1,18 +1,19 @@
-// #include <glog/logging.h>
+// FROM SLAM
+#include "esvo2_core/tools/types.h"
 #include "image_representation/ImageRepresentation.h"
-#include "../../refactor_files/unused/debug_log.hh"
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/core/eigen.hpp>
-#include <opencv2/opencv.hpp>
 #include "data_passing.hh"
 #include "multi_data_passing.hh"
-#include "esvo2_core/tools/types.h"
 
+// From STD Library
 #include <fstream>
 #include <cmath>
 #include <vector>
 
-// #define ESVIO_REPRESENTATION_LOG
+// From Dependencies
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/opencv.hpp>
+
 
 namespace image_representation
 {
@@ -23,25 +24,7 @@ ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const Y
             DataPassingDeque<cv::Mat>& AA_left_IR_to_Map)
              : is_running(is_running_), config_(config), multi_to_Track_(multi_to_Track), multi_to_Map_(multi_to_Map), AA_left_IR_to_Map_(AA_left_IR_to_Map)
 {
-    // setup subscribers and publishers
-    // event_sub_ = nh_.subscribe("events", 0, &ImageRepresentation::eventsCallback, this);
-    // image_transport::ImageTransport it_(nh_);
     is_left_ = config_["is_left"].as<bool>(true);
-    // if (is_left_)
-    // {
-    //     image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5); // for block matching
-    //     image_representation_pub_negative_TS_ =
-    //         it_.advertise("image_representation_negative_TS_", 5); // negative OS-TS for 3D-2D regristration
-    //     image_representation_pub_AA_frequency_ = it_.advertise("image_representation_AA_frequency_", 5);
-    //     image_representation_pub_AA_mat_ =
-    //         it_.advertise("image_representation_AA_mat_", 5); // for temporal stereo matching
-    //     dx_image_pub_ = it_.advertise("dx_image_pub_", 5);    // gradient map for point sampling
-    //     dy_image_pub_ = it_.advertise("dy_image_pub_", 5);
-    // }
-    // else
-    // {
-    //     image_representation_pub_TS_ = it_.advertise("image_representation_TS_", 5);
-    // }
     bUse_Sim_Time_ = config_["use_sim_time"].as<bool>(true);
 
     // system variables
@@ -76,7 +59,6 @@ ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const Y
     else
         std::cout << "\33[32m" << "Right event representation node is up " << "\33[0m"<<std::endl;
 
-    // std::cout<<"creating IR "<<is_left_<<std::endl;
     // start generation
     std::thread GenerationThread(&ImageRepresentation::GenerationLoop, this);
     GenerationThread.detach();
@@ -84,12 +66,10 @@ ImageRepresentation::ImageRepresentation(std::atomic<bool> &is_running_, const Y
 
 ImageRepresentation::~ImageRepresentation()
 {
-    // dx_image_pub_.shutdown();
-    // dy_image_pub_.shutdown();
-    // image_representation_pub_TS_.shutdown();
-    // image_representation_pub_negative_TS_.shutdown();
-    // image_representation_pub_AA_frequency_.shutdown();
-    // image_representation_pub_AA_mat_.shutdown();
+    if(thread_sobel.joinable())
+    {
+        thread_sobel.join();
+    }
 }
 
 void ImageRepresentation::init(int width, int height)
@@ -108,30 +88,24 @@ void ImageRepresentation::init(int width, int height)
 
 void ImageRepresentation::GenerationLoop()
 {
-    // std::cout<<"start of IR "<<is_left_<<" generation loop!"<<std::endl;
     const std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/generation_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
 
     while (is_running) {
-        // std::cout<<"IR "<<is_left_<<" is creating an IR representation!"<<std::endl;
         createImageRepresentationAtTime(std::chrono::steady_clock::now());
         next_wake_up_time += interval;
-        // std::cout<<"IR "<<is_left_<<" created an IR representation!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     }
     if(thread_sobel.joinable())
     {
-        std::cout<<"joining sobel"<<std::endl;
-        // std::cout<<"test"<<std::endl;
         thread_sobel.join();
     }
 
-    std::cout<<"IR "<<is_left_<<" is no longer running!"<<std::endl;
+    // std::cout<<"IR "<<is_left_<<" is no longer running!"<<std::endl;
 }
 
 void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &ptr_e, int distance, double external_t)
 {
-    DLOG("AA_thread START  is_left=" << is_left_ << "  distance=" << distance << "  t=" << external_t);
     timePoint external_sync_time(esvo2_core::secondsToTimePoint(external_t));
 
     representation_AA_ = cv::Mat::zeros(sensor_size_, CV_8U);   // for temporal stereo matching
@@ -201,43 +175,25 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
         }
     }
 
-
-    // std::cout<<"AA thread is like 1/2 through its function"<<std::endl;
     // distortion correction
     cv::remap(representation_AA_, representation_AA_, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
 
-    // cv_bridge::CvImage cv_AA_frequency, cv_AA_mat;
-
     // ---Publishing AA_frequency AKA AA_Left
-    // cv_bridge::CvImage cv_AA_frequency
-    // cv_AA_frequency.encoding = "mono8";
-    // cv_AA_frequency.image = AA_frequency.clone();
-    // cv_AA_frequency.header.stamp = external_sync_time;
-    // image_representation_pub_AA_frequency_.publish(cv_AA_frequency.toImageMsg());
     std::shared_ptr<cv::Mat> AA_freq = std::make_shared<cv::Mat>();
     *AA_freq = AA_frequency;
-    // std::cout<<"AA thread abotu to publish"<<std::endl;
-    DLOG("AA_thread adding AA_freq to AA_left_IR_to_Map");
     AA_left_IR_to_Map_.add(AA_freq, external_sync_time);
-    // cv::imshow("Frequency AA", AA_frequency);
-    // cv::waitKey(10);
+   
 
     // ---Publishing AA_map
-    // cv_AA_mat.encoding = "mono8";
-    // cv_AA_mat.image = representation_AA_.clone();
-    // cv_AA_mat.header.stamp = external_sync_time;
-    // image_representation_pub_AA_mat_.publish(cv_AA_mat.toImageMsg());
-    // std::cout<<"AA thread about to publish again"<<std::endl;
     std::shared_ptr<cv::Mat> AA_map = std::make_shared<cv::Mat>();
     *AA_map = representation_AA_;
-    // std::cout<<"AA thread about to add"<<std::endl;
-    DLOG("AA_thread adding AA_map to multi_to_Map channel 2");
     multi_to_Map_.add<2>({AA_map, external_sync_time});
-    DLOG("AA_thread DONE");
+    
+    // Below CV code won't work because AA_thread function is called from a separate detached thread
+     // cv::imshow("Frequency AA", AA_frequency);
+    // cv::waitKey(10);
     // cv::imshow("Representation AA", representation_AA_);
     // cv::waitKey(10);
-    // std::cout<<"AA thread is done"<<std::endl;
-
 }
 
 void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_external_sync_time)
@@ -246,11 +202,9 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
         return;
     else
         bcreat_ = false;
-    // std::cout<<"Starting createImageRepresentationAtTime callback "<<is_left_<<std::endl;
     std::lock_guard<std::mutex> lock(data_mutex_);
     if (!bSensorInitialized_ || !bCamInfoAvailable_)
     {
-        // std::cout<<"IR not initialized so returning"<<bSensorInitialized_<<" "<<bCamInfoAvailable_<<std::endl;
         return;
     }
 
@@ -262,24 +216,18 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
     
     if (representation_mode_ == Fast)
     {
-        // std::cout<<"fast mode for createImageRepresentationAtTime for side: "<<is_left_<<std::endl;
         if (vEvents_.size() == 0)
         {
-            DLOG("createImageRepresentation early-return: vEvents_ empty  is_left=" << is_left_);
             return;
         }
-        // double external_t = esvo2_core::timePointToSec(external_sync_time);
         double external_t = esvo2_core::timePointToSec(vEvents_.at(vEvents_.size()-1).timestamp);
-        // std::cout<<"IR time: "<<external_t<<" "<<esvo2_core::timePointToSec(esvo2_core::secondsToTimePoint(external_t))<<std::endl;
         timePoint external_sync_time = vEvents_.at(vEvents_.size()-1).timestamp;
         std::vector<esvo2_core::Event>::iterator ptr_e = EventVector_lower_bound(vEvents_, external_t);
         int distance = std::distance(vEvents_.begin(), ptr_e);
 
         if (is_left_) // generate AA and TS in parallel, just for left camera
         {
-            // std::cout<<"left is spawning aa thread"<<std::endl;
             std::thread thread0(&ImageRepresentation::AA_thread, this, std::ref(ptr_e), distance, external_t);
-            // std::cout<<"aa thread spawned"<<std::endl;
             representation_TS_.setTo(cv::Scalar(0));
             cv::Mat TS_img = cv::Mat::zeros(sensor_size_, CV_64F);
 
@@ -290,7 +238,6 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
 
             std::vector<esvo2_core::Event>::iterator it = vEvents_.begin();
 
-            // cv::Mat testImge = cv::Mat::zeros(sensor_size_, CV_8U);
             // generate TS map
             for (int i = 0; i < distance; i++)
             {
@@ -299,31 +246,15 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
                     break;
                 esvo2_core::Event e = *(it + index);
                 TS_temp_map(e.y, e.x) = esvo2_core::timePointToSec(e.timestamp) / decay_sec_;
-                // testImge.at<uchar>(e.y, e.x) = 255;
-                // std::cout<< "event: "<<e.x<<" "<<e.y<<" "<<esvo2_core::timePointToSec(e.timestamp)<<std::endl;
-                
             }
 
             cv::eigen2cv(TS_temp_map, representation_TS_);
             representation_TS_ = representation_TS_ - external_t / decay_sec_;
-
-            // double event_time_sec = esvo2_core::timePointToSec((it+distance-1)->timestamp);
-            // double time_diff = event_time_sec - external_t;
-            // std::cout << "Time difference: " << time_diff << " s" << std::endl;
-            // std::cout<<"Timestamps:"<<esvo2_core::timePointToSec((it+distance-1)->timestamp)<<" "<<external_t<<std::endl;
              
             cv::exp(representation_TS_, representation_TS_);
 
             TS_img = representation_TS_ * 255.0;
             TS_img.convertTo(TS_img, CV_8U);
-
-            // testImge.convertTo(testImge, CV_8U);
-            
-            // cv::imshow("Test", testImge);
-            // cv::waitKey(10);
-
-            //  cv::imshow("Early Left TS", TS_img);
-            // cv::waitKey(10);
 
             // distortion correction
             cv::remap(TS_img, TS_img, undistort_map1_, undistort_map2_, cv::INTER_LINEAR);
@@ -335,67 +266,43 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
             cv::Mat mask = (TS_img == 0);
             TS_img_blur.copyTo(OS_TS, mask);
             cv::medianBlur(TS_img, TS_img, 2 * median_blur_kernel_size_ + 1);
-            // std::cout<<"left did lots of math. about to join sobel"<<std::endl;
 
             // generate and publish gradient map in parallel
             if (thread_sobel.joinable())
                 thread_sobel.join();
-            // std::cout<<"sobel joined"<<std::endl;
+
             negative_TS_img = cv::Mat::ones(sensor_size_, CV_8U);
             negative_TS_img = negative_TS_img * 255;
             negative_TS_img = negative_TS_img - OS_TS;
 
-            // cv_bridge::CvImage cv_TS_image, cv_negative_TS_image;
-            // dx and dy are published in sobel so idk why have the below
-            // cv_dx_image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
-            // cv_dy_image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
-            // cv_dx_image.header.stamp = timePoint(external_t);
-            // cv_dy_image.header.stamp = timePoint(external_t);
-            // std::cout<<"making sobel thread"<<std::endl;
             thread_sobel = std::thread(&ImageRepresentation::sobel, this, external_t);
 
             // ---Publishing TS_left
-            // cv_TS_image.encoding = "mono8";
-            // cv_TS_image.header.stamp = timePoint(external_t);
-            // cv_TS_image.image = TS_img.clone();
-            // cv_TS_image.header.stamp = external_sync_time;
-            // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
             std::shared_ptr<cv::Mat> TS_left = std::make_shared<cv::Mat>();
             *TS_left = TS_img;
-            // std::cout<<"adding ts left"<<std::endl;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-            // DLOG("LEFT: adding TS_left to Track ch0 and Map ch0  t=" << esvo2_core::timePointToSec(external_sync_time));
             multi_to_Track_.add<0>({TS_left, external_sync_time});
             multi_to_Map_.add<0>({TS_left, external_sync_time});
-            // std::cout<<"added ts left"<<std::endl;
             // ---Publishing TS_neg
-            // cv_negative_TS_image.encoding = "mono8";
-            // cv_negative_TS_image.header.stamp = timePoint(external_t);
-            // cv_negative_TS_image.image = negative_TS_img.clone();
-            // cv_negative_TS_image.header.stamp = external_sync_time;
-            // image_representation_pub_negative_TS_.publish(cv_negative_TS_image.toImageMsg());
             std::shared_ptr<cv::Mat> TS_neg = std::make_shared<cv::Mat>();
             *TS_neg = negative_TS_img;
-            // std::cout<<"adding ts neg to queues"<<std::endl;
             // Can add same shared ptr to both because they treat it as a const in the callback functions I think
             multi_to_Track_.add<1>({TS_neg, external_sync_time});
             multi_to_Map_.add<3>({TS_neg, external_sync_time});
-            // std::cout<<"ts neg added"<<std::endl;
-            
-            // std::cout<<"joining aa thread"<<std::endl;
+
             thread0.join();
-            cv::imshow("Left TS", *TS_left);
-            cv::waitKey(10);
-            cv::imshow("Neg Left TS", *TS_neg);
-            cv::waitKey(10);
-            // std::cout<<"aa thread joined"<<std::endl;
+
+            // cv::imshow("Left TS", *TS_left);
+            // cv::waitKey(10);
+            // cv::imshow("Neg Left TS", *TS_neg);
+            // cv::waitKey(10);
         }
         else // generate TS, just for right camera
         {
-            // std::cout<<"right IR is image generating"<<std::endl;
             representation_TS_.setTo(cv::Scalar(0));
             cv::Mat TS_img = cv::Mat::zeros(sensor_size_, CV_64F);
 
+            // Can be helpful if too many events
             // double step = static_cast<double>(distance) / 90000.0;
             // if (step < 1)
             double step = 1;
@@ -419,29 +326,17 @@ void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_exte
 
             cv::medianBlur(TS_img, TS_img, 2 * median_blur_kernel_size_ + 1);
 
-            // std::cout<<"ir right did lots of math"<<std::endl;
-
             // ---Publishing TS_right
-            // cv_bridge::CvImage cv_TS_image;
-            // cv_TS_image.encoding = "mono8";
-            // cv_TS_image.header.stamp = timePoint(external_t);
-            // cv_TS_image.image = TS_img.clone();
-            // image_representation_pub_TS_.publish(cv_TS_image.toImageMsg());
             std::shared_ptr<cv::Mat> TS_right = std::make_shared<cv::Mat>();
             *TS_right = TS_img;
-            // Can add same shared ptr to both because they treat it as a const in the callback functions I think
-            // std::cout<<"IR right sending ts right"<<std::endl;
-            // DLOG("RIGHT: adding TS_right to Map ch1  t=" << esvo2_core::timePointToSec(external_sync_time));
-            multi_to_Map_.add<1>({TS_right, external_sync_time});
-            // std::cout<<"IR right sent ts right"<<std::endl;
 
-            cv::imshow("Right TS", *TS_right);
-            cv::waitKey(10);
+            multi_to_Map_.add<1>({TS_right, external_sync_time});
+
+            // cv::imshow("Right TS", *TS_right);
+            // cv::waitKey(10);
         }
 
-        // std::cout<<"about to clear events"<<std::endl;
         clearEvents(distance, ptr_e);
-        // std::cout<<"cleared events"<<std::endl;
     }
 }
 
@@ -455,14 +350,12 @@ void ImageRepresentation::clearEvents(int distance, std::vector<esvo2_core::Even
 
 void ImageRepresentation::eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg)
 {
-    // std::cout<<" ir on events callback "<<is_left_<<std::endl;
     TicToc t;
     std::lock_guard<std::mutex> lock(data_mutex_);
     double t1 = t.toc();
     if (!bSensorInitialized_)
     {
         init(msg->width, msg->height);
-        // std::cout<<"side: "<<is_left_<<" is initializing sensor with "<<msg->width<<" "<<msg->height<<std::endl;
     }
     for (const esvo2_core::Event &e : msg->events)
     {
@@ -478,9 +371,7 @@ void ImageRepresentation::eventsCallback(const std::shared_ptr<esvo2_core::Event
         }
         vEvents_[i + 1] = e;
     }
-    // std::cout<<"IR got events, about to clear event queue"<<std::endl;
     clearEventQueue();
-    // std::cout<<"IR done with events callbacl!"<<std::endl;
     bcreat_ = true;
 }
 
@@ -502,8 +393,6 @@ void ImageRepresentation::sobel(double external_t)
     cv::Sobel(negative_TS_img, dy_result, CV_16SC1, 0, 1);
 
     // Publishing dx
-    // cv_dx_image.header.stamp = timePoint(external_t);
-    // dx_image_pub_.publish(cv_dx_image.toImageMsg());
     std::shared_ptr<cv::Mat> dx_image = std::make_shared<cv::Mat>();
     *dx_image = std::move(dx_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
@@ -512,8 +401,6 @@ void ImageRepresentation::sobel(double external_t)
 
 
     // Publishing dy
-    // cv_dy_image.header.stamp = timePoint(external_t);
-    // dy_image_pub_.publish(cv_dy_image.toImageMsg());
     std::shared_ptr<cv::Mat> dy_image = std::make_shared<cv::Mat>();
     *dy_image = std::move(dy_result);
     // Can add same shared ptr to both because they treat it as a const in the callback functions I think
@@ -526,10 +413,6 @@ bool ImageRepresentation::loadCalibInfo(const std::string& camera_yaml_path, boo
 {
     bCamInfoAvailable_ = false;
     std::string cam_calib_dir;
-    // if (is_left)
-    //     cam_calib_dir = cameraSystemDir + "/left.yaml";
-    // else
-    //     cam_calib_dir = cameraSystemDir + "/right.yaml";
     if (!fileExists(camera_yaml_path))
         return bCamInfoAvailable_;
     YAML::Node CamCalibInfo = YAML::LoadFile(camera_yaml_path);
@@ -591,7 +474,6 @@ bool ImageRepresentation::loadCalibInfo(const std::string& camera_yaml_path, boo
         else
         {
             std::cerr<<"Distortion model <<"<<distortion_model_.c_str()<<"is not supported."<<std::endl;
-
             return bCamInfoAvailable_;
         }
 

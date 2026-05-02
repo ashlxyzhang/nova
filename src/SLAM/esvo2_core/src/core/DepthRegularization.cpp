@@ -88,7 +88,7 @@ void DepthRegularization::apply( DepthMap::Ptr& depthMapPtr )
           }
           else
           {
-            std::cout << "(Regularization) Wrong dpConfiguration is provided.";
+            std::cout << "(Regularization) Wrong dpConfiguration is provided. In DepthRegularization.cpp apply()"<<std::endl;
             exit(-1);
           }
 

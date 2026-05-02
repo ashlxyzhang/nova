@@ -151,7 +151,7 @@ void DepthProblemSolver::solve_multiple_problems(Job & job)
     }
     else
     {
-      std::cerr << "Wrong Depth Problem Type is assigned!!!" << std::endl;
+      std::cerr << "Wrong Depth Problem Type is assigned!!! In DepthProblemSolver.cpp solve_multiple_problems" << std::endl;
       exit(-1);
     }
 

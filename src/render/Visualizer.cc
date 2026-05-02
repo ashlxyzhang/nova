@@ -157,23 +157,30 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     bool slam_active = slam_pointcloud_ != nullptr;
 
     // CPU Update phase
-    if(slam_pc_changed)
-    {
-        if(display_global_pointcloud)
-            slam_renderer->cpu_update_global(slam_global_pointcloud_, camera.getPosition());
-        else
-        {
-            slam_renderer->cpu_update(slam_pointcloud_);
-            // Move camera back to default position
-            camera.setOrbitCenter(glm::vec3(0,0,0));
-        }
-    }
     if (!slam_active)
     {
+        // Move camera back to default location in case it moved around during SLAM
+        camera.setOrbitCenter(glm::vec3(0,0,0));
+        slam_renderer->clear();
         grid_renderer->cpu_update(params);
         points_renderer->cpu_update(data_source, params);
         text_renderer->cpu_update(data_source, params);
         frames_renderer->cpu_update(data_source, params);
+    }
+    else
+    {
+        if(display_global_pointcloud)
+        {
+            if(slam_pc_changed)
+                slam_renderer->cpu_update_global(slam_global_pointcloud_);
+            if(slam_path_changed)
+                slam_renderer->cpu_update_path(slam_path_);
+        }
+        else
+        {
+            if(slam_pc_changed)
+                slam_renderer->cpu_update(slam_pointcloud_);
+        }
     }
 
     // Create command buffer and copy pass once for all sub-renderers
@@ -181,14 +188,19 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     // Copy pass phase
-    if(slam_pc_changed)
-        slam_renderer->copy_pass(upload_buffer, copy_pass);
     if (!slam_active)
     {
         grid_renderer->copy_pass(upload_buffer, copy_pass);
         points_renderer->copy_pass(upload_buffer, copy_pass, data_source);
         text_renderer->copy_pass(upload_buffer, copy_pass, data_source);
         frames_renderer->copy_pass(upload_buffer, copy_pass, data_source);
+    }
+    else
+    {
+        if((slam_pc_changed))
+            slam_renderer->copy_pass(upload_buffer, copy_pass);
+        if(slam_path_changed)
+            slam_renderer->copy_pass_path(upload_buffer, copy_pass);
     }
 
     // End copy pass
@@ -218,13 +230,19 @@ void Visualizer::render(std::shared_ptr<DataSource> data_source)
     glm::mat4 projection = camera.getProjectionMatrix();
     glm::mat4 vp = projection * view;
 
-    slam_renderer->render_pass(command_buffer, render_pass, vp, params);
     if (!slam_active)
     {
         grid_renderer->render_pass(command_buffer, render_pass, vp);
         points_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
         frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
         text_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
+    }
+    else
+    {
+        slam_renderer->render_pass(command_buffer, render_pass, vp, params);
+        // Only show path if displaying the global point cloud
+        if(display_global_pointcloud)
+            slam_renderer->render_pass_path(command_buffer, render_pass, vp, params);
     }
 
     SDL_EndGPURenderPass(render_pass);

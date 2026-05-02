@@ -12,9 +12,7 @@
 
 #include "SystemStatus.h"
 #include <opencv2/core/core.hpp>
-// #include <src/util/pch.hh>
 #include <glm/gtc/quaternion.hpp>
-// #include "esvo2_core/tools/utils.h"
 #include <kindr/minimal/quat-transformation.h>
 #include <kindr/minimal/rotation-quaternion.h>
 
@@ -200,22 +198,11 @@ public:
                 }
 
                 kindr_tf = kindr::minimal::QuatTransformationTemplate<double>(rotation, position);
-                // Eigen::Matrix<double, 3, 1> kindr_pos(trans.x, trans.y, trans.z);
-                // kindr::minimal::RotationQuaternionTemplate<double> kindr_rot(rot.w, rot.x, rot.y, rot.z);
-                
-                // // Enforce positive w.
-                // if (kindr_rot.w() < 0) {
-                //         kindr_rot.setValues(kindr_rot.w()*-1, kindr_rot.x()*-1, kindr_rot.y()*-1, kindr_rot.z()*-1);
-                //         // rotate.coeffs() = -rotate.coeffs();
-                // }
-                // kindr_rot.normalize();
-                // kindr_tf = kindr::minimal::QuatTransformation(kindr_rot, kindr_pos);
         }
 };
 
 // Replaces tf::Transformer
 // https://wiki.ros.org/tf
-// https://chat.tamu.ai/c/a112aef2-ef25-45a9-ad11-071c6dc02664
 class Transformer
 {
 public:
@@ -261,12 +248,6 @@ public:
         // Says if lookupTransform will be valid if called with timePoint t
         bool canTransform(std::string from, std::string to, timePoint t, std::string* err)
         {
-                // std::cout<<"are in can transform!"<<std::endl;
-                // std::cout<<transform_buffer.size()<<std::endl;
-                // for (auto i : transform_buffer)
-                // {
-                        // std::cout<<esvo2_core::timePointToSec(i.timestamp)<<std::endl;
-                // }
                 StampedTransform test(t);
                 auto right = transform_buffer.lower_bound(test);
                 // Nothing is greater than t, so cannot lerp
@@ -276,7 +257,6 @@ public:
                         return false;
                 }
                 // Right exactly equals t, so can just return right
-                // if(esvo2_core::timePointToSec(right->timestamp) == esvo2_core::timePointToSec(t))
                 if(right->timestamp == t)
                         return true;
                 // There exists another timestamp before t, so can lerp because have a left and right

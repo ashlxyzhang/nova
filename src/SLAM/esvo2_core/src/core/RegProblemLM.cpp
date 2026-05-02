@@ -185,7 +185,7 @@ int RegProblemLM::df(const Eigen::Matrix<double,6,1>& x, Eigen::MatrixXd& fjac) 
 {
   if(x != Eigen::Matrix<double,6,1>::Zero())
   {
-    std::cout << "The Jacobian is not evaluated at Zero !!!!!!!!!!!!!";
+    std::cout << "The Jacobian is not evaluated at Zero !!!!!!!!!!!!! In RegProblemLM.coo df()"<<std::endl;
     exit(-1);
   }
   fjac.resize(m_values, 6);
@@ -343,7 +343,7 @@ RegProblemLM::getWarpingTransformation(
   R_cur_ref = svd.matrixU() * svd.matrixV().transpose();
   if( R_cur_ref.determinant() < 0.0 )
   {
-    std::cout << "oops the matrix is left-handed\n";
+    std::cout << "oops the matrix is left-handed\n In RegProbleLM.cpp getWarpingTransform()"<<std::endl;
     exit(-1);
   }
   t_cur_ref = -R_cur_ref * ( dt + dR * t_ );

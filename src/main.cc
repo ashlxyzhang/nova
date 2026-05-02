@@ -136,9 +136,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     {
         if (app->slam->isRunning())
         {
-            std::cout << "Stopping SLAM" << std::endl;
             app->slam->stopSlam();
-            std::cout << "SLAM stopped" << std::endl;
+            app->visualizer->set_slam_pointcloud(nullptr);
+            app->visualizer->set_slam_global_pointcloud(nullptr);
         }
         else
         {
@@ -161,7 +161,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
             params.right_scrubber = &sources.at(1)->scrubber;
             params.right_eventdata = &sources.at(1)->event_data;
 
-            std::cout << "Starting SLAM" << std::endl;
             app->slam->startSlam(params);
         }
     }
@@ -189,10 +188,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     // Update SLAM based on its scrubbers's events
     app->slam->send_events();
-    app->visualizer->set_slam_pointcloud(app->slam->get_viz_pointcloud());
-    app->visualizer->set_slam_global_pointcloud(app->slam->get_viz_global_pointcloud());
-    app->visualizer->set_slam_pc_changed(app->slam->were_pointclouds_updated());
-
+    if(app->visualizer->set_slam_pc_changed(app->slam->were_pointclouds_updated()))
+    {
+        app->visualizer->set_slam_pointcloud(app->slam->get_viz_pointcloud());
+        app->visualizer->set_slam_global_pointcloud(app->slam->get_viz_global_pointcloud());
+    }
+    if(app->visualizer->set_slam_path_changed(app->slam->was_path_updated()))
+    {
+        app->visualizer->set_slam_path(app->slam->get_viz_path());
+    }
+   
     // Render all data sources
     std::vector<std::shared_ptr<DataSource>> data_sources = app->data_acq->get_data_sources();
     for (const auto &data_source : data_sources)

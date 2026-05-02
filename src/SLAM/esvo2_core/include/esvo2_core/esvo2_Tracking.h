@@ -70,12 +70,10 @@ class esvo2_Tracking
         void refMapCallback(const std::pair<std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>>, timePoint> &msg);
         void refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &msg);
         void VBaBgCallback(const std::shared_ptr<esvo2_core::VBaBg> &msg);
-        void groundTruthCallback(const std::shared_ptr<esvo2_core::PoseStamped> msg);
         void timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &time_surface_left,
                                          const esvo2_core::ImagePtr &time_surface_negative,
                                          const esvo2_core::ImagePtr &time_surface_dx,
                                          const esvo2_core::ImagePtr &time_surface_dy);
-        // void eventsCallback(const EventArray::ConstPtr &msg); // unused
 
         // results
         void publishPose(const timePoint &t, Transformation &tr);
@@ -92,6 +90,21 @@ class esvo2_Tracking
         void renameOldTraj();
         Eigen::Matrix3d fixRotationMatrix(const Eigen::Matrix3d &R);
 
+        std::shared_ptr<std::vector<esvo2_core::PoseStamped>> get_viz_path()
+        {
+            std::lock_guard<std::mutex> lock(viz_path_mutex_);
+            std::shared_ptr<std::vector<esvo2_core::PoseStamped>> viz_path = std::make_shared<std::vector<esvo2_core::PoseStamped>>();
+            *viz_path = path_.poses;
+            return viz_path;
+        }
+
+        bool was_path_updated()
+        {
+            bool answer = path_updated;
+            path_updated = false;
+            return answer;
+        }
+
     private:
         //queues
         DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Map_;
@@ -103,36 +116,10 @@ class esvo2_Tracking
         // configuration variables struct
         YAML::Node config_;
 
-        // subscribers and publishers
-        // ros::Subscriber events_left_sub_;
-
-
-        // ros::Subscriber map_sub_, map_sub_for_tracking_visualization_;
-        // ros::Subscriber V_ba_bg_sub_;
-        // ros::Subscriber imu_sub_;
-        // ros::Subscriber gt_sub_;
-
-        // message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
-        // message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
-        // ros::Subscriber stampedPose_sub_;
-        // image_transport::Publisher reprojMap_pub_left_;
-
-        // publishers
-        // ros::Publisher pose_pub_, path_pub_;
-
         // results
         Path path_;
         std::list<Eigen::Matrix<double, 4, 4>, Eigen::aligned_allocator<Eigen::Matrix<double, 4, 4>>> lPose_;
         std::list<std::string> lTimestamp_;
-
-        // Time Surface sync policy
-        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>
-            // ApproximateSyncPolicy;
-        // message_filters::Synchronizer<ApproximateSyncPolicy> TS_sync_;
-        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image,
-                                                                // sensor_msgs::Image, sensor_msgs::Image>
-            // ApproximateSyncPolicy_negaTS;
-        // message_filters::Synchronizer<ApproximateSyncPolicy_negaTS> TS_negaTS_sync_;
 
         // offline data
         std::string dvs_frame_id_;
@@ -161,6 +148,11 @@ class esvo2_Tracking
         std::map<timePoint, pcl::PointCloud<pcl::PointXYZRGBL>::Ptr> refPCMap_;
         RefFrame ref_;
         CurFrame cur_;
+
+        // Visualization
+        std::mutex viz_path_mutex_;
+        // std::shared_ptr<std::vector<esvo2_core::PoseStamped>> viz_path_;
+        std::atomic<bool> path_updated = false;
 
         /**** offline parameters ***/
         size_t tracking_rate_hz_;

@@ -32,18 +32,12 @@ class DataPassingDeque {
         // Adds a thing to the queue
         void add(std::shared_ptr<T> thingToAdd, timePoint timestamp)
         {
-            // std::cout<<"about to lock"<<std::endl;
             lock();
-            // std::cout<<"locked! Stuff: "<<dq.size()<<" "<<max_queue_size<<std::endl;
             while(dq.size() >= max_queue_size)
                 dq.pop_front();
-            // std::cout<<"popped: "<<dq.size()<<"about to push back"<<std::endl;
             dq.push_back({thingToAdd, timestamp});
-            // std::cout<<"added to dq, about to unlock"<<std::endl;
             unlock();
-            // std::cout<<"unlocked, about to notivy"<<std::endl;
             cv->notify_one();
-            // std::cout<<"notified"<<std::endl;
         }
         
         void lock()

@@ -1,14 +1,15 @@
-#include "esvo2_core/esvo2_Tracking.h"
-#include "esvo2_core/tools/TicToc.h"
-// #include <minkindr_conversions/kindr_tf.h>
-#include <sys/stat.h>
-// #include <tf/transform_broadcaster.h>
-#include "data_passing.hh"
-#include "multi_data_passing.hh"
+// From STD library
 #include <fstream>
 #include <string>
+#include <sys/stat.h>
 
-// #define ESVO2_CORE_TRACKING_DEBUG
+// From SLAM
+#include "esvo2_core/esvo2_Tracking.h"
+#include "esvo2_core/tools/TicToc.h"
+#include "data_passing.hh"
+#include "multi_data_passing.hh"
+
+
 // #define ESVO2_CORE_TRACKING_DEBUG
 namespace esvo2_core
 {
@@ -18,7 +19,6 @@ esvo2_Tracking::esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node 
         DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Track)
     : is_running(is_running_), config_(config), stamped_pose_Track_to_Map_(stamped_pose_Track_to_Map),
       stamped_pose_Track_to_Track_(stamped_pose_Track_to_Track), 
-    //   calibInfoDir_(config_["calibInfoDir"].as<std::string>("")),
       camSysPtr_(new CameraSystem(left_camera_yaml_path, right_camera_yaml_path, false)),
       rpConfigPtr_(new RegProblemConfig(
           config_["patch_size_X"].as<int>(25), config_["patch_size_Y"].as<int>(25), config_["kernelSize"].as<int>(15),
@@ -42,11 +42,11 @@ esvo2_Tracking::esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node 
     REF_HISTORY_LENGTH_ = config_["REF_HISTORY_LENGTH"].as<int>(5);
     bSaveTrajectory_ = config_["SAVE_TRAJECTORY"].as<bool>(false);
     bVisualizeTrajectory_ = config_["VISUALIZE_TRAJECTORY"].as<bool>(true);
-    bUseImu_ = config_["USE_IMU"].as<bool>(true);
+    // IMU IS NOT SUPPORTED!!!!!!!!!!!
+    // bUseImu_ = config_["USE_IMU"].as<bool>(true);
+    bUseImu_ = false;
     resultPath_ = config_["PATH_TO_SAVE_TRAJECTORY"].as<std::string>(std::string());
     setSystemStatus(SystemStatus::INITIALIZATION);
-
-    std::cout<<"savers?: "<<bSaveTrajectory_<<std::endl;
     
     // get extrinsic parameters
     R_b_c_ = camSysPtr_->cam_left_ptr_->T_b_c_.block<3, 3>(0, 0);
@@ -54,13 +54,11 @@ esvo2_Tracking::esvo2_Tracking(std::atomic<bool> &is_running_, const YAML::Node 
     imu_data_.initialization(ba_, bg_);
     initVsFlag = false;
 
-    // TS_negaTS_sync_.registerCallback(boost::bind(&esvo2_Tracking::timeSurface_NegaTS_Callback, this, _1, _2, _3, _4));
-
     tf_ = std::make_shared<esvo2_core::Transformer>(100);
-    // In refactoring, IMU HAS NO SUB/PUB queues  set up!
+    // In refactoring, IMU HAS NO SUB/PUB queues set up.
         // imu_sub_ = nh_.subscribe("/imu/data", 0, &esvo2_Tracking::refImuCallback, this); // local map in the ref view.
     /*** For Visualization and Test ***/
-    // In refactoring, below 2 have NO SUB/PUB queues  set up!
+    // In refactoring, below 2 have NO SUB/PUB queues set up!
         // path_pub_ = nh_.advertise<nav_msgs::Path>("/esvo2_tracking/trajectory", 1);
         // reprojMap_pub_left_ = it_.advertise("Reproj_Map_Left", 1);
     // In refactoring, Pub/Sub queue is inside of the RegProblemSolverLM class directly, but it is also not setup
@@ -80,133 +78,21 @@ esvo2_Tracking::~esvo2_Tracking()
 {
     if (!resultPath_.empty())
     {
-        std::cout << "pose size: " << lPose_.size();
         std::string path = std::string(resultPath_ + "result.txt");
         saveTrajectory(path);
     }
-    // pose_pub_.shutdown();
 }
 
 void esvo2_Tracking::TrackingLoop()
 {
-//     ros::Rate r(tracking_rate_hz_);
-//     while (ros::ok())
-//     {
-//         // Keep Idling
-//         if (refPCMap_.size() < 1 || TS_history_.size() < 1)
-//         {
-//             r.sleep();
-//             continue;
-//         }
-
-//         // Reset
-//         if (getSystemStatus() == SystemStatus::INITIALIZATION &&
-//             ets_ == WORKING) // This is true when the system is reset from dynamic reconfigure
-//         {
-//             reset();
-//             r.sleep();
-//             continue;
-//         }
-//         if (getSystemStatus() == SystemStatus::TERMINATE)
-//         {
-//             std::cout << "The tracking node is terminated manually...";
-//             break;
-//         }
-//         TicToc tt;
-//         double curData_time;
-//         // Data Transfer (If mapping node had published refPC.)
-//         {
-//             std::lock_guard<std::mutex> lock(data_mutex_);
-//             if (esvo2_core::timePointToSec(ref_.t_) < esvo2_core::timePointToSec(refPCMap_.rbegin()->first)) // new reference map arrived
-//                 refDataTransferring();
-//             if (esvo2_core::timePointToSec(cur_.t_) < esvo2_core::timePointToSec(TS_history_.rbegin()->first)) // new observation arrived
-//             {
-//                 if (esvo2_core::timePointToSec(ref_.t_) >= esvo2_core::timePointToSec(TS_history_.rbegin()->first))
-//                 {
-//                     std::cout << "The time_surface observation should be obtained after the reference frame";
-//                     exit(-1);
-//                 }
-//                 if (!curDataTransferring())
-//                 {
-//                     continue;
-//                 }
-//             }
-//             else
-//             {
-//                 continue;
-//             }
-//         }
-//         curData_time = tt.toc();
-
-//         // create new regProblem
-//         double t_resetRegProblem, t_solve, t_pub_result;
-
-//         if (rpSolver_.resetRegProblem(&ref_, &cur_))
-//         {
-//             if (ets_ == IDLE)
-//                 ets_ = WORKING;
-//             if (getSystemStatus() != SystemStatus::WORKING)
-//             {
-//                 setSystemStatus(SystemStatus::WORKING);
-//                 std::cout << "ESVO2_SYSTEM_STATUS: WORKING";
-//             }
-
-//             // TicToc t_coarse;
-//             if (rpType_ == REG_NUMERICAL)
-//                 rpSolver_.solve_numerical();
-//             if (rpType_ == REG_ANALYTICAL)
-//                 rpSolver_.solve_analytical();
-
-//             T_world_cur_ = cur_.tr_.getTransformationMatrix();
-//             t_world_cur_ = T_world_cur_.block(0, 3, 3, 1);
-//             publishPose(cur_.t_, cur_.tr_);
-//             if (bVisualizeTrajectory_)
-//                 publishPath(cur_.t_, cur_.tr_);
-
-//             // save result and gt if available.
-//             if (bSaveTrajectory_)
-//             {
-//                 // save results to listPose and listPoseGt
-//                 lTimestamp_.push_back(std::to_string(esvo2_core::timePointToSec(cur_.t_)));
-//                 lPose_.push_back(cur_.tr_.getTransformationMatrix());
-//             }
-//         }
-//         else
-//         {
-//             setSystemStatus(SystemStatus::INITIALIZATION);
-//             ets_ = IDLE;
-//         }
-//         std::ofstream f;
-
-// #ifdef ESVO2_CORE_TRACKING_LOG
-//         double t_overall_count = 0;
-//         t_overall_count = t_resetRegProblem + t_solve + t_pub_result;
-//         std::cout << "\n";
-//         std::cout << "------------------------------------------------------------";
-//         std::cout << "--------------------Tracking Computation Cost---------------";
-//         std::cout << "------------------------------------------------------------";
-//         std::cout << "ResetRegProblem: " << t_resetRegProblem << " ms, (" << t_resetRegProblem / t_overall_count * 100
-//                   << "%).";
-//         std::cout << "Registration: " << t_solve << " ms, (" << t_solve / t_overall_count * 100 << "%).";
-//         std::cout << "pub result: " << t_pub_result << " ms, (" << t_pub_result / t_overall_count * 100 << "%).";
-//         std::cout << "Total Computation (" << rpSolver_.lmStatics_.nPoints_ << "): " << t_overall_count << " ms.";
-//         std::cout << "------------------------------------------------------------";
-//         std::cout << "------------------------------------------------------------";
-// #endif
-//         r.sleep();
-//     } // while
-    //  std::cout<<"first time at tracking whiel loop!"<<std::endl;
-
     const std::chrono::nanoseconds interval = std::chrono::nanoseconds(static_cast<long long>(1e9/tracking_rate_hz_));
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
     while (is_running)
     {
-        //  std::cout<<"at beginning of tracking while loop!"<<std::endl;
         // Keep Idling
         if (refPCMap_.size() < 1 || TS_history_.size() < 1)
         {
             next_wake_up_time += interval;
-            // std::cout<<"at end of tracking while loop! Sizes are too small: "<<refPCMap_.size()<<" "<<TS_history_.size()<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
@@ -217,13 +103,12 @@ void esvo2_Tracking::TrackingLoop()
         {
             reset();
             next_wake_up_time += interval;
-            // std::cout<<"at end of tracking while loop! Are reset from dynamic reconfigure woah"<<std::endl;
             std::this_thread::sleep_until(next_wake_up_time);
             continue;
         }
         if (getSystemStatus() == SystemStatus::TERMINATE)
         {
-            std::cout << "The tracking node is terminated manually..." << std::endl;
+            // std::cout << "The tracking node is terminated manually..." << std::endl;
             break;
         }
         TicToc tt;
@@ -237,19 +122,17 @@ void esvo2_Tracking::TrackingLoop()
             {
                 if (esvo2_core::timePointToSec(ref_.t_) >= esvo2_core::timePointToSec(TS_history_.rbegin()->first))
                 {
-                    std::cerr << "The time_surface observation should be obtained after the reference frame" << std::endl;
+                    std::cerr << "The time_surface observation should be obtained after the reference frame."
+                    <<"Are in esvo2_Tracking.cpp TrackingLoop()." << std::endl;
                     // exit(-1);
-                    // std::cerr<<"Tracking wanted to kill the program because it is dumb"<<std::endl;
                 }
                 if (!curDataTransferring())
                 {
-                    // std::cout<<"at end of tracking while loop! not current data transfeerring"<<std::endl;
                     continue;
                 }
             }
             else
             {
-                // std::cout<<"at end of tracking while loop! IDK bro"<<std::endl;
                 continue;
             }
         }
@@ -265,7 +148,7 @@ void esvo2_Tracking::TrackingLoop()
             if (getSystemStatus() != SystemStatus::WORKING)
             {
                 setSystemStatus(SystemStatus::WORKING);
-                std::cout << "ESVO2_SYSTEM_STATUS: WORKING" << std::endl;
+                // std::cout << "ESVO2_SYSTEM_STATUS: WORKING" << std::endl;
             }
 
             // TicToc t_coarse;
@@ -284,7 +167,6 @@ void esvo2_Tracking::TrackingLoop()
             if (bSaveTrajectory_)
             {
                 // save results to listPose and listPoseGt
-                std::cout<<"Tracking is saving the results"<<std::endl;
                 lTimestamp_.push_back(std::to_string(esvo2_core::timePointToSec(cur_.t_)));
                 lPose_.push_back(cur_.tr_.getTransformationMatrix());
             }
@@ -312,18 +194,17 @@ void esvo2_Tracking::TrackingLoop()
         std::cout << "------------------------------------------------------------";
 #endif
         next_wake_up_time += interval;
-        // std::cout<<"at end of tracking while loop!"<<std::endl;
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
-    std::cout<<"Tracking is no longer running!"<<std::endl;
+    // std::cout<<"Tracking is no longer running!"<<std::endl;
 }
 
 bool esvo2_Tracking::refDataTransferring()
 {
     // load reference info.
     ref_.t_ = refPCMap_.rbegin()->first;
+    // Because IR is no longer based on chrono::now(), won't have to go back in time or anything and can just use the exact timestamp
     // timePoint t = esvo2_core::secondsToTimePoint(esvo2_core::timePointToSec(refPCMap_.rbegin()->first) - 0.001);
-    // Because are not doing based on chrono::now(), won't have to go back in time or anything and can just use the exact timestamp
     timePoint t = refPCMap_.rbegin()->first;
     if (getSystemStatus() == SystemStatus::INITIALIZATION && ets_ == IDLE)
         ref_.tr_.setIdentity();
@@ -334,7 +215,8 @@ bool esvo2_Tracking::refDataTransferring()
         {
             std::cout << "system_status: " << systemStatusToString() << ", ref_.t_: " << timePointToSec(ref_.t_);
             std::cout
-                << "Logic error ! There must be a pose for the given timestamp, because mapping has been finished.";
+                << "Logic error ! There must be a pose for the given timestamp, because mapping has been finished."
+                <<" Are in esvo2_Trakcing.cpp refDataTransfering()"<<std::endl;
             // exit(-1);
             return false;
         }
@@ -536,10 +418,6 @@ void esvo2_Tracking::VBaBgCallback(const std::shared_ptr<esvo2_core::VBaBg> &msg
 void esvo2_Tracking::refMapCallback(const std::pair<std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>>, timePoint> &msg)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    // pcl::PCLPointCloud2 pcl_pc;
-    // pcl_conversions::toPCL(*msg, pcl_pc);
-    // pcl::PointCloud<pcl::PointXYZRGBL>::Ptr PC_ptr(new pcl::PointCloud<pcl::PointXYZRGBL>);
-    // pcl::fromPCLPointCloud2(pcl_pc, *PC_ptr);
     std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> PC_ptr = std::make_shared<pcl::PointCloud<pcl::PointXYZRGBL>>();
     *PC_ptr = *(msg.first);
 
@@ -552,49 +430,16 @@ void esvo2_Tracking::refMapCallback(const std::pair<std::shared_ptr<pcl::PointCl
     }
 }
 
-// eventsCallback is never bound to anything so does nothing????????
-// void esvo2_Tracking::eventsCallback(const EventArray::ConstPtr &msg)
-// {
-//     std::lock_guard<std::mutex> lock(data_mutex_);
-//     // add new ones and remove old ones
-//     for (const Event &e : msg->events)
-//     {
-//         events_left_.push_back(e);
-//         int i = events_left_.size() - 2;
-//         while (i >= 0 && events_left_[i].ts > e.ts) // we may have to sort the queue, just in case the raw event
-//                                                     // messages do not come in a chronological order.
-//         {
-//             events_left_[i + 1] = events_left_[i];
-//             i--;
-//         }
-//         events_left_[i + 1] = e;
-//     }
-//     clearEventQueue();
-// }
-
-// void esvo2_Tracking::clearEventQueue()
-// {
-//     static constexpr size_t MAX_EVENT_QUEUE_LENGTH = 5000000;
-//     if (events_left_.size() > MAX_EVENT_QUEUE_LENGTH)
-//     {
-//         size_t remove_events = events_left_.size() - MAX_EVENT_QUEUE_LENGTH;
-//         events_left_.erase(events_left_.begin(), events_left_.begin() + remove_events);
-//     }
-// }
-
 void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &time_surface_left,
                                                  const esvo2_core::ImagePtr &time_surface_negative,
                                                  const esvo2_core::ImagePtr &time_surface_dx,
                                                  const esvo2_core::ImagePtr &time_surface_dy)
 {
-
-    // std::cout<<"Tracking negts callback"<<std::endl;
     cv::Mat cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy;
-    cv_ptr_left = *(time_surface_left.image); //cv_bridge::toCvCopy(time_surface_left, sensor_msgs::image_encodings::MONO8);
-    cv_ptr_negative = *(time_surface_negative.image); //cv_bridge::toCvCopy(time_surface_negative, sensor_msgs::image_encodings::MONO8);
-    cv_ptr_dx = *(time_surface_dx.image); //cv_bridge::toCvCopy(time_surface_dx, sensor_msgs::image_encodings::TYPE_16SC1);
-    cv_ptr_dy = *(time_surface_dy.image); //cv_bridge::toCvCopy(time_surface_dy, sensor_msgs::image_encodings::TYPE_16SC1);
-//    std::cout<<"made cv mats"<<std::endl;
+    cv_ptr_left = *(time_surface_left.image);
+    cv_ptr_negative = *(time_surface_negative.image);
+    cv_ptr_dx = *(time_surface_dx.image);
+    cv_ptr_dy = *(time_surface_dy.image); 
     std::lock_guard<std::mutex> lock(data_mutex_);
     // push back the most current TS.
     timePoint t_new_ts = time_surface_left.header_stamp;
@@ -602,16 +447,12 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
                         TimeSurfaceObservation(cv_ptr_left, cv_ptr_negative, cv_ptr_dx, cv_ptr_dy, TS_id_, false));
     TS_id_++;
 
-    // std::cout<<"added to ts history"<<std::endl;
     // keep TS_history_'s size constant
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin();
-        // std::cout<<"about to erase from ts history"<<std::endl;
         TS_history_.erase(it);
-        // std::cout<<"erased from ts history"<<std::endl;
     }
-    // std::cout<<"removed from ts history maybe and are done!"<<std::endl;
 }
 
 void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseStamped> &msg)
@@ -621,7 +462,6 @@ void esvo2_Tracking::stampedPoseCallback(const std::shared_ptr<esvo2_core::PoseS
     esvo2_core::Transform tf(msg->orientation[0], msg->orientation[1], msg->orientation[2],
                                     msg->orientation[3], msg->position[0], msg->position[1], msg->position[2]);
     esvo2_core::StampedTransform st(tf, msg->timestamp, msg->frame_id, dvs_frame_id_);
-    // std::cout<<"Tracking is adding transform with ts: "<<esvo2_core::timePointToSec(msg->timestamp)<<std::endl;
     tf_->setTransform(st);
 
     // VIZ PUBLISH -> not publishing anything right now
@@ -635,17 +475,16 @@ bool esvo2_Tracking::getPoseAt(const timePoint &t, esvo2_core::Transformation &T
     std::string *err_msg = new std::string();
     if (!tf_->canTransform(world_frame_id_, source_frame, t, err_msg))
     {
-        std::cout<<"tracking WARNING:" << timePointToSec(t) << " : " << *err_msg<<std::endl;
+        std::cout<<"tracking WARNING:" << timePointToSec(t) << " : " << *err_msg<<
+        " Are in esvo2_Tracking.cpp getPoseAt()"<<std::endl;
         delete err_msg;
         return false;
     }
     else
     {
         esvo2_core::StampedTransform st;
-        std::cout<<"tf is looking up a transform in tracking"<<std::endl;
         tf_->lookupTransform(world_frame_id_, source_frame, t, st);
         st.toKindrTransformation(Tr);
-        // tf::transformTFToKindr(st, &Tr);
         return true;
     }
 }
@@ -653,27 +492,16 @@ bool esvo2_Tracking::getPoseAt(const timePoint &t, esvo2_core::Transformation &T
 /************ publish results *******************/
 void esvo2_Tracking::publishPose(const timePoint &t, Transformation &tr)
 {
-    // geometry_msgs::PoseStampedPtr ps_ptr(new geometry_msgs::PoseStamped());
     std::shared_ptr<esvo2_core::PoseStamped> ps_ptr = std::make_shared<esvo2_core::PoseStamped>();
-    // ps_ptr->header.stamp = t;
     ps_ptr->timestamp = t;
-    // ps_ptr->header.frame_id = world_frame_id_;
     ps_ptr->frame_id = world_frame_id_;
-    // ps_ptr->pose.position.x = tr.getPosition()(0);
-    // ps_ptr->pose.position.y = tr.getPosition()(1);
-    // ps_ptr->pose.position.z = tr.getPosition()(2);
     ps_ptr->position[0] = tr.getPosition()(0);
     ps_ptr->position[1] = tr.getPosition()(1);
     ps_ptr->position[2] = tr.getPosition()(2);
-    // ps_ptr->pose.orientation.x = tr.getRotation().x();
-    // ps_ptr->pose.orientation.y = tr.getRotation().y();
-    // ps_ptr->pose.orientation.z = tr.getRotation().z();
-    // ps_ptr->pose.orientation.w = tr.getRotation().w();
     ps_ptr->orientation[0] = tr.getRotation().x();
     ps_ptr->orientation[1] = tr.getRotation().y();
     ps_ptr->orientation[2] = tr.getRotation().z();
     ps_ptr->orientation[3] = tr.getRotation().w();
-    // pose_pub_.publish(ps_ptr);
     // Can send same ptr to both because the callback functions treat the pose as const
     stamped_pose_Track_to_Map_.add(ps_ptr, t);
     stamped_pose_Track_to_Track_.add(ps_ptr, t);
@@ -711,21 +539,22 @@ void esvo2_Tracking::publishPath(const timePoint &t, Transformation &tr)
     ps_ptr->orientation[3] = tr.getRotation().w();
     path_.header_stamp = t;
     path_.header_frame_id = world_frame_id_;
+    // VIZ PUBLISH
+    std::lock_guard<std::mutex> lock(viz_path_mutex_);
     path_.poses.push_back(*ps_ptr);
-    // VIZ PUBLISH -> not publishing anything right now
-    // path_pub_.publish(path_);
+    path_updated = true;
 }
 
 void esvo2_Tracking::saveTrajectory(std::string &resultDir)
 {
-    std::cout << "Saving trajectory to " << resultPath_ + "stamped_traj_estimate.txt" << " ......";
+    // std::cout << "Saving trajectory to " << resultPath_ + "stamped_traj_estimate.txt" << " ......";
 
     std::ofstream f;
     f.open(resultPath_ + "stamped_traj_estimate.txt", std::ofstream::app);
     if (!f.is_open())
     {
         std::cout << "File at " << resultPath_ + "stamped_traj_estimate.txt"
-                  << " is not opened, save trajectory failed.";
+                  << " is not opened, save trajectory failed." <<"Are in esvo2_Tracking.cpp saveTrajectory()."<<std::endl;
         return;
         // exit(-1);
     }
@@ -752,7 +581,7 @@ void esvo2_Tracking::saveTrajectory(std::string &resultDir)
           << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << std::endl;
     }
     f.close();
-    std::cout << "Saving trajectory to " << resultPath_ + "stamped_traj_estimate.txt" << ". Done !!!!!!.";
+    // std::cout << "Saving trajectory to " << resultPath_ + "stamped_traj_estimate.txt" << ". Done !!!!!!.";
 }
 
 void esvo2_Tracking::renameOldTraj()
@@ -767,21 +596,6 @@ void esvo2_Tracking::renameOldTraj()
     {
         std::cout << "\33[33m" << "Failed to rename the file." << "\33[0m";
     }
-}
-
-void esvo2_Tracking::groundTruthCallback(const std::shared_ptr<esvo2_core::PoseStamped> msg)
-{
-    std::ofstream f;
-    f.open("/home/njk/output/ESVO2/stamped_groundtruth.txt", std::ofstream::app);
-    f << std::fixed;
-    f.setf(std::ios::fixed, std::ios::floatfield);
-    f.precision(9);
-    f << esvo2_core::timePointToSec(msg->timestamp) << " ";
-    f.precision(5);
-    f << msg->position[0] << " " << msg->position[1] << " " << msg->position[2] << " "
-      << msg->orientation[0] << " " << msg->orientation[1] << " " << msg->orientation[2] << " "
-      << msg->orientation[3] << std::endl;
-    f.close();
 }
 
 Eigen::Matrix3d esvo2_Tracking::fixRotationMatrix(const Eigen::Matrix3d &R)

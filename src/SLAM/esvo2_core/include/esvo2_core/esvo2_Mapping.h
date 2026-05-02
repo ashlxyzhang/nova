@@ -1,16 +1,15 @@
 #ifndef ESVO2_CORE_MAPPING_H
 #define ESVO2_CORE_MAPPING_H
 
-// #include <ros/ros.h>
+// From STD library
+#include <deque>
+#include <future>
+#include <map>
+#include <mutex>
+#include <string>
 
+// From SLAM
 #include <esvo2_core/tools/types.h>
-// #include <message_filters/subscriber.h>
-// #include <message_filters/sync_policies/approximate_time.h>
-// #include <message_filters/sync_policies/exact_time.h>
-// #include <message_filters/synchronizer.h>
-
-// #include <tf2_ros/transform_broadcaster.h>
-
 #include <esvo2_core/container/CameraSystem.h>
 #include <esvo2_core/container/DepthMap.h>
 #include <esvo2_core/container/EventMatchPair.h>
@@ -21,32 +20,18 @@
 #include <esvo2_core/core/EventBM.h>
 #include <esvo2_core/tools/Visualization.h>
 #include <esvo2_core/tools/utils.h>
+#include <esvo2_core/core/BackendOptimization.h>
+#include <esvo2_core/factor/imu_integration.h>
+#include <data_passing.hh>
+#include <multi_data_passing.hh>
 
-// #include <dynamic_reconfigure/server.h>
-// #include <esvo2_core/DVS_MappingStereoConfig.h> // TODO -> I think this might set param stuff, may have to implement something for it
-
+// From dependencies
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-
-#include <deque>
-#include <future>
-#include <map>
-#include <mutex>
-#include <string>
-
 #include <pcl/point_types.h>
-// #include <pcl_ros/point_cloud.h>
-
 #include <yaml-cpp/yaml.h>
-#include <esvo2_core/core/BackendOptimization.h>
-#include <esvo2_core/factor/imu_integration.h>
-// #include <sensor_msgs/Imu.h>
-#include <data_passing.hh>
-#include <multi_data_passing.hh>
 #include <Eigen/Dense>
-// from utils.h
-// using Transformation = kindr::minimal::QuatTransformation;
 
 namespace esvo2_core
 {
@@ -80,9 +65,7 @@ class esvo2_Mapping
                                  const esvo2_core::ImagePtr &time_surface_negative,
                                  const esvo2_core::ImagePtr &time_surface_dx,
                                  const esvo2_core::ImagePtr &time_surface_dy);
-        // void onlineParameterChangeCallback(DVS_MappingStereoConfig &config, uint32_t level);
         void AACallback(const esvo2_core::ImagePtr &AA_left);
-        // EventQueue& EQ);
         void refImuCallback(const std::shared_ptr<esvo2_core::ImuMsg> &msg);
         // utils
         bool getPoseAt(const timePoint &t, Transformation &Tr, const std::string &source_frame);
@@ -152,43 +135,11 @@ class esvo2_Mapping
         // configuration variables struct
         YAML::Node config_;
 
-        // Subscribers
-        // ros::Subscriber events_left_sub_;
-        // ros::Subscriber stampedPose_sub_, AA_frequency_sub_;
-        // message_filters::Subscriber<sensor_msgs::Image> TS_left_sub_, TS_right_sub_;
-        // message_filters::Subscriber<sensor_msgs::Image> AA_map_sub_;
-        // message_filters::Subscriber<sensor_msgs::Image> TS_negative_sub_, TS_dx_sub_, TS_dy_sub_;
-
-        // ros::Subscriber imu_sub_;
-
-        // Publishers
-        // ros::Publisher pc_pub_;
-        //  ros::Publisher gpc_pub_, pc_filtered_pub_;
-        // ros::Publisher V_ba_bg_pub_;
-        // image_transport::ImageTransport it_;
         double t_last_pub_pc_;
-
-        // Time-Surface sync policy
-        // typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image> ExactSyncPolicy;
-        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image,
-        //                                                         sensor_msgs::Image, sensor_msgs::Image,
-        //                                                         sensor_msgs::Image, sensor_msgs::Image>
-        //     ApproxSyncPolicy2;
-        // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image>
-        //     ApproxSyncPolicy;
-        // message_filters::Synchronizer<ApproxSyncPolicy> TS_sync_;
-        // message_filters::Synchronizer<ApproxSyncPolicy2> TS_AA_sync_;
-
-        //  In esvo2_Mapping.cpp, the below stuff never actually happens. Also commented out the
-        //  onlineParameterChangeCallback function.
-        // dynamic configuration (modify parameters online).
-        // boost::shared_ptr<dynamic_reconfigure::Server<DVS_MappingStereoConfig>> server_;
-        // dynamic_reconfigure::Server<DVS_MappingStereoConfig>::CallbackType dynamic_reconfigure_callback_;
 
         // offline data
         std::string dvs_frame_id_;
         std::string world_frame_id_;
-        // std::string calibInfoDir_;
         CameraSystem::Ptr camSysPtr_;
 
         // imu data
@@ -228,7 +179,6 @@ class esvo2_Mapping
         DepthFrame::Ptr depthFramePtr_;
         bool blarge_scale_;
 
-        // std::deque<std::vector<DepthPoint> > dqvDepthPoints_,dqvDepthPoints_ln_;
         std::deque<DepthPointFrame> dqvDepthPoints_, dqvDepthPoints_ln_;
         // DepthPointFrame
 
@@ -301,7 +251,6 @@ class esvo2_Mapping
         /**********************************************************/
         /******************** For test & debug ********************/
         /**********************************************************/
-        // image_transport::Publisher invDepthMap_pub_, stdVarMap_pub_, ageMap_pub_, costMap_pub_, invDepthMap_rel_pub_;
         std::string resultPath_;
         // For counting the total number of fusion
         std::size_t TotalNumFusion_;

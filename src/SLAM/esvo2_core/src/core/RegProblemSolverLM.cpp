@@ -28,8 +28,8 @@ RegProblemSolverLM::RegProblemSolverLM(
   }
   else
   {
-    std::cerr << "Wrong Registration Problem Type is assigned!!!"<<std::endl;
-    exit(-1);
+    std::cerr << "Wrong Registration Problem Type is assigned!!! In RegProblemSolverLM.cpp Constructor"<<std::endl;
+    // exit(-1);
   }
   z_min_ = 1.0 / rpConfigPtr_->invDepth_max_range_;
   z_max_ = 1.0 / rpConfigPtr_->invDepth_min_range_;
@@ -50,16 +50,13 @@ bool RegProblemSolverLM::resetRegProblem(RefFrame* ref, CurFrame* cur)
     std::cout << "The system will be re-initialized";
     return false;
   }
-  //  std::cout << "resetRegProblem RESET succeeds.";
   if(rpType_ == REG_NUMERICAL)
   {
     numDiff_regProblemPtr_->setProblem(ref, cur, false);
-//    std::cout << "numDiff_regProblemPtr_->setProblem(ref, cur, false) -----------------";
   }
   if(rpType_ == REG_ANALYTICAL)
   {
     regProblemPtr_->setProblem(ref, cur, true);
-//    std::cout << "regProblemPtr_->setProblem(ref, cur, true) -----------------";
   }
 
   lmStatics_.nPoints_ = 0;
@@ -80,21 +77,18 @@ bool RegProblemSolverLM::resetRegProblem(std::shared_ptr<RegProblemConfig> &rpCo
     std::cout << "The system will be re-initialized";
     return false;
   }
-  //  std::cout << "resetRegProblem RESET succeeds.";
   if(rpType_ == REG_NUMERICAL)
   {
     numDiff_regProblemPtr_ =
       std::make_shared<Eigen::NumericalDiff<RegProblemLM> >(camSysPtr_, rpConfigPtr_, NUM_THREAD_);
     
     numDiff_regProblemPtr_->setProblem(ref, cur, false);
-//    std::cout << "numDiff_regProblemPtr_->setProblem(ref, cur, false) -----------------";
   }
   if(rpType_ == REG_ANALYTICAL)
   {
     regProblemPtr_ = std::make_shared<RegProblemLM>(camSysPtr_, rpConfigPtr_, NUM_THREAD_);
 
     regProblemPtr_->setProblem(ref, cur, true);
-//    std::cout << "regProblemPtr_->setProblem(ref, cur, true) -----------------";
   }
 
   lmStatics_.nPoints_ = 0;
@@ -160,10 +154,6 @@ bool RegProblemSolverLM::solve_numerical()
       }
 
       // VIZ PUBLISH -> not publishing anything right now
-      // std_msgs::Header header;
-      // header.stamp = numDiff_regProblemPtr_->cur_->t_;
-      // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
-      // reprojMap_pub_->publish(msg);
       std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
       *reprojected_map_left = reprojMap_left;
       // timestamp is numDiff_regProblemPtr_->cur_->t_;
@@ -241,14 +231,10 @@ bool RegProblemSolverLM::solve_analytical()
     }
 
     // VIZ PUBLISH -> not publishing anything right now
-    // std_msgs::Header header;
-    // header.stamp = regProblemPtr_->cur_->t_;
-    // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", reprojMap_left).toImageMsg();
-    // reprojMap_pub_->publish(msg);
     std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
     *reprojected_map_left = reprojMap_left;
-    cv::imshow("reproj map left", reprojMap_left);
-    cv::waitKey(10);
+    // cv::imshow("reproj map left", reprojMap_left);
+    // cv::waitKey(10);
       // timestamp is numDiff_regProblemPtr_->cur_->t_;
   }
   /*************************** Visualization ************************/
