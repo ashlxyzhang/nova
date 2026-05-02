@@ -139,6 +139,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
             app->slam->stopSlam();
             app->visualizer->set_slam_pointcloud(nullptr);
             app->visualizer->set_slam_global_pointcloud(nullptr);
+            app->visualizer->set_slam_path(nullptr);
         }
         else
         {

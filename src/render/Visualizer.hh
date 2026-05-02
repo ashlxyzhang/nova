@@ -890,6 +890,7 @@ class Visualizer
                     if (!pc)
                         return;
                     vertices.reserve(pc->size());
+                    // y is reveresed so do *-1
                     for (const auto &pt : *pc)
                         vertices.push_back({glm::vec4(pt.x, -pt.y, pt.z, 1.0f),
                                             glm::vec4(pt.r / 255.0f, pt.g / 255.0f, pt.b / 255.0f, 1.0f)});
@@ -925,6 +926,7 @@ class Visualizer
                         double r = esvo2_core::tools::Visualization::r[index];
                         double g = esvo2_core::tools::Visualization::g[index];
                         double b = esvo2_core::tools::Visualization::b[index];
+                        // y is reveresed so do *-1
                         vertices.push_back({glm::vec4(pt.x, -pt.y, pt.z, 1.0f),
                                             glm::vec4(r, g, b, 1.0f)});
                     }
@@ -944,7 +946,8 @@ class Visualizer
                     //    as an intermediary to render a simple black line to connect all the pose positions.
                     // for (const auto &pose : *path)
                     // {
-                    //     poses.push_back({glm::vec4(pose.position[0], pose.position[1], pose.position[2], 1.0f),
+                    //     // y is reveresed so do *-1
+                    //     poses.push_back({glm::vec4(pose.position[0], -pose.position[1], pose.position[2], 1.0f),
                     //                     glm::quat(pose.orientation[3], pose.orientation[0], pose.orientation[1], pose.orientation[2])});
                     // }
 
@@ -952,7 +955,8 @@ class Visualizer
                     for (int i=0; i<path->size(); i++)
                     {
                         const auto &pose = (*path)[i];
-                        new_lines.push_back(glm::vec3(pose.position[0], pose.position[1], pose.position[2]));
+                        // y is reveresed so do *-1
+                        new_lines.push_back(glm::vec3(pose.position[0], -pose.position[1], pose.position[2]));
                         // Readd the point again so that the lines will be fully connected
                         if(i!=0 && i!=path->size()-1)
                             new_lines.push_back(new_lines.at(new_lines.size()-1));
