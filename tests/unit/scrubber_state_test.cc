@@ -5,6 +5,8 @@
 #include "ui/Scrubber.hh"
 #include <gtest/gtest.h>
 
+using namespace nova;
+
 static void fill_events(EventData &ed, int32_t n, int64_t step_us = 1000)
 {
     for (int32_t i{0}; i < n; ++i)

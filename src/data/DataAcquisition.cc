@@ -5,19 +5,22 @@
 #include <algorithm>
 #include <metavision/hal/device/device_discovery.h>
 
-DataAcquisition::DataAcquisition(SDL_GPUDevice *gpu_device) : gpu_device(gpu_device)
+namespace nova {
+
+
+DataAcquisition::DataAcquisition(GPUDevice& gpu_device) : gpu_device(gpu_device.get_SDL_device())
 {
 }
 
+
 void DataAcquisition::discover_cameras()
 {
-    std::unique_lock da_read_write_lock(mutex);
     scanned_cameras.clear();
     scanned_camera_names.clear();
     const auto discovered_cameras{dv::io::camera::discover()};
     for (const auto &camera : discovered_cameras)
     {
-        scanned_cameras.push_back(ScannedCamera{ScannedCamera::Vendor::DV, camera, {}});
+        scanned_cameras.push_back(DataSource::ScannedCamera{DataSource::Vendor::DV, camera, {}});
         std::stringstream str_stream;
         str_stream << "[DV] Model: " << camera.cameraModel << " ";
         str_stream << "Serial Number: " << camera.serialNumber << "\0";
@@ -29,7 +32,7 @@ void DataAcquisition::discover_cameras()
         const auto prophesee_cameras = Metavision::DeviceDiscovery::list_available_sources();
         for (const auto &desc : prophesee_cameras)
         {
-            ScannedCamera entry{ScannedCamera::Vendor::PROPHESEE, {}, desc.serial_};
+            DataSource::ScannedCamera entry{DataSource::Vendor::PROPHESEE, {}, desc.serial_};
             scanned_cameras.push_back(std::move(entry));
             std::stringstream str_stream;
             str_stream << "[Prophesee] Plugin: " << desc.plugin_name_ << " ";
@@ -45,18 +48,18 @@ void DataAcquisition::discover_cameras()
 
 std::vector<std::string> DataAcquisition::get_scanned_camera_names()
 {
-    std::shared_lock da_read_lock(mutex);
     return scanned_camera_names;
 }
 
-void DataAcquisition::add_camera_source(int camera_index)
+std::shared_ptr<DataSource> DataAcquisition::add_camera_source(int camera_index)
 {
-    std::unique_lock da_read_write_lock(mutex);
+    std::shared_ptr<DataSource> new_source;
+    
     if (camera_index >= 0 && camera_index < (int)scanned_cameras.size())
     {
         const auto &entry = scanned_cameras[camera_index];
-        std::shared_ptr<DataSource> new_source;
-        if (entry.vendor == ScannedCamera::Vendor::DV)
+        
+        if (entry.vendor == DataSource::Vendor::DV)
         {
             new_source = std::make_shared<DataSource>(gpu_device, entry.dv_descriptor);
         }
@@ -75,12 +78,12 @@ void DataAcquisition::add_camera_source(int camera_index)
             std::cerr << "Failed to open camera source: " << scanned_camera_names[camera_index] << std::endl;
         }
     }
+
+    return new_source;
 }
 
-void DataAcquisition::add_file_source(const std::string &file_path)
+std::shared_ptr<DataSource> DataAcquisition::add_file_source(const std::string &file_path)
 {
-    std::unique_lock da_read_write_lock(mutex);
-
     std::shared_ptr<DataSource> new_source = std::make_shared<DataSource>(gpu_device, file_path);
 
     if (new_source->is_open())
@@ -91,11 +94,12 @@ void DataAcquisition::add_file_source(const std::string &file_path)
     {
         std::cerr << "Failed to open file source: " << file_path << std::endl;
     }
+
+    return new_source;
 }
 
 void DataAcquisition::remove_data_source(size_t index)
 {
-    std::unique_lock da_read_write_lock(mutex);
     if (index < data_sources.size())
     {
         data_sources.erase(data_sources.begin() + index);
@@ -104,19 +108,16 @@ void DataAcquisition::remove_data_source(size_t index)
 
 std::vector<std::shared_ptr<DataSource>> DataAcquisition::get_data_sources()
 {
-    std::shared_lock da_read_lock(mutex);
     return data_sources;
 }
 
 void DataAcquisition::set_state(Scrubber::State state)
 {
-    std::unique_lock da_read_write_lock(mutex);
     shared_scrubber_state = state;
 }
 
 Scrubber::State DataAcquisition::get_state()
 {
-    std::unique_lock da_read_write_lock(mutex);
 
     shared_scrubber_state.max_index = 0;
     shared_scrubber_state.max_time = 0;
@@ -196,19 +197,16 @@ void DataAcquisition::sync_end()
 
 int DataAcquisition::size()
 {
-    std::shared_lock da_read_lock(mutex);
     return (int)data_sources.size();
 }
 
 std::shared_ptr<DataSource> DataAcquisition::at(int index)
 {
-    std::shared_lock da_read_lock(mutex);
     return data_sources.at(index);
 }
 
 void DataAcquisition::update()
 {
-    std::unique_lock da_read_write_lock(mutex);
 
     // Shared state doesn't need full update since there is no associated event_data & data to upload
     shared_scrubber_state.step_forward();
@@ -219,3 +217,5 @@ void DataAcquisition::update()
         data_source->update();
     }
 }
+
+} // namespace nova

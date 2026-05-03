@@ -7,6 +7,9 @@
 #include <optional>
 #include <vector>
 
+namespace nova {
+
+
 /**
  * @brief Backend-agnostic interface for reading event camera data.
  *        Implementations exist for dv-processing (.aedat4, inivation cameras)
@@ -50,3 +53,5 @@ class IEventReader
 };
 
 #endif // IEVENTREADER_HH
+
+} // namespace nova

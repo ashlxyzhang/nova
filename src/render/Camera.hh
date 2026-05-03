@@ -4,6 +4,9 @@
 
 #include "util/pch.hh"
 
+namespace nova {
+
+
 /**
  * @brief A simplified orbital camera class using GLM
  *
@@ -138,6 +141,35 @@ class Camera
         }
 
         /**
+         * @brief Pan the camera in the direction it is currently facing.
+         * Worsk by changing the orbit center. Takes in the relative amount to pan.
+         * @param offset Translation offset for the orbit center
+         */
+        void pan(const float amountToPan)
+        {
+            glm::vec3 dir = m_front;
+            dir *= amountToPan;
+            m_orbit_center += dir;
+            updateOrbitPosition();
+        }
+
+        /**
+         * @brief Pan the camera according to past in direciton.
+         * @param direction Is x/y/z each of which is either -1, 0, or 1. X = Right/Left, Y = Up/Down, Z=forwards/backwards.
+         * @param distance Distance to travel
+         */
+        void pan(glm::vec3 direction, const float distance)
+        {
+            glm::vec3 final_dir(0, 0, 0);
+            final_dir += m_right * direction.x;
+            final_dir += m_up * direction.y;
+            final_dir += m_front * direction.z;
+            final_dir = glm::normalize(final_dir);
+            glm::vec3 offset = final_dir * distance;
+            pan(offset);
+        }
+
+        /**
          * @brief Set the orbit center
          * @param center New orbit center
          */
@@ -258,3 +290,5 @@ class Camera
 };
 
 #endif // CAMERA_HH
+
+} // namespace nova

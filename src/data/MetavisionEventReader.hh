@@ -13,6 +13,9 @@
 #include <thread>
 #include <vector>
 
+namespace nova {
+
+
 /**
  * @brief IEventReader backed by the OpenEB/Metavision SDK.
  *        Supports .raw, .dat, and other Prophesee file formats,
@@ -100,7 +103,7 @@ class MetavisionEventReader final : public IEventReader
                 auto *erc = camera_->get_device().get_facility<Metavision::I_ErcModule>();
                 if (erc)
                 {
-                    erc->set_cd_event_rate(5'000'000); // 5 Mev/s
+                    erc->set_cd_event_rate(2'000'000); // 5 Mev/s
                     erc->enable(true);
                 }
             }
@@ -180,3 +183,5 @@ class MetavisionEventReader final : public IEventReader
 };
 
 #endif // METAVISIONEVENTREADER_HH
+
+} // namespace nova

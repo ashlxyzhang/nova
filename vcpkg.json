@@ -11,6 +11,14 @@
       ]
     },
     "sdl3-ttf",
-    "gtest"
+    "gtest",
+    "eigen3",
+    "pcl",
+    "ceres",
+    "tbb"
+  ],
+  "overrides": [
+    { "name": "ceres", "version": "1.14.0", "port-version":10 },
+    { "name": "eigen3", "version": "3.4.1", "port-version":1 }
   ]
 }

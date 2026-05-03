@@ -3,20 +3,20 @@
 #define DIGITAL_CODED_EXPOSURE_HH
 
 #include "util/pch.hh"
-
-#include "data/DataAcquisition.hh"
 #include "data/EventData.hh"
-#include "render/Camera.hh"
 #include "render/RenderTarget.hh"
-#include "render/UploadBuffer.hh"
+#include "render/GPUDevice.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include <memory>
-struct DataSource;
+
 
 #include "shaders/digital_coded_exposure/clear_comp.h"
 #include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/process_comp.h"
+
+namespace nova {
+    struct DataSource;
 
 
 /**
@@ -111,11 +111,10 @@ class DigitalCodedExposure
     public:
         /**
          * @brief Constructor. Initializes compute pipelines.
-         * @param data_acq DataAcquisition object used to access event data for processing
          * @param gpu_device SDL_GPUDevice to create texture on
          */
-        DigitalCodedExposure(SDL_GPUDevice *gpu_device)
-            : gpu_device(gpu_device)
+        DigitalCodedExposure(GPUDevice& gpu_device)
+            : gpu_device(gpu_device.get_SDL_device())
         {
 
             SDL_GPUComputePipelineCreateInfo clear_compute_pipeline_info = {0};
@@ -133,7 +132,7 @@ class DigitalCodedExposure
             clear_compute_pipeline_info.threadcount_y = 1;
             clear_compute_pipeline_info.threadcount_z = 1;
 
-            clear_compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &clear_compute_pipeline_info);
+            clear_compute_pipeline = SDL_CreateGPUComputePipeline(this->gpu_device, &clear_compute_pipeline_info);
 
             SDL_GPUComputePipelineCreateInfo compute_pipeline_info = {0};
             compute_pipeline_info.code_size = sizeof(dce_comp);
@@ -150,7 +149,7 @@ class DigitalCodedExposure
             compute_pipeline_info.threadcount_y = 1;
             compute_pipeline_info.threadcount_z = 1;
 
-            compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &compute_pipeline_info);
+            compute_pipeline = SDL_CreateGPUComputePipeline(this->gpu_device, &compute_pipeline_info);
 
             SDL_GPUComputePipelineCreateInfo process_compute_pipeline_info = {0};
             process_compute_pipeline_info.code_size = sizeof(process_comp);
@@ -167,7 +166,7 @@ class DigitalCodedExposure
             process_compute_pipeline_info.threadcount_y = 1;
             process_compute_pipeline_info.threadcount_z = 1;
 
-            process_compute_pipeline = SDL_CreateGPUComputePipeline(gpu_device, &process_compute_pipeline_info);
+            process_compute_pipeline = SDL_CreateGPUComputePipeline(this->gpu_device, &process_compute_pipeline_info);
         }
 
         /**
@@ -185,6 +184,9 @@ class DigitalCodedExposure
          * @param command_buffer GPU command buffer.
          */
         void render(std::shared_ptr<DataSource> data_source);
+        void render(DataSource& data_source);
 };
 
 #endif
+
+} // namespace nova

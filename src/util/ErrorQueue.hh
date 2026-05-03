@@ -8,6 +8,9 @@
 #include <queue>
 #include <string>
 
+namespace nova {
+
+
 /**
  * @brief Modules can report error messages here to be logged and reported to GUI for pop up window
  */
@@ -81,3 +84,5 @@ class ErrorQueue
 };
 
 #endif
+
+} // namespace nova

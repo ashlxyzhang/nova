@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <iterator>
 #include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/imgproc.hpp>  
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
@@ -22,6 +22,12 @@
 
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <set>
+
+#include "data/IEventWriter.hh"
+#include "data/DVEventWriter.hh"
+
+namespace nova {
+
 
 /**
  * @brief From previous NOVA source code
@@ -85,10 +91,15 @@ class EventData
                 ~MappedEventBuffer()
                 {
                     mapped_file_.close();
+
                     if (!file_path_.empty())
                     {
                         std::error_code ec;
                         std::filesystem::remove(file_path_, ec);
+
+                        if (ec) {
+                            std::cerr << "Error deleting mapped file: " << ec.message() << std::endl;
+                        }
                     }
                 }
 
@@ -417,6 +428,49 @@ class EventData
         {
         }
 
+        void save_to_file(const std::string& path, size_t start_index, size_t end_index, std::atomic<bool>& running) {
+
+            // Make sure bounds are OK
+            if (start_index > end_index || end_index >= size()) {
+                std::cout << "Invalid indices passed to save_to_file()" << std::endl;  
+                return;
+            }
+
+            // Attempt to initialize writer object
+            std::unique_ptr<IEventWriter> writer;
+            glm::vec2 resolution = get_camera_event_resolution();
+
+            if (path.ends_with(".aedat4")) {
+                writer = std::make_unique<DVEventWriter>(path, resolution.x, resolution.y);
+            } else {
+                std::cout << "save_to_file() only supports saving to .aedat4 at the moment" << std::endl;
+                return;
+            }
+
+            // Write data from event buffer in batches
+            size_t current_index = start_index;
+            size_t window_size = 1<<20;
+            std::vector<glm::vec4> window(window_size);
+
+            while (running && current_index < end_index) {
+
+                // Make copy of window to avoid excessive blocking
+                lock_data_vectors();
+                const glm::vec4* data = evt_data_vector_relative.data() + current_index;
+
+                size_t current_window_size = (std::min)(window_size, end_index - current_index);
+                window.assign(data, data + current_window_size); 
+                unlock_data_vectors();
+
+                // Use writer to add events to file
+                writer->write_event_batch(window);
+                
+                current_index += window_size;
+            }
+
+            running = false;
+        }
+
         size_t size()
         {
             std::unique_lock<std::recursive_mutex> evt_lock_ul{evt_lock};
@@ -440,12 +494,6 @@ class EventData
 
             evt_data_latest_timestamp = -1;
             frame_data_latest_timestamp = -1;
-
-            camera_event_width = 0;
-            camera_event_height = 0;
-
-            camera_frame_width = 0;
-            camera_frame_height = 0;
 
             evt_lock_ul.unlock();
         }
@@ -686,3 +734,5 @@ class EventData
 };
 
 #endif // EVENTDATA_HH
+
+} // namespace nova

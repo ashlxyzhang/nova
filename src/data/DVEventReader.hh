@@ -5,6 +5,9 @@
 #include "data/IEventReader.hh"
 #include <dv-processing/io/mono_camera_recording.hpp>
 
+namespace nova {
+
+
 /**
  * @brief IEventReader backed by the dv-processing library.
  *        Supports .aedat4 files and inivation cameras (DAVIS, DVXplorer, etc.).
@@ -90,3 +93,5 @@ class DVEventReader final : public IEventReader
 };
 
 #endif // DVEVENTREADER_HH
+
+} // namespace nova
