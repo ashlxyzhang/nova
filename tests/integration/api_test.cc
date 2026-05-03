@@ -10,6 +10,8 @@
 #include <filesystem>
 #include <memory>
 
+using namespace nova;
+
 namespace {
 	std::filesystem::path fixture_path() {
 		const char *root = std::getenv("NOVA_TEST_FIXTURES");

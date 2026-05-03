@@ -4,6 +4,9 @@
 
 #include "util/pch.hh"
 
+namespace nova {
+
+
 /**
  * @brief A simplified orbital camera class using GLM
  *
@@ -287,3 +290,5 @@ class Camera
 };
 
 #endif // CAMERA_HH
+
+} // namespace nova

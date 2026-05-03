@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <metavision/hal/device/device_discovery.h>
 
+namespace nova {
+
+
 DataAcquisition::DataAcquisition(GPUDevice& gpu_device) : gpu_device(gpu_device.get_SDL_device())
 {
 }
@@ -214,3 +217,5 @@ void DataAcquisition::update()
         data_source->update();
     }
 }
+
+} // namespace nova

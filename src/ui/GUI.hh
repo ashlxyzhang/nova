@@ -14,6 +14,9 @@
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
 
+namespace nova {
+
+
 
 
 // Forward declarations for callbacks
@@ -404,13 +407,15 @@ class GUI
                         save_config.save_index_bounds = {0, source->scrubber.state.max_index};
                     }
                     
-                    ImGui::SameLine();
+                    
                     if (source->is_reading()) {
+                        ImGui::SameLine();
                         if (ImGui::SmallButton("Stop")) {
                             source->stop_reading_thread();
                         }
                     } else {
                         if (!source->is_eof()) {
+                            ImGui::SameLine();
                             if (ImGui::SmallButton("Read")) {
                                 source->read(event_discard_odds, false);
                             }
@@ -443,10 +448,12 @@ class GUI
          * @brief Draw slam management window.
          */
         void draw_slam_window()
-        {
+        {   
+            int num_sources = (int)data_acquisition.get_data_sources().size();
+            if (num_sources == 0) return;
+            
             ImGui::Begin("3D Reconstruction");
             
-            int num_sources = (int)data_acquisition.get_data_sources().size();
             if (num_sources < 2)
             {
                 ImGui::TextWrapped("3D Reconstruction requires two data sources. You can add them in the Data Sources tab.");
@@ -1312,8 +1319,7 @@ class GUI
 
             // Setup ImGui frame
             ImGuiStyle &style = ImGui::GetStyle();
-            ImGui::Begin("Frame");
-            ImGui::Text("Digital Coded Exposure");
+            ImGui::Begin("Digital Coded Exposure");
 
             // Single view fills entire window
             if (view_mode == ViewMode::SINGLE)
@@ -1666,7 +1672,7 @@ class GUI
             ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
             ImGui::DockBuilderDockWindow("3D Reconstruction", dock_id_right_top_top);
 
-            ImGui::DockBuilderDockWindow("Frame", dock_id_main);
+            ImGui::DockBuilderDockWindow("Digital Coded Exposure", dock_id_main);
             ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
 
             ImGui::DockBuilderDockWindow("Scrubber", dock_id_left_bottom);
@@ -1734,3 +1740,4 @@ inline void SDLCALL set_slam_config_file(void *user_data, const char *const *dat
 }
 
 #endif // GUI_HH
+} // namespace nova

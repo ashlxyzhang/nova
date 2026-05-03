@@ -4,6 +4,9 @@
 
 #include "util/pch.hh"
 
+namespace nova {
+
+
 /**
  * @brief Target to render on screen.
  */
@@ -16,3 +19,5 @@ struct RenderTarget
 };
 
 #endif
+
+} // namespace nova

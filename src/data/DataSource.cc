@@ -10,6 +10,9 @@
 #include <filesystem>
 #include <random>
 
+namespace nova {
+
+
 DataSource::DataSource(SDL_GPUDevice* gpu_device, const std::string& file_path)
 	: gpu_device(gpu_device), 
     transfer_buffer(gpu_device), 
@@ -441,3 +444,4 @@ EventData* DataSource::get_ptr_to_event_data()
 {
     return &event_data;
 }
+} // namespace nova

@@ -16,6 +16,8 @@
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 
+namespace nova {
+
 struct Application
 {
     // Graphics
@@ -109,6 +111,8 @@ struct Application
     }
 };
 
+} // namespace nova
+
 
 //////////////////////////////////////
 /** 
@@ -120,7 +124,7 @@ struct Application
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {   
-    auto *app = new Application();
+    auto *app = new nova::Application();
     if (app->init() == SDL_APP_FAILURE) {
         return SDL_APP_FAILURE;
     }
@@ -133,7 +137,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    auto *app = static_cast<Application *>(appstate);
+    auto *app = static_cast<nova::Application *>(appstate);
 
     app->gui->event_handler(event);
 
@@ -145,7 +149,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-    auto *app = static_cast<Application *>(appstate);
+    auto *app = static_cast<nova::Application *>(appstate);
 
     if (SDL_GetWindowFlags(app->window) & SDL_WINDOW_MINIMIZED)
     {
@@ -161,7 +165,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
-    auto *app = static_cast<Application *>(appstate);
+    auto *app = static_cast<nova::Application *>(appstate);
     
     delete app;
     SDL_Quit();

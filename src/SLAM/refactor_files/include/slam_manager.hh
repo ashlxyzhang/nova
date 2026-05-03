@@ -20,6 +20,8 @@
 #include <opencv2/core/mat.hpp>
 #include <pcl/point_types.h>
 
+namespace nova {
+
 class SlamManager
 {
     public:
@@ -241,3 +243,5 @@ class SlamManager
     - EventQueue was originally called EventBuffer and was a vector of Event* before started refactoring. Now it is a deque of events.
     I don't think it affects anything but it might be an issue
 */
+
+} // namespace nova

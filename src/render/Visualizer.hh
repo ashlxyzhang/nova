@@ -35,6 +35,9 @@
 #include "SLAM/esvo2_core/include/esvo2_core/tools/Visualization.h"
 
 #include <memory>
+
+namespace nova {
+
 struct DataSource;
 
 /**
@@ -1274,3 +1277,4 @@ class Visualizer
     };
 
 #endif
+} // namespace nova

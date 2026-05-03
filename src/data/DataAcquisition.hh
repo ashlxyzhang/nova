@@ -19,6 +19,9 @@
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
 
+namespace nova {
+
+
 /**
  * @brief This class provides a nice wrapper for managing and creating multiple DataSource's in a thread-safe way
  *
@@ -58,3 +61,5 @@ class DataAcquisition
 };
 
 #endif // DATA_ACQUISITION_HH
+
+} // namespace nova

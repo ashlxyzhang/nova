@@ -1,6 +1,9 @@
 #include "render/Visualizer.hh"
 #include "data/DataSource.hh"
 
+namespace nova {
+
+
 void Visualizer::PointsRenderer::render_pass(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
                                              const glm::mat4 &vp, DataSource& data_source,
                                              const Parameters &params)
@@ -264,3 +267,5 @@ void Visualizer::render(DataSource& data_source)
     SDL_WaitForGPUFences(gpu_device, true, &fence, 1);
     SDL_ReleaseGPUFence(gpu_device, fence);
 }
+
+} // namespace nova

@@ -2,6 +2,9 @@
 #include "ui/Windows.hh"
 #include <algorithm>
 
+namespace nova {
+
+
 Window::Window(GPUDevice& gpu_device, int width, int height, std::string title) 
 	: gpu_device(gpu_device), title(title), open_flag(false), running(false), width(width), height(height) {}
 
@@ -453,3 +456,4 @@ void VisualizerDisplay::handle_event(const SDL_Event& event) {
 		is_mouse_dragging = false;
 	}
 }
+} // namespace nova

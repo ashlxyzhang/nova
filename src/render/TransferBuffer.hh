@@ -4,6 +4,9 @@
 
 #include "util/pch.hh"
 
+namespace nova {
+
+
 /**
  * @brief Class for transfering data between CPU and GPU.
  */
@@ -233,3 +236,5 @@ class TransferBuffer
 };
 
 #endif
+
+} // namespace nova

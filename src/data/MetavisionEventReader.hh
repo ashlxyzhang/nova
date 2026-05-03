@@ -13,6 +13,9 @@
 #include <thread>
 #include <vector>
 
+namespace nova {
+
+
 /**
  * @brief IEventReader backed by the OpenEB/Metavision SDK.
  *        Supports .raw, .dat, and other Prophesee file formats,
@@ -180,3 +183,5 @@ class MetavisionEventReader final : public IEventReader
 };
 
 #endif // METAVISIONEVENTREADER_HH
+
+} // namespace nova

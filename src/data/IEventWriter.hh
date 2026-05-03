@@ -5,6 +5,8 @@
 #include <vector>
 #include <glm/glm.hpp>
 
+namespace nova {
+
 class IEventWriter {
 	protected:
 		std::string path;
@@ -17,3 +19,5 @@ class IEventWriter {
 };
 
 #endif
+
+} // namespace nova

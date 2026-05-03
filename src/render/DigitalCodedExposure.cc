@@ -1,6 +1,9 @@
 #include "render/DigitalCodedExposure.hh"
 #include "data/DataSource.hh"
 
+namespace nova {
+
+
 void DigitalCodedExposure::render(DataSource& data_source)
 {
     // Read parameters, rendering textures, and resolution from data source
@@ -90,3 +93,4 @@ void DigitalCodedExposure::render(DataSource& data_source)
 void DigitalCodedExposure::render(std::shared_ptr<DataSource> data_source) {
     render(*data_source);
 }
+} // namespace nova

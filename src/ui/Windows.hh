@@ -9,6 +9,9 @@
 #include <memory>
 #include <SDL3/SDL.h>
 
+namespace nova {
+
+
 class Window {
 	public:
 		Window(GPUDevice& gpu_device, int width, int height, std::string title="");
@@ -81,3 +84,4 @@ class VisualizerDisplay : public Window {
 
 
 #endif
+} // namespace nova

@@ -16,6 +16,9 @@
 #include <dv-processing/io/camera/discovery.hpp>
 #include <dv-processing/io/camera/usb_device.hpp>
 
+namespace nova {
+
+
 struct DataSource {
 	friend class DataAcqusition;
 	friend class GUI;
@@ -131,3 +134,5 @@ struct DataSource {
 
 
 #endif // DATA_SOURCE_HH
+
+} // namespace nova

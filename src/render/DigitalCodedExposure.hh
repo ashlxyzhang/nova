@@ -9,11 +9,14 @@
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include <memory>
-struct DataSource;
+
 
 #include "shaders/digital_coded_exposure/clear_comp.h"
 #include "shaders/digital_coded_exposure/dce_comp.h"
 #include "shaders/digital_coded_exposure/process_comp.h"
+
+namespace nova {
+    struct DataSource;
 
 
 /**
@@ -185,3 +188,5 @@ class DigitalCodedExposure
 };
 
 #endif
+
+} // namespace nova

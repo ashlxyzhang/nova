@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <memory>
 
+using namespace nova;
+
 namespace
 {
 std::filesystem::path fixture_path()

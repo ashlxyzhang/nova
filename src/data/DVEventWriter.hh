@@ -12,6 +12,9 @@
 #include <filesystem>
 #include <memory>
 
+namespace nova {
+
+
 class DVEventWriter : public IEventWriter {
 	private:
 		std::unique_ptr<dv::io::MonoCameraWriter> writer;	
@@ -46,3 +49,4 @@ class DVEventWriter : public IEventWriter {
 };
 
 #endif
+} // namespace nova

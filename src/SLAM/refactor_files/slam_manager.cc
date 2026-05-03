@@ -21,6 +21,9 @@
 #include <pcl/point_types.h>
 
 #include <iomanip>
+
+namespace nova {
+
     SlamManager::SlamManager() {}
 
     // Spawns threads for all the modules
@@ -569,3 +572,4 @@
             }
         }
     }
+} // namespace nova

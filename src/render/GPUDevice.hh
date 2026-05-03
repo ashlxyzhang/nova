@@ -4,6 +4,9 @@
 
 #include "util/pch.hh"
 
+namespace nova {
+
+
 /**
  * Internally, all of NOVA utilizes a SDL_GPUDevice* for rendering and compute. 
  * For easy of use in the API, however, GPUDevice acts as a wrapper for all of the
@@ -120,3 +123,4 @@ class GPUDevice
 };
 
 #endif // GPU_DEVICE_HH
+} // namespace nova

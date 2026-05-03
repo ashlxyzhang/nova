@@ -1,6 +1,8 @@
 #include "data/EventData.hh"
 #include <gtest/gtest.h>
 
+using namespace nova;
+
 TEST(EventData, CameraResolution)
 {
     EventData ed{};

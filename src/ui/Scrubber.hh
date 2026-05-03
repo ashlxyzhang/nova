@@ -8,6 +8,9 @@
 #include "util/pch.hh"
 #include <array>
 
+namespace nova {
+
+
 /**
  * @brief Provides functionality for scrubbing through subsets of event data.
  */
@@ -522,3 +525,5 @@ class Scrubber
 };
 
 #endif
+
+} // namespace nova

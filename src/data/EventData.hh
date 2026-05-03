@@ -26,6 +26,9 @@
 #include "data/IEventWriter.hh"
 #include "data/DVEventWriter.hh"
 
+namespace nova {
+
+
 /**
  * @brief From previous NOVA source code
  *        Used for timestamp comparisons of event data
@@ -731,3 +734,5 @@ class EventData
 };
 
 #endif // EVENTDATA_HH
+
+} // namespace nova
