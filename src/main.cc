@@ -15,8 +15,10 @@
 #include "ui/GUI.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
+#include "util/PluginBootstrap.hh"
 
 namespace nova {
+
 
 struct Application
 {
@@ -124,6 +126,9 @@ struct Application
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {   
+    plugin_bootstrap::setup_metavision_plugin_path();
+    plugin_bootstrap::setup_vulkan_icd_path();
+  
     auto *app = new nova::Application();
     if (app->init() == SDL_APP_FAILURE) {
         return SDL_APP_FAILURE;
