@@ -11,6 +11,7 @@
 #include "render/RenderTarget.hh"
 #include "ui/Windows.hh"
 #include "render/Visualizer.hh"
+#include "slam_manager.hh"
 #include "ui/GUI.hh"
 #include "ui/Scrubber.hh"
 #include "util/ErrorQueue.hh"
@@ -28,6 +29,7 @@ struct Application
     std::unique_ptr<Visualizer> visualizer;
     std::unique_ptr<DigitalCodedExposure> digital_coded_exposure;
     std::unique_ptr<GUI> gui;
+        std::unique_ptr<SlamManager> slam;
 
     // Initializes graphics of entire application
     SDL_AppResult init() {
@@ -46,6 +48,7 @@ struct Application
         visualizer = std::make_unique<Visualizer>(gpu_device);
         digital_coded_exposure = std::make_unique<DigitalCodedExposure>(gpu_device);
         gui = std::make_unique<GUI>(*data_acq, *visualizer, *error_queue, window, gpu_device);
+        app->slam = std::make_unique<SlamManager>();
 
         return SDL_APP_CONTINUE;
     }
@@ -54,6 +57,16 @@ struct Application
         // Update all of the data sources
         data_acq->update();
         
+        if(app->visualizer->set_slam_pc_changed(app->slam->were_pointclouds_updated()))
+        {
+            app->visualizer->set_slam_pointcloud(app->slam->get_viz_pointcloud());
+            app->visualizer->set_slam_global_pointcloud(app->slam->get_viz_global_pointcloud());
+        }
+        if(app->visualizer->set_slam_path_changed(app->slam->was_path_updated()))
+        {
+            app->visualizer->set_slam_path(app->slam->get_viz_path());
+        }
+
         // Render all data sources
         std::vector<std::shared_ptr<DataSource>> data_sources = data_acq->get_data_sources();
         for (const auto& data_source : data_sources)
@@ -121,7 +134,48 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     auto *app = static_cast<Application *>(appstate);
 
     app->gui->event_handler(event);
-    if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
+
+    if (event->type == SDL_EVENT_QUIT)
+        return SDL_APP_SUCCESS;
+
+    if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_BACKSPACE))
+    {
+        if (app->slam->isRunning())
+        {
+            app->slam->stopSlam();
+            app->visualizer->set_slam_pointcloud(nullptr);
+            app->visualizer->set_slam_global_pointcloud(nullptr);
+            app->visualizer->set_slam_path(nullptr);
+        }
+        else
+        {
+            SlamManager::StartSlamParameters params;
+            params.left_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
+            params.right_camera_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
+            params.Mapping_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
+            params.Tracking_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
+            params.IR_Left_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast.yaml";
+            params.IR_Right_yaml_path = "C:/Users/jackm/Desktop/nova/src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
+
+            std::vector<std::shared_ptr<DataSource>> sources = app->data_acq->get_data_sources();
+            if (sources.size() < 2)
+            {
+                std::cerr << "Need at least 2 data sources (left + right) to start SLAM" << std::endl;
+                return SDL_APP_CONTINUE;
+            }
+            params.left_scrubber = &sources.at(0)->scrubber;
+            params.left_eventdata = &sources.at(0)->event_data;
+            params.right_scrubber = &sources.at(1)->scrubber;
+            params.right_eventdata = &sources.at(1)->event_data;
+
+            app->slam->startSlam(params);
+        }
+    }
+
+     if ((event->type == SDL_EVENT_KEY_DOWN) && (event->key.key == SDLK_SPACE))
+    {
+        app->visualizer->toggle_display_global_pointcloud();
+    }
 
     return SDL_APP_CONTINUE;
 }

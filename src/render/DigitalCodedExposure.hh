@@ -4,7 +4,6 @@
 
 #include "util/pch.hh"
 #include "data/EventData.hh"
-#include "render/Camera.hh"
 #include "render/RenderTarget.hh"
 #include "render/GPUDevice.hh"
 #include "ui/Scrubber.hh"
