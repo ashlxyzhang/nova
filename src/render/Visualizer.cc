@@ -237,17 +237,17 @@ void Visualizer::render(DataSource& data_source)
         points_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
         frames_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
         text_renderer->render_pass(command_buffer, render_pass, vp, data_source, params);
-    if (params.show_oscilloscope)
-    {
-        float z1 = params.osc_t1 * 2.0f - 1.0f;
-        float z2 = params.osc_t2 * 2.0f - 1.0f;
-        glm::vec4 glass = glm::vec4(0.3f, 0.6f, 1.0f, 0.35f);
-        std::vector<std::pair<glm::mat4, glm::vec4>> rects = {
-            {vp * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z1)), glass},
-            {vp * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z2)), glass},
-        };
-        osc_renderer->render_pass(command_buffer, render_pass, rects);
-    }
+        if (params.show_oscilloscope)
+        {
+            float z1 = params.osc_t1 * 2.0f - 1.0f;
+            float z2 = params.osc_t2 * 2.0f - 1.0f;
+            glm::vec4 glass = glm::vec4(0.3f, 0.6f, 1.0f, 0.35f);
+            std::vector<std::pair<glm::mat4, glm::vec4>> rects = {
+                {vp * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z1)), glass},
+                {vp * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z2)), glass},
+            };
+            osc_renderer->render_pass(command_buffer, render_pass, rects);
+        }
     }
     else
     {

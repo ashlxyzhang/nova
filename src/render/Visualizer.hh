@@ -55,8 +55,6 @@ class Visualizer
         {
                 RenderTarget color;
                 RenderTarget depth;
-                RenderTarget color;
-                RenderTarget depth;
 
                 void init_textures(SDL_GPUDevice *gpu_device, cv::Size resolution)
                 {
@@ -85,39 +83,7 @@ class Visualizer
                     depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width,
                              vis_depth_create_info.height};
                 }
-                void init_textures(SDL_GPUDevice *gpu_device, cv::Size resolution)
-                {
-                    SDL_GPUTextureCreateInfo vis_color_create_info = {
-                        .type = SDL_GPU_TEXTURETYPE_2D,
-                        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_SNORM,
-                        .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER,
-                        .width = 1920,
-                        .height = 1200,
-                        .layer_count_or_depth = 1,
-                        .num_levels = 1,
-                        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                    };
-                    color = {SDL_CreateGPUTexture(gpu_device, &vis_color_create_info), vis_color_create_info.width,
-                             vis_color_create_info.height};
 
-                    SDL_GPUTextureCreateInfo vis_depth_create_info = {
-                        .format = SDL_GPU_TEXTUREFORMAT_D16_UNORM,
-                        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-                        .width = 1920,
-                        .height = 1200,
-                        .layer_count_or_depth = 1,
-                        .num_levels = 1,
-                        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-                    };
-                    depth = {SDL_CreateGPUTexture(gpu_device, &vis_depth_create_info), vis_depth_create_info.width,
-                             vis_depth_create_info.height};
-                }
-
-                void delete_textures(SDL_GPUDevice *gpu_device)
-                {
-                    SDL_ReleaseGPUTexture(gpu_device, color.texture);
-                    SDL_ReleaseGPUTexture(gpu_device, depth.texture);
-                }
                 void delete_textures(SDL_GPUDevice *gpu_device)
                 {
                     SDL_ReleaseGPUTexture(gpu_device, color.texture);
@@ -130,13 +96,7 @@ class Visualizer
                 uint32_t grid_x_subdivisions = 5;
                 uint32_t grid_y_subdivisions = 5;
                 uint32_t grid_z_subdivisions = 5;
-                uint32_t grid_x_subdivisions = 5;
-                uint32_t grid_y_subdivisions = 5;
-                uint32_t grid_z_subdivisions = 5;
 
-                float particle_scale = 3.0f;
-                glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
-                glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
                 float particle_scale = 3.0f;
                 glm::vec3 polarity_neg_color = glm::vec3(1.0f, 0.0f, 0.0f);
                 glm::vec3 polarity_pos_color = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -1143,7 +1103,7 @@ class Visualizer
                     poseGridRenderer->cpu_update(new_lines);
                 }
 
-                void copy_pass(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass)
                 {
                     if (vertices.empty())
                         return;
@@ -1158,13 +1118,13 @@ class Visualizer
                                                         .size =
                                                             static_cast<Uint32>(vertices.size() * sizeof(SlamVertex))};
                     vertex_buffer = SDL_CreateGPUBuffer(gpu_device, &buf_info);
-                    upload_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(),
+                    transfer_buffer.upload_to_gpu(copy_pass, vertex_buffer, vertices.data(),
                                                 vertices.size() * sizeof(SlamVertex));
                 }
 
-                void copy_pass_path(UploadBuffer &upload_buffer, SDL_GPUCopyPass *copy_pass)
+                void copy_pass_path(TransferBuffer &transfer_buffer, SDL_GPUCopyPass *copy_pass)
                 {
-                    poseGridRenderer->copy_pass(upload_buffer, copy_pass);
+                    poseGridRenderer->copy_pass(transfer_buffer, copy_pass);
                 }
 
                 void render_pass_path(SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass,
@@ -1199,7 +1159,6 @@ class Visualizer
         bool slam_pc_changed = false;
         bool slam_path_changed = false;
         std::atomic<bool> display_global_pointcloud = false;
-        // glm::vec3 original_camera_center;
 
     public:
         /**

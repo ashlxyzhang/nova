@@ -95,6 +95,7 @@ struct DataSource {
 		size_t size();
 		Vendor get_vendor();
 		static std::vector<ScannedCamera> get_attached_cameras();
+		EventData* get_ptr_to_event_data();
 
 
 	private:

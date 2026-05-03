@@ -436,3 +436,8 @@ std::vector<DataSource::ScannedCamera> DataSource::get_attached_cameras() {
         std::cerr << "Prophesee discovery failed: " << e.what() << std::endl;
     }
 }
+
+EventData* DataSource::get_ptr_to_event_data()
+{
+    return &event_data;
+}

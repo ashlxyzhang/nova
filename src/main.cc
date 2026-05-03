@@ -29,7 +29,7 @@ struct Application
     std::unique_ptr<Visualizer> visualizer;
     std::unique_ptr<DigitalCodedExposure> digital_coded_exposure;
     std::unique_ptr<GUI> gui;
-        std::unique_ptr<SlamManager> slam;
+    std::unique_ptr<SlamManager> slam;
 
     // Initializes graphics of entire application
     SDL_AppResult init() {
@@ -48,7 +48,7 @@ struct Application
         visualizer = std::make_unique<Visualizer>(gpu_device);
         digital_coded_exposure = std::make_unique<DigitalCodedExposure>(gpu_device);
         gui = std::make_unique<GUI>(*data_acq, *visualizer, *error_queue, window, gpu_device);
-        app->slam = std::make_unique<SlamManager>();
+        slam = std::make_unique<SlamManager>();
 
         return SDL_APP_CONTINUE;
     }
@@ -57,14 +57,16 @@ struct Application
         // Update all of the data sources
         data_acq->update();
         
-        if(app->visualizer->set_slam_pc_changed(app->slam->were_pointclouds_updated()))
+        // Update SLAM based on its scrubbers's events
+        slam->send_events();
+        if(visualizer->set_slam_pc_changed(slam->were_pointclouds_updated()))
         {
-            app->visualizer->set_slam_pointcloud(app->slam->get_viz_pointcloud());
-            app->visualizer->set_slam_global_pointcloud(app->slam->get_viz_global_pointcloud());
+            visualizer->set_slam_pointcloud(slam->get_viz_pointcloud());
+            visualizer->set_slam_global_pointcloud(slam->get_viz_global_pointcloud());
         }
-        if(app->visualizer->set_slam_path_changed(app->slam->was_path_updated()))
+        if(visualizer->set_slam_path_changed(slam->was_path_updated()))
         {
-            app->visualizer->set_slam_path(app->slam->get_viz_path());
+            visualizer->set_slam_path(slam->get_viz_path());
         }
 
         // Render all data sources
@@ -164,9 +166,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
                 return SDL_APP_CONTINUE;
             }
             params.left_scrubber = &sources.at(0)->scrubber;
-            params.left_eventdata = &sources.at(0)->event_data;
+            params.left_eventdata = sources.at(0)->get_ptr_to_event_data();
             params.right_scrubber = &sources.at(1)->scrubber;
-            params.right_eventdata = &sources.at(1)->event_data;
+            params.right_eventdata = sources.at(1)->get_ptr_to_event_data();
 
             app->slam->startSlam(params);
         }
