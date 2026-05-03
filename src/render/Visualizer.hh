@@ -107,6 +107,9 @@ class Visualizer
                 bool show_oscilloscope = false;
                 float osc_t1 = 0.25f; // fraction [0,1] of depth range
                 float osc_t2 = 0.75f;
+
+                bool display_global_pointcloud = true;
+                bool is_left_camera = false;
         };
 
     private:
@@ -1158,7 +1161,6 @@ class Visualizer
         std::shared_ptr<std::vector<esvo2_core::PoseStamped>> slam_path_;
         bool slam_pc_changed = false;
         bool slam_path_changed = false;
-        std::atomic<bool> display_global_pointcloud = false;
 
     public:
         /**
@@ -1258,19 +1260,9 @@ class Visualizer
             return value;
         }
 
-        void toggle_display_global_pointcloud()
-        {
-            display_global_pointcloud = !display_global_pointcloud;
-        }
-
         bool is_slam_running()
         {
             return slam_pointcloud_ != nullptr;
-        }
-
-        bool is_global_pointcloud_displayed()
-        {
-            return display_global_pointcloud;
         }
 
         /**

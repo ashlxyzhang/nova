@@ -168,9 +168,9 @@ void Visualizer::render(DataSource& data_source)
         text_renderer->cpu_update(data_source, params);
         frames_renderer->cpu_update(data_source, params);
     }
-    else
+    else if(params.is_left_camera)
     {
-        if(display_global_pointcloud)
+        if(params.display_global_pointcloud)
         {
             if(slam_pc_changed)
                 slam_renderer->cpu_update_global(slam_global_pointcloud_);
@@ -196,7 +196,7 @@ void Visualizer::render(DataSource& data_source)
         text_renderer->copy_pass(transfer_buffer, copy_pass, data_source);
         frames_renderer->copy_pass(transfer_buffer, copy_pass, data_source);
     }
-    else
+    else if(params.is_left_camera)
     {
         if((slam_pc_changed))
             slam_renderer->copy_pass(transfer_buffer, copy_pass);
@@ -249,11 +249,11 @@ void Visualizer::render(DataSource& data_source)
             osc_renderer->render_pass(command_buffer, render_pass, rects);
         }
     }
-    else
+    else if(params.is_left_camera)
     {
         slam_renderer->render_pass(command_buffer, render_pass, vp, params);
         // Only show path if displaying the global point cloud
-        if(display_global_pointcloud)
+        if(params.display_global_pointcloud)
             slam_renderer->render_pass_path(command_buffer, render_pass, vp, params);
     }
 

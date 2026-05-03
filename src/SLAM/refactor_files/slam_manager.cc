@@ -27,10 +27,10 @@
     void SlamManager::startSlam(StartSlamParameters params)
     {
         // Loading YAML config files
-        yaml_IR_Left_config = YAML::LoadFile(params.IR_Left_yaml_path);
-        yaml_IR_Right_config = YAML::LoadFile(params.IR_Right_yaml_path);
-        yaml_Track_config = YAML::LoadFile(params.Tracking_yaml_path);
-        yaml_Map_config = YAML::LoadFile(params.Mapping_yaml_path);
+        yaml_IR_Left_config = YAML::LoadFile(IR_Left_yaml_path);
+        yaml_IR_Right_config = YAML::LoadFile(IR_Right_yaml_path);
+        yaml_Track_config = YAML::LoadFile(Tracking_yaml_path);
+        yaml_Map_config = YAML::LoadFile(Mapping_yaml_path);
 
         // Setting the scrubbers
         this->left_scrubber = params.left_scrubber;
@@ -59,16 +59,16 @@
 
         // The module's constructors create and detach a new thread that manages their respective processes
         image_representation_left = std::make_unique<image_representation::ImageRepresentation>(
-                image_representation_left_running, yaml_IR_Left_config, params.left_camera_yaml_path, 
+                image_representation_left_running, yaml_IR_Left_config, left_camera_yaml_path, 
                 multi_to_Track, multi_to_Map, AA_left_IR_to_Map);
         image_representation_right = std::make_unique<image_representation::ImageRepresentation>(
-                image_representation_right_running, yaml_IR_Right_config, params.right_camera_yaml_path, 
+                image_representation_right_running, yaml_IR_Right_config, right_camera_yaml_path, 
                 multi_to_Track, multi_to_Map, AA_left_IR_to_Map);
         mapping = std::make_unique<esvo2_core::esvo2_Mapping>(
-                mapping_running, yaml_Map_config, params.left_camera_yaml_path, params.right_camera_yaml_path,
+                mapping_running, yaml_Map_config, left_camera_yaml_path, right_camera_yaml_path,
                 v_ba_bg_Map_to_Track, pointcloud_Map_to_Track);
         tracking = std::make_unique<esvo2_core::esvo2_Tracking>(
-                tracking_running, yaml_Track_config, params.left_camera_yaml_path, params.right_camera_yaml_path,
+                tracking_running, yaml_Track_config, left_camera_yaml_path, right_camera_yaml_path,
                 stamped_pose_Track_to_Map, stamped_pose_Track_to_Track);
 
         // Launching the threads to handle the queues/passing of data
@@ -88,13 +88,17 @@
         tracking_running = false;
 
         // joining all the threads
-        image_representation_left_thread.join();
+        if(image_representation_left_thread.joinable())
+            image_representation_left_thread.join();
 
-        image_representation_right_thread.join();
+        if(image_representation_right_thread.joinable())
+            image_representation_right_thread.join();
 
-        mapping_thread.join();
+        if(mapping_thread.joinable())
+            mapping_thread.join();
 
-        tracking_thread.join();
+        if(tracking_thread.joinable())
+            tracking_thread.join();
 
         // Resetting yaml nodes
         yaml_IR_Left_config.reset();
@@ -104,7 +108,7 @@
 
         // Queues don't need to be reset because will be reassigned in operator= in startSlam.
         // Stall to give time for the modules to terminate?
-        std::this_thread::sleep_for(200ms);
+        // std::this_thread::sleep_for(200ms);
 
         // Got lots of issues due to race conditions when did the below reset, so are not doing this anymore.
         // The shared pointers get reset anyway in startSlam when remaking the modules, so it is fine.
@@ -123,6 +127,64 @@
         right_eventdata = nullptr;
         last_processed_event_idx_left = 0;
         last_processed_event_idx_right = 0;
+    }
+
+    void SlamManager::set_config_file(std::string file_path)
+    {
+        switch(current_config_file_type)
+        {
+            case(SlamConfigFiles::IR_Left):
+            {
+                IR_Left_yaml_path = file_path;
+                break;
+            }
+            case(SlamConfigFiles::IR_Right):
+            {
+                IR_Right_yaml_path = file_path;
+                break;
+            }
+            case(SlamConfigFiles::Tracking):
+            {
+                Tracking_yaml_path = file_path;
+                break;
+            }
+            case(SlamConfigFiles::Mapping):
+            {
+                std::cout<<"mapping set!"<<file_path<<std::endl;
+                Mapping_yaml_path = file_path;
+                break;
+            }
+            case(SlamConfigFiles::Camera_Left):
+            {
+                left_camera_yaml_path = file_path;
+                break;
+            }
+            case(SlamConfigFiles::Camera_Right):
+            {
+                right_camera_yaml_path = file_path;
+                break;
+            }
+        }
+    }
+
+    std::string SlamManager::get_config_file_path(SlamConfigFiles type)
+    {
+        switch(type)
+        {
+            case(SlamConfigFiles::IR_Left):
+                return IR_Left_yaml_path;
+            case(SlamConfigFiles::IR_Right):
+                return IR_Right_yaml_path;
+            case(SlamConfigFiles::Tracking):
+                return Tracking_yaml_path;
+            case(SlamConfigFiles::Mapping):
+                return Mapping_yaml_path;
+            case(SlamConfigFiles::Camera_Left):
+                return left_camera_yaml_path;
+            case(SlamConfigFiles::Camera_Right):
+                return right_camera_yaml_path;
+        }
+        return "";
     }
 
     void SlamManager::send_events()

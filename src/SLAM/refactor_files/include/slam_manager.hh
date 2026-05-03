@@ -25,18 +25,22 @@ class SlamManager
     public:
         using timePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
+        enum class SlamConfigFiles
+        {
+            IR_Left=0, 
+            IR_Right, 
+            Tracking, 
+            Mapping, 
+            Camera_Left, 
+            Camera_Right
+        };
+
         struct StartSlamParameters
         {
-                Scrubber *left_scrubber;
-                Scrubber *right_scrubber;
-                EventData *left_eventdata;
-                EventData *right_eventdata;
-                std::string IR_Left_yaml_path;
-                std::string IR_Right_yaml_path;
-                std::string Tracking_yaml_path;
-                std::string Mapping_yaml_path;
-                std::string left_camera_yaml_path;
-                std::string right_camera_yaml_path;
+            Scrubber *left_scrubber;
+            Scrubber *right_scrubber;
+            EventData *left_eventdata;
+            EventData *right_eventdata;
         };
 
         SlamManager();
@@ -51,6 +55,14 @@ class SlamManager
 
         // Sends left/right events from scrubbers to the SLAM threads
         void send_events();
+
+        void set_config_file(std::string file_path);
+        std::string get_config_file_path(SlamConfigFiles type);
+
+        void set_curr_file_type(SlamConfigFiles curr_type)
+        {
+            current_config_file_type = curr_type;
+        }
 
         // Get the PCL point cloud for NOVA Visualizer
         // points to pc_filtered_ (the filtered point cloud for one frame)
@@ -119,6 +131,13 @@ class SlamManager
         std::unique_ptr<esvo2_core::esvo2_Tracking> tracking;
 
         // For calibration
+        SlamConfigFiles current_config_file_type;
+        std::string IR_Left_yaml_path="../src/SLAM/image_representation/cfg/image_representation_fast.yaml";
+        std::string IR_Right_yaml_path="../src/SLAM/image_representation/cfg/image_representation_fast_r.yaml";
+        std::string Tracking_yaml_path="../src/SLAM/esvo2_core/cfg/tracking/tracking_dsec_AA.yaml";
+        std::string Mapping_yaml_path="../src/SLAM/esvo2_core/cfg/mapping/mapping_dsec_AA.yaml";
+        std::string left_camera_yaml_path="../src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/left.yaml";
+        std::string right_camera_yaml_path="../src/SLAM/esvo2_core/calib/dsec/zurich_city_04_a/right.yaml";
         YAML::Node yaml_IR_Left_config;
         YAML::Node yaml_IR_Right_config;
         YAML::Node yaml_Track_config;

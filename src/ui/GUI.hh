@@ -19,6 +19,7 @@
 // Forward declarations for callbacks
 inline void SDLCALL open_file_callback(void *user_data, const char *const *data_file_list, int filter);
 inline void SDLCALL save_file_callback(void *user_data, const char *const *data_file_list, int filter);
+inline void SDLCALL set_slam_config_file(void *user_data, const char *const *data_file_list, int filter);
 
 /**
  * @brief This class provides functions to draw the GUI.
@@ -52,6 +53,7 @@ class GUI
         DataAcquisition &data_acquisition;
         Visualizer &visualizer;
         ErrorQueue &error_queue;
+        SlamManager &slam_manager;
 
         // GPU
         SDL_Window *window = nullptr;
@@ -74,6 +76,7 @@ class GUI
 
         static inline const std::string time_units[] = {"s", "ms", "us"};
         static inline const std::string freq_units[] = {"Hz", "mHz", "uHz"};
+        static constexpr SDL_DialogFileFilter file_filter_yaml[] = {{ "YAML files",  "yaml" }};
 
         // Timeline visual constants
         static constexpr ImU32 kTrackColor = IM_COL32(60, 60, 60, 255);
@@ -433,6 +436,119 @@ class GUI
                 ImGui::Unindent();
             }
 
+            ImGui::End();
+        }
+
+         /**
+         * @brief Draw slam management window.
+         */
+        void draw_slam_window()
+        {
+            ImGui::Begin("3D Reconstruction");
+            
+            int num_sources = (int)data_acquisition.get_data_sources().size();
+            if (num_sources < 2)
+            {
+                ImGui::TextWrapped("3D Reconstruction requires two data sources. You can add them in the Data Sources tab.");
+                ImGui::End();
+                return;
+            }
+           
+
+            if(view_mode != ViewMode::SYNCED)
+            {
+                ImGui::TextWrapped("3D Reconstruction requires the view mode to be synced. You can change this in the Data Sources tab.");
+                ImGui::End();
+                return;
+            }
+
+            // YAML files
+            ImGui::Text("Configuration:");
+
+            if (ImGui::Button("Set Mapping Config"))
+            {
+                slam_manager.set_curr_file_type(SlamManager::SlamConfigFiles::Mapping);
+                SDL_ShowOpenFileDialog(set_slam_config_file, &slam_manager, window, file_filter_yaml, 1, nullptr, 0);
+            }
+            ImGui::Text("%s", slam_manager.get_config_file_path(SlamManager::SlamConfigFiles::Mapping).c_str());
+
+            if (ImGui::Button("Set Tracking Config"))
+            {
+                slam_manager.set_curr_file_type(SlamManager::SlamConfigFiles::Tracking);
+                SDL_ShowOpenFileDialog(set_slam_config_file, &slam_manager, window, file_filter_yaml, 1, nullptr, 0);
+            }
+            ImGui::Text("%s", slam_manager.get_config_file_path(SlamManager::SlamConfigFiles::Tracking).c_str());
+
+            if (ImGui::Button("Set IR Left Config"))
+            {
+                slam_manager.set_curr_file_type(SlamManager::SlamConfigFiles::IR_Left);
+                SDL_ShowOpenFileDialog(set_slam_config_file, &slam_manager, window, file_filter_yaml, 1, nullptr, 0);
+            }
+            ImGui::Text("%s", slam_manager.get_config_file_path(SlamManager::SlamConfigFiles::IR_Left).c_str());
+
+            if (ImGui::Button("Set IR Right Config"))
+            {
+                slam_manager.set_curr_file_type(SlamManager::SlamConfigFiles::IR_Right);
+                SDL_ShowOpenFileDialog(set_slam_config_file, &slam_manager, window, file_filter_yaml, 1, nullptr, 0);
+            }
+            ImGui::Text("%s", slam_manager.get_config_file_path(SlamManager::SlamConfigFiles::IR_Right).c_str());
+
+            if (ImGui::Button("Set Camera Left Config"))
+            {
+                slam_manager.set_curr_file_type(SlamManager::SlamConfigFiles::Camera_Left);
+                SDL_ShowOpenFileDialog(set_slam_config_file, &slam_manager, window, file_filter_yaml, 1, nullptr, 0);
+            }
+            ImGui::Text("%s", slam_manager.get_config_file_path(SlamManager::SlamConfigFiles::Camera_Left).c_str());
+
+            if (ImGui::Button("Set Camera Right Config"))
+            {
+                slam_manager.set_curr_file_type(SlamManager::SlamConfigFiles::Camera_Right);
+                SDL_ShowOpenFileDialog(set_slam_config_file, &slam_manager, window, file_filter_yaml, 1, nullptr, 0);
+            }
+            ImGui::Text("%s", slam_manager.get_config_file_path(SlamManager::SlamConfigFiles::Camera_Right).c_str());
+
+            ImGui::Separator();
+
+            if (!slam_manager.isRunning())
+            {
+                if(ImGui::Button("Start 3D Reconstruction"))
+                {
+                    SlamManager::StartSlamParameters slam_params;
+                    std::vector<std::shared_ptr<DataSource>> sources = data_acquisition.get_data_sources();
+                    sources.at(0)->visualizer_parameters.is_left_camera = true;
+                    sources.at(1)->visualizer_parameters.is_left_camera = false;
+                    slam_params.left_scrubber = &sources.at(0)->scrubber;
+                    slam_params.left_eventdata = sources.at(0)->get_ptr_to_event_data();
+                    slam_params.right_scrubber = &sources.at(1)->scrubber;
+                    slam_params.right_eventdata = sources.at(1)->get_ptr_to_event_data();
+                    try
+                    {
+                        slam_manager.startSlam(slam_params);
+                    }
+                    catch (const std::runtime_error& e)
+                    {
+                        std::string error_msg = "3D Reconstruction Failed to start. Your left/right camera config files were probably incorrect. Error message: "+std::string(e.what())+"\n";
+                        error_queue.push_error(error_msg);
+                        slam_manager.stopSlam();
+                        visualizer.set_slam_pointcloud(nullptr);
+                        visualizer.set_slam_global_pointcloud(nullptr);
+                        visualizer.set_slam_path(nullptr);
+                    }
+                }
+            }
+            else
+            {
+                if(ImGui::Button("Stop 3D Reconstruction"))
+                {
+                    slam_manager.stopSlam();
+                    visualizer.set_slam_pointcloud(nullptr);
+                    visualizer.set_slam_global_pointcloud(nullptr);
+                    visualizer.set_slam_path(nullptr);
+                }
+            }
+
+            ImGui::Checkbox("Show Global Pointcloud", &data_acquisition.get_data_sources().at(0)->visualizer_parameters.display_global_pointcloud);
+           
             ImGui::End();
         }
 
@@ -1298,10 +1414,11 @@ class GUI
         /**
          * @brief Constructor for GUI.
          */
-        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer, ErrorQueue &error_queue, SDL_Window *window, GPUDevice& gpu_device)
+        GUI(DataAcquisition &data_acquisition, Visualizer &visualizer, ErrorQueue &error_queue, SlamManager & slam_manager, SDL_Window *window, GPUDevice& gpu_device)
             : data_acquisition(data_acquisition), 
             visualizer(visualizer), 
-            error_queue(error_queue), 
+            error_queue(error_queue),
+            slam_manager(slam_manager), 
             window(window), 
             gpu_device(gpu_device.get_SDL_device()), 
             fps_history_buf(100, 0.0f), 
@@ -1411,35 +1528,43 @@ class GUI
 
                 // Handle panning (translation) for the SLAM global point cloud. Have this outside of above switch statement
                 // because user might want to rotate camera and pan at the same time
-                if(event->type == SDL_EVENT_KEY_DOWN && visualizer.is_slam_running())// && visualizer.is_global_pointcloud_displayed())
+                if(event->type == SDL_EVENT_KEY_DOWN && visualizer.is_slam_running())
                 {
                     const float pan_distance = 0.5;
                     // X = left/right, Y = Up/Down, Z=forwards/backwards.
                     glm::vec3 direction(0, 0, 0);
-                    // Setting direction. Don't use a switch because may want to hit multiple keys at once
-                    if(event->key.key == SDLK_W)
+                    switch(event->key.key)
                     {
-                        direction.z += 1;
-                    }
-                    if(event->key.key == SDLK_S)
-                    {
-                        direction.z -= 1;
-                    }
-                    if(event->key.key ==  SDLK_A)
-                    {
-                        direction.x += 1;
-                    }
-                    if(event->key.key ==  SDLK_D)
-                    {
-                        direction.x -= 1;
-                    }
-                    if(event->key.key ==  SDLK_Q)
-                    {
-                        direction.y += 1;
-                    }
-                    if(event->key.key ==  SDLK_E)
-                    {
-                        direction.y -= 1;
+                        case(SDLK_W):
+                        {
+                            direction.z += 1;
+                            break;
+                        }
+                        case(SDLK_S):
+                        {
+                            direction.z -= 1;
+                            break;
+                        }
+                        case(SDLK_A):
+                        {
+                            direction.x += 1;
+                            break;
+                        }
+                        case(SDLK_D):
+                        {
+                            direction.x -= 1;
+                            break;
+                        }
+                        case(SDLK_Q):
+                        {
+                            direction.y += 1;
+                            break;
+                        }
+                        case(SDLK_E):
+                        {
+                            direction.y -= 1;
+                            break;
+                        }
                     }
                     // Panning the camera
                     if(direction.x !=0 || direction.y !=0 || direction.z != 0)
@@ -1481,10 +1606,11 @@ class GUI
             draw_info_window();
             draw_debug_window(fps);
             draw_data_sources_window();
+            draw_slam_window();
             draw_scrubber_window();
             draw_digital_coded_exposure();
             draw_visualizers();
-            draw_quickstart_window();
+            draw_quickstart_window();            
 
             ImGui::Render();
             draw_data = ImGui::GetDrawData();
@@ -1538,6 +1664,7 @@ class GUI
 
             ImGui::DockBuilderDockWindow("Data Sources", dock_id_right_top_top);
             ImGui::DockBuilderDockWindow("Debug", dock_id_right_top_top);
+            ImGui::DockBuilderDockWindow("3D Reconstruction", dock_id_right_top_top);
 
             ImGui::DockBuilderDockWindow("Frame", dock_id_main);
             ImGui::DockBuilderDockWindow("3D Visualizer", dock_id_main);
@@ -1588,6 +1715,21 @@ inline void SDLCALL save_file_callback(void *user_data, const char *const *data_
         save_config->source.reset();
     } else {
         
+    }
+}
+
+// Callback functions
+inline void SDLCALL set_slam_config_file(void *user_data, const char *const *data_file_list, int filter)
+{
+    SlamManager *slam_manager = static_cast<SlamManager *>(user_data);
+    if (data_file_list && *data_file_list)
+    {
+        std::string file_name{*data_file_list};
+        slam_manager->set_config_file(file_name);
+    }
+    else
+    {
+        std::cerr << "Error happened when selecting file or no file was chosen" << std::endl;
     }
 }
 
