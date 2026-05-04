@@ -250,6 +250,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
                 MappingAtTime(TS_obs_ptr_->first);
             }
             BackendOpt_.slideWindow();
+            currProcessingTSTimes.erase(TS_obs_ptr_->first);
         }
         else
         {
@@ -462,7 +463,7 @@ void esvo2_Mapping::MappingAtTime(const timePoint &t)
     t_overall_count += time_optimize;
 
     std::thread tPublishMappingResult(&esvo2_Mapping::publishMappingResults, this, depthFramePtr_->dMap_,
-                                      depthFramePtr_->T_world_frame_, t);
+                                      depthFramePtr_->T_world_frame_, t, TS_obs_ptr_->second.img_left_.clone());
     tPublishMappingResult.detach();
 #ifdef ESVO2_CORE_MAPPING_LOG
     std::cout << "\n";
@@ -551,7 +552,7 @@ bool esvo2_Mapping::InitializationAtTime(const timePoint &t)
     dFusor_.naive_propagation(vdp_sgm, depthFramePtr_);
     // publish the invDepth map
     std::thread tPublishMappingResult(&esvo2_Mapping::publishMappingResults, this, depthFramePtr_->dMap_,
-                                      depthFramePtr_->T_world_frame_, t);
+                                      depthFramePtr_->T_world_frame_, t, TS_obs_ptr_->second.img_left_.clone());
     tPublishMappingResult.detach();
     return true;
 }
@@ -567,6 +568,7 @@ bool esvo2_Mapping::dataTransferring()
         return false;
     totalNumCount_ = 0;
 
+    // TS LOCK HERE
     // load current Time-Surface Observation
     auto it_end = TS_history_.rbegin();
     it_end++; // in case that the tf is behind the most current TS.
@@ -624,6 +626,8 @@ bool esvo2_Mapping::dataTransferring()
     if (TS_obs_ptr_->second.isEmpty())
         return false;
 
+    currProcessingTSTimes.insert(TS_obs_ptr_->first);
+        
     std::vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
     double curTime = esvo2_core::timePointToSec(TS_obs_ptr_->first);
     if (prevTime == 0)
@@ -668,9 +672,6 @@ bool esvo2_Mapping::dataTransferring()
         }
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
-        // Have this check because can be out of bounds if nothing in events_left with time >= TS_obs_ptr_->first + 0.005
-        if(ev_end_it == events_left_.end())
-            --ev_end_it;
         const std::size_t MAX_NUM_Event_INVOLVED = 30000;
         vEventsPtr_left_SGM_.reserve(MAX_NUM_Event_INVOLVED);
         while (ev_begin_it != ev_end_it && vEventsPtr_left_SGM_.size() <= PROCESS_EVENT_NUM_)
@@ -704,7 +705,7 @@ bool esvo2_Mapping::dataTransferring()
         auto ev_end_it = tools::EventBuffer_lower_bound(events_left_, t_end);
         auto ev_begin_it = tools::EventBuffer_lower_bound(events_left_, t_begin);
         // Have this check because can be out of bounds if nothing in events_left with time >= TS_obs_ptr_->first + 0.005
-        if(ev_end_it == events_left_.end())
+        if(ev_end_it == events_left_.end() && ev_begin_it!=events_left_.end())
             --ev_end_it;
         const std::size_t MAX_NUM_Event_INVOLVED = PROCESS_EVENT_NUM_;
         vALLEventsPtr_left_.reserve(MAX_NUM_Event_INVOLVED);
@@ -892,8 +893,13 @@ void esvo2_Mapping::timeSurfaceCallback(const esvo2_core::ImagePtr &time_surface
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin();
-        // std::cout<<"erasing ts history mapping with time: "<<esvo2_core::timePointToSec(it->first)<<std::endl;
-        TS_history_.erase(it);
+        if(currProcessingTSTimes.empty() || it->first < *currProcessingTSTimes.begin())
+        {
+            TS_history_.erase(it);
+        }
+        else
+            break;
+        
     }
 }
 
@@ -1026,6 +1032,7 @@ void esvo2_Mapping::reset()
     events_left_.clear();
     events_right_.clear();
     TS_history_.clear();
+    currProcessingTSTimes.clear();
     tf_->clear();
     pc_color_->clear();
     pc_filtered_->clear();
@@ -1057,14 +1064,14 @@ void esvo2_Mapping::reset()
     MappingThread.detach();
 }
 
-void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformation tr, timePoint t)
+void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformation tr, timePoint t, cv::Mat invDepthImage)
 {
     // DLOG("publishMappingResults  status=" << (int)getSystemStatus()
     //      << "  dqvDepthPoints.size=" << dqvDepthPoints_.size());
-    cv::Mat invDepthImage, stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
+    cv::Mat stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
 
     try{
-        invDepthImage = TS_obs_ptr_->second.img_left_.clone();
+        // invDepthImage = TS_obs_ptr_->second.img_left_.clone();
         // visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
         //                      stdVar_vis_threshold_, age_vis_threshold_);
         // VIZ PUBLISH -> not publishing anything right now

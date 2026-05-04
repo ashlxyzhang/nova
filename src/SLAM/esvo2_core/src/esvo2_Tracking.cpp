@@ -193,6 +193,7 @@ void esvo2_Tracking::TrackingLoop()
         std::cout << "------------------------------------------------------------";
         std::cout << "------------------------------------------------------------";
 #endif
+        currProcessingTSTimes.erase(cur_.t_);
         next_wake_up_time += interval;
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
@@ -247,6 +248,7 @@ bool esvo2_Tracking::curDataTransferring()
         return false;
     cur_.t_ = TS_it->first;
     cur_.pTsObs_ = &TS_it->second;
+    currProcessingTSTimes.insert(TS_it->first);
 
     if (getSystemStatus() == SystemStatus::INITIALIZATION && ets_ == IDLE)
     {
@@ -343,6 +345,7 @@ void esvo2_Tracking::reset()
     ets_ = IDLE;
     TS_id_ = 0;
     TS_history_.clear();
+    currProcessingTSTimes.clear();
     refPCMap_.clear();
     events_left_.clear();
 }
@@ -455,8 +458,13 @@ void esvo2_Tracking::timeSurface_NegaTS_Callback(const esvo2_core::ImagePtr &tim
     while (TS_history_.size() > TS_HISTORY_LENGTH_)
     {
         auto it = TS_history_.begin(); 
-        // std::cout<<"erasing ts history tracking with time: "<<esvo2_core::timePointToSec(it->first)<<std::endl;
-        TS_history_.erase(it);
+        if(currProcessingTSTimes.empty() || it->first < *currProcessingTSTimes.begin())
+        {
+            TS_history_.erase(it);
+        }
+        else
+            break;
+        
     }
 }
 

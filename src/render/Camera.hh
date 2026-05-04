@@ -117,6 +117,20 @@ class Camera
             updateOrbitPosition();
         }
 
+        void setYawAndPitch(float yaw, float pitch)
+        {
+            m_yaw = yaw;
+            m_pitch = pitch;
+
+            // Constrain pitch to prevent camera flipping
+            if (m_pitch > 89.0f)
+                m_pitch = 89.0f;
+            if (m_pitch < -89.0f)
+                m_pitch = -89.0f;
+
+            updateOrbitPosition();
+        }
+
         /**
          * @brief Process mouse scroll for zoom (FOV-based)
          * @param yoffset Scroll offset

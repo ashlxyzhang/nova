@@ -62,6 +62,49 @@ cd build-packaging && cpack
 
 The package bundles the Metavision HAL plugins, and on macOS also bundles MoltenVK so end users don't need the Vulkan SDK. On Linux/Windows, a working GPU driver with Vulkan support is required (standard on any modern machine).
 
+## 3D Reconstruction Instructions
+The 3D Reconstruction in NOVA is implemented using the ESVO2 algorithm.
+
+### Configuration
+The 3D reconstruction is configured by using six YAML files. Explanation for the parameters of these files can be found at the original [ESVO2 github](https://github.com/NAIL-HNU/ESVO2). It is probably easiest to just use or slightly modify the example files found in src/SLAM/esvo2_core/cfg/mapping, src/SLAM/esvo2_core/cfg/tracking, and src/SLAM/image_representation/cfg. Please note that NOVA does not currently support IMUs, so the tracking parameter `USE_IMU` will always be set to false. If you want a more dense global point cloud, setting the mapping parameter `visualizeGPC_interval` to 0 or a value near 0 has worked pretty well for us.
+
+### Camera Calibration
+Users must calibrate their stereo setup themselves. The left and right camera calibration should be put in separate YAML files. You can view examples of the expected format in src/SLAM/esvo2_core/calib.
+
+### Running the Algorithm
+First, navigate to the Data Sources tab and load two cameras or two files. **The first data source you load should correspond to the left camera and the second to the right camera.** Click `Read` for both data sources and set `View Mode` to `Synced`.
+
+Next, navigate to the 3D Reconstruction tab and load in your configuration YAML files. There are some default file paths loaded, but they may be invalid depending on how you downloaded NOVA.
+
+Next, navigate to the Scrubber tab and ensure both `Window` and `Step` are set to nonzero values. When testing on the DSEC dataset, having `Window` be about 10 and `Step` around 5 worked well for us, but other values will also work. Click `Play` to begin reading in the event data. If you are using live data from cameras, you can skip to read the latest events by clicking the `>|` button.
+
+Finally, in the 3D reconstruction tab, click `Start 3D Reconstruction`. The point cloud will now show up in the 
+3D Visualizer. It may take a few seconds for the grid to go away, while everything is initializing. **Sometimes the point cloud will not be immediately visible on the 3D visualizer. The points will sometimes spawn to the right or left of where the 3D visualizer initially faces. If this is the case, rotate the 3D visualizer using your mouse to see the point cloud.**
+
+### Show Global Pointcloud
+If `Show Global Pointcloud` is toggled on, the 3D visualizer will show the left camera's estimated location as a black line. It will also display the full reconstruction of the scene as a 3D point cloud. The point cloud is updated in set intervals based on the mapping's YAML file `visualizeGPC_interval` parameter. The colors of the points indicate the distance from the camera's initial position with red being close and blue being far.
+
+If `Show Global Pointcloud` is toggled off, the 3D visualizer will show only the latest depth information from the algorithm. This information is still represented in 3D space, so you may have to move the camera to view it from the proper angle. The colors indicate the distance from the camera's current estimated position. Red is close and blue is far.
+
+### Camera Controls
+Rotate by dragging the mouse.
+Zoom in/out by scrolling.
+Use w/a/s/d/q/e to move forward/left/back/right/up/down respectively.
+
+### Additional notes
+We ran our implementation on a scene from the [DSEC dataset](https://dsec.ifi.uzh.ch/dsec-datasets/download/). The dataset does not provide files in the format NOVA uses, so we made a small python program to convert from the DSEC h5 to .dat files. This program and instruction for running it can be found at: src/SLAM/refactor_files/unused/h5_to_dat.py.
+
+
+## References
+The 3D reconstruction uses a modified version of the [ESVO2 Algorithm](mhttps://github.com/NAIL-HNU/ESVO2).
+
+[ESVO2: Direct Visual-Inertial Odometry with Stereo Event Cameras](https://arxiv.org/abs/2410.09374), *Junkai Niu, Sheng Zhong, Xiuyuan Lu, Shaojie Shen, Guillermo Gallego, Yi Zhou*, IEEE Transactions on Robotics (T-RO), 2025. [PDF](https://arxiv.org/abs/2410.09374), [Video](https://youtu.be/gmAU32Oeiv8).
+
+We also cloned and used [Minkindr](https://github.com/ethz-asl/minkindr) in the 3D reconstruction.
+
+We adapted some code from ROS Noetic in order to implement the 3D reconstruction. A link to the file we adapted can be found [here](https://github.com/ros/ros_comm/blob/noetic-devel/utilities/message_filters/include/message_filters/sync_policies/approximate_time.h).
+
+This is the 3rd phase of NOVA. Our work would not have been possible wihtout the work of [Phase 1](https://github.com/andrewleachtx/nova) and [Phase 2](https://github.com/Utsawb/nova?tab=readme-ov-file).
 <!--
 # NOVA PHASE 2
 Neuromorphic Optics and Visualization Application.

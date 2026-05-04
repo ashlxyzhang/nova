@@ -164,7 +164,6 @@ void Visualizer::render(DataSource& data_source)
     if (!slam_active)
     {
         // Move camera back to default location in case it moved around during SLAM
-        camera.setOrbitCenter(glm::vec3(0,0,0));
         slam_renderer->clear();
         grid_renderer->cpu_update(params);
         points_renderer->cpu_update(data_source, params);

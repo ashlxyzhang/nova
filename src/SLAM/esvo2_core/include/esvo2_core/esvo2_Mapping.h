@@ -73,7 +73,7 @@ class esvo2_Mapping
         void reset();
 
         /*** publish results ***/
-        void publishMappingResults(DepthMap::Ptr depthMapPtr, Transformation tr, timePoint t);
+        void publishMappingResults(DepthMap::Ptr depthMapPtr, Transformation tr, timePoint t, cv::Mat invDepthImage);
         void publishPointCloud(DepthMap::Ptr &depthMapPtr, Transformation &tr, timePoint &t);
         void publishImage(const cv::Mat &image, const timePoint &t, std::string encoding = "bgr8");
 
@@ -150,6 +150,7 @@ class esvo2_Mapping
         EventQueue events_left_, events_right_;
         TimeSurfaceHistory TS_history_;
         constStampedTimeSurfaceObs *TS_obs_ptr_;
+        std::set<timePoint> currProcessingTSTimes;
         StampTransformationMap st_map_;
         std::shared_ptr<esvo2_core::Transformer> tf_;
         std::size_t TS_id_;
