@@ -13,7 +13,7 @@
 #include "render/Visualizer.hh"
 #include "slam_manager.hh"
 #include "ui/GUI.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "util/PluginBootstrap.hh"
 

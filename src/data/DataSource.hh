@@ -4,7 +4,7 @@
 
 #include "data/EventData.hh"
 #include "render/RenderTarget.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 #include "data/IEventReader.hh"
 #include "data/MetavisionEventReader.hh"
 #include "render/DigitalCodedExposure.hh"

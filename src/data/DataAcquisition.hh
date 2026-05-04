@@ -7,7 +7,7 @@
 #include "data/EventData.hh"
 #include "data/IEventReader.hh"
 #include "data/MetavisionEventReader.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "render/GPUDevice.hh"
 

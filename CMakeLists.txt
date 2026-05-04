@@ -19,6 +19,11 @@ file(GLOB_RECURSE HEADERS
     "src/*.hh"
     "src/SLAM/*.h"
 )
+file(GLOB NOVA_PUBLIC_HEADERS
+    "include/nova/*.hh"
+)
+list(APPEND HEADERS ${NOVA_PUBLIC_HEADERS})
+
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED)
@@ -105,10 +110,11 @@ endif()
 
 set_target_properties(nova_lib PROPERTIES CXX_EXTENSIONS OFF)
 
-target_include_directories(nova_lib PUBLIC 
+target_include_directories(nova_lib PUBLIC
+    "include/"
+     "src/"
     ${IMGUI_DIR}
     "resources/"
-    "src/"
     "src/SLAM/esvo2_core/include/"
     "src/SLAM/image_representation/include/"
     "src/SLAM/minkindr/minkindr/include/"
@@ -148,4 +154,4 @@ if(NOVA_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-include(Packaging)
+# include(Packaging)

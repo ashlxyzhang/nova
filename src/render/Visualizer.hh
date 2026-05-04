@@ -9,7 +9,7 @@
 #include "render/RenderTarget.hh"
 #include "render/TransferBuffer.hh"
 #include "render/GPUDevice.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "SLAM/esvo2_core/include/esvo2_core/tools/types.h"
 

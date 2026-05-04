@@ -1,10 +1,7 @@
 // Integration test: file (.aedat4) -> DVEventReader -> EventData.
 // Exercises the highest-value data flow that doesn't require a GPU device,
 // deliberately bypassing DataSource (which owns GPU upload buffers).
-#include "data/DVEventReader.hh"
-#include "data/EventData.hh"
-
-#include <dv-processing/io/mono_camera_recording.hpp>
+#include <nova/nova.hh>
 #include <gtest/gtest.h>
 
 #include <cstdlib>

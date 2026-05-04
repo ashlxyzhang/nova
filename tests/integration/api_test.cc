@@ -1,9 +1,5 @@
 
-#include "data/DataSource.hh"
-#include "ui/Windows.hh"
-#include "ui/Scrubber.hh"
-#include "render/GPUDevice.hh"
-
+#include <nova/nova.hh>
 #include <gtest/gtest.h>
 
 #include <cstdlib>

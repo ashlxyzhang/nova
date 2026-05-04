@@ -1,8 +1,7 @@
 // Tests for Scrubber::State pure logic (no GPU required).
 // The Scrubber class itself owns an SDL_GPUDevice, but State is a plain struct
 // whose update()/step_forward()/update_bounds() operate on an EventData instance.
-#include "data/EventData.hh"
-#include "ui/Scrubber.hh"
+#include <nova/nova.hh>
 #include <gtest/gtest.h>
 
 using namespace nova;

@@ -1,4 +1,4 @@
-#include "data/EventData.hh"
+#include <nova/nova.hh>
 #include <gtest/gtest.h>
 
 using namespace nova;

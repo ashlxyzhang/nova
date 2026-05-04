@@ -1,3 +1,5 @@
+#pragma once
+
 // FROM STD library
 #include <atomic>
 #include <condition_variable>
@@ -5,7 +7,7 @@
 
 // From NOVA
 #include "data/EventData.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 #include "util/pch.hh"
 
 // FROM SLAM

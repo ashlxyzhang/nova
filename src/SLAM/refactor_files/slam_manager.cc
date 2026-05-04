@@ -7,7 +7,7 @@
 
 #include "util/pch.hh"
 #include "data/EventData.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 
 #include "image_representation/ImageRepresentation.h"
 #include "esvo2_core/esvo2_Tracking.h"

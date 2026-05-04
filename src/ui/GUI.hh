@@ -10,9 +10,10 @@
 #include "render/RenderTarget.hh"
 #include "render/Visualizer.hh"
 #include "render/GPUDevice.hh"
-#include "ui/Scrubber.hh"
+#include "data/Scrubber.hh"
 #include "util/ErrorQueue.hh"
 #include "util/pch.hh"
+#include "SLAM/refactor_files/include/slam_manager.hh"
 
 namespace nova {
 
