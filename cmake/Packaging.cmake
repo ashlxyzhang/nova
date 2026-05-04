@@ -49,16 +49,39 @@ endif()
 
 # ----- Per-platform install layout -----
 if(APPLE)
+    # Determine the actual macOS floor for LSMinimumSystemVersion. Without
+    # CMAKE_OSX_DEPLOYMENT_TARGET the linker stamps the build host's version
+    # into LC_BUILD_VERSION, and dyld enforces that regardless of what the
+    # plist claims — so the plist needs to track reality, not fiction.
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(NOVA_MIN_MACOS "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    else()
+        execute_process(
+            COMMAND sw_vers -productVersion
+            OUTPUT_VARIABLE NOVA_MIN_MACOS
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    endif()
+
+    # Pre-substitute Info.plist.in via configure_file so we can drive
+    # LSMinimumSystemVersion from a custom variable. CMake's per-target plist
+    # mechanism only substitutes a fixed set of MACOSX_BUNDLE_* names.
+    set(MACOSX_BUNDLE_BUNDLE_NAME           "${PROJECT_NAME}")
+    set(MACOSX_BUNDLE_BUNDLE_VERSION        "${PROJECT_VERSION}")
+    set(MACOSX_BUNDLE_SHORT_VERSION_STRING  "${PROJECT_VERSION}")
+    set(MACOSX_BUNDLE_GUI_IDENTIFIER        "${NOVA_BUNDLE_ID}")
+    set(MACOSX_BUNDLE_EXECUTABLE_NAME       "${PROJECT_NAME}")
+    set(MACOSX_BUNDLE_COPYRIGHT             "${NOVA_COPYRIGHT}")
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/cmake/Info.plist.in"
+        "${CMAKE_BINARY_DIR}/Info.plist"
+        @ONLY
+    )
+
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        MACOSX_BUNDLE                       TRUE
-        MACOSX_BUNDLE_INFO_PLIST            "${CMAKE_SOURCE_DIR}/cmake/Info.plist.in"
-        MACOSX_BUNDLE_BUNDLE_NAME           "${PROJECT_NAME}"
-        MACOSX_BUNDLE_BUNDLE_VERSION        "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING  "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_GUI_IDENTIFIER        "${NOVA_BUNDLE_ID}"
-        MACOSX_BUNDLE_EXECUTABLE_NAME       "${PROJECT_NAME}"
-        MACOSX_BUNDLE_COPYRIGHT             "${NOVA_COPYRIGHT}"
-        INSTALL_RPATH                       "@executable_path/../Frameworks"
+        MACOSX_BUNDLE             TRUE
+        MACOSX_BUNDLE_INFO_PLIST  "${CMAKE_BINARY_DIR}/Info.plist"
+        INSTALL_RPATH             "@executable_path/../Frameworks"
     )
 
     set(NOVA_APP_REL          "${PROJECT_NAME}.app")

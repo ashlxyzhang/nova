@@ -81,7 +81,11 @@ class EventData
                     std::ostringstream oss;
                     oss << "nova_evt_buffer_" << std::hex << std::hash<std::thread::id>{}(std::this_thread::get_id())
                         << "_" << reinterpret_cast<std::uintptr_t>(this) << ".bin";
-                    file_path_ = std::filesystem::current_path() / oss.str();
+                    // Use the OS temp dir, not cwd: cwd is "/" when the app is
+                    // launched via LaunchServices (Finder, `open`), and creating
+                    // a file there fails — boost throws ios_base::failure and
+                    // the load aborts.
+                    file_path_ = std::filesystem::temp_directory_path() / oss.str();
                     remap(kInitialCapacity);
                 }
 

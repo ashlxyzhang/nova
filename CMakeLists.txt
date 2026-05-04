@@ -9,7 +9,9 @@ if(WIN32)
     set(CMAKE_C_COMPILER "clang-cl")
 endif()
 
-project(NOVA LANGUAGES C CXX)
+project(NOVA VERSION 0.1.0 LANGUAGES C CXX)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 file(GLOB_RECURSE SOURCES 
     "src/*.cc"
@@ -154,4 +156,6 @@ if(NOVA_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# include(Packaging)
+if(PROJECT_IS_TOP_LEVEL)
+    include(Packaging)
+endif()
