@@ -62,6 +62,34 @@ cd build-packaging && cpack
 
 The package bundles the Metavision HAL plugins, and on macOS also bundles MoltenVK so end users don't need the Vulkan SDK. On Linux/Windows, a working GPU driver with Vulkan support is required (standard on any modern machine).
 
+## Integrating NOVA into Your C++ Project
+
+NOVA builds into a static library (`nova_lib.lib`) that includes all the features of the main application (except for `main.cc`). Add NOVA to your project as a git submodule or clone directly with the following commands:
+
+```
+cd YourProject
+git submodule add https://github.com/ashlxyzhang/nova.git external/NOVA
+git submodule update --init --recursive
+```
+OR
+```
+git clone https://github.com/ashlxyzhang/nova.git external/NOVA
+```
+
+Then add NOVA to your CMakeLists.txt with the following lines (there are many ways of going about this but 'add_subdirectory' requires the least amount of work): 
+
+```
+add_subdirectory(external/NOVA)
+...
+target_link_libraries(my_app PRIVATE nova_lib)
+```
+
+See `tests/integration/api_test.cc` for examples of the API being used. Note that the entire project is wrapped in the `nova` namespace. There are five includes for nova: `nova/nova.hh`, `nova/render.hh`, `nova/data.hh`, `nova/ui.hh`, and `nova/slam.hh`. (Just use `#include <nova/nova.hh>` if you want everything).
+
+
+
+
+
 <!--
 # NOVA PHASE 2
 Neuromorphic Optics and Visualization Application.
