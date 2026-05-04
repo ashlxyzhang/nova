@@ -1062,12 +1062,12 @@ class Visualizer
                     for (const auto &pt : *pc)
                     {
                         double dist = glm::length(glm::vec3(pt.x, 0.0f, pt.z));
-                        int index =
-                        floor((dist - min_range) / (max_range - min_range) * 255.0f);
+                        int index = floor((dist - min_range) / (max_range - min_range) * 255.0f);
                         if (index > 255)
                             index = 255;
                         if (index < 0)
                             index = 0;
+                        index = 255 - index; // Make global match how the filtered point cloud is rendered
                         double r = esvo2_core::tools::Visualization::r[index];
                         double g = esvo2_core::tools::Visualization::g[index];
                         double b = esvo2_core::tools::Visualization::b[index];
@@ -1234,6 +1234,19 @@ class Visualizer
         void pan_camera(glm::vec3 direction, float offset)
         {
             camera.pan(direction, offset);
+        }
+
+        void reset_camera_after_slam()
+        {
+            std::cout<<"here?"<<std::endl;
+            camera.setOrbitCenter(glm::vec3(0,0,0));
+            camera.setYawAndPitch(0, 0);
+            camera.setOrbitDistance(5);
+        }
+
+        void set_camera_yaw_and_pitch(float yaw, float pitch)
+        {
+            camera.setYawAndPitch(yaw, pitch);
         }
 
         void set_slam_pointcloud(std::shared_ptr<pcl::PointCloud<pcl::PointXYZRGBL>> pc)

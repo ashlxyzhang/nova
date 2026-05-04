@@ -143,6 +143,7 @@ class esvo2_Tracking
         // online data
         EventQueue events_left_;
         TimeSurfaceHistory TS_history_;
+        std::set<timePoint> currProcessingTSTimes;
         size_t TS_id_;
         std::shared_ptr<esvo2_core::Transformer> tf_;
         std::map<timePoint, pcl::PointCloud<pcl::PointXYZRGBL>::Ptr> refPCMap_;

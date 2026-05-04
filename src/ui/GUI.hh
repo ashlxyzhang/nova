@@ -532,12 +532,14 @@ class GUI
                     try
                     {
                         slam_manager.startSlam(slam_params);
+                        visualizer.set_camera_yaw_and_pitch(270,0);
                     }
                     catch (const std::runtime_error& e)
                     {
                         std::string error_msg = "3D Reconstruction Failed to start. Your left/right camera config files were probably incorrect. Error message: "+std::string(e.what())+"\n";
                         error_queue.push_error(error_msg);
                         slam_manager.stopSlam();
+                        visualizer.reset_camera_after_slam();
                         visualizer.set_slam_pointcloud(nullptr);
                         visualizer.set_slam_global_pointcloud(nullptr);
                         visualizer.set_slam_path(nullptr);
@@ -549,6 +551,7 @@ class GUI
                 if(ImGui::Button("Stop 3D Reconstruction"))
                 {
                     slam_manager.stopSlam();
+                    visualizer.reset_camera_after_slam();
                     visualizer.set_slam_pointcloud(nullptr);
                     visualizer.set_slam_global_pointcloud(nullptr);
                     visualizer.set_slam_path(nullptr);
