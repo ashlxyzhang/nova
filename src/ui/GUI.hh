@@ -451,7 +451,6 @@ class GUI
         void draw_slam_window()
         {   
             int num_sources = (int)data_acquisition.get_data_sources().size();
-            if (num_sources == 0) return;
             
             ImGui::Begin("3D Reconstruction");
             

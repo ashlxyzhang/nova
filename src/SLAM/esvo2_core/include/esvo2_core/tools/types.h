@@ -237,7 +237,7 @@ public:
                 // Erasing if max - min exceeds the maximum allowed duration
                 if(max_time - min_time > max_duration_seconds)
                 {
-                        std::cout<<"Are erasing in types.h/Transformer! This should only happen if have been running SLAM for >100 seconds!"<<std::endl;
+                        std::cerr<<"Are erasing in types.h/Transformer! This should only happen if have been running SLAM for >100 seconds!"<<std::endl;
                         StampedTransform min_st(min_time);
                         auto right = transform_buffer.upper_bound(min_st);
                         transform_buffer.erase(transform_buffer.begin(), right);

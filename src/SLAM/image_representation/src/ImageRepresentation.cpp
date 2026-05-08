@@ -101,7 +101,6 @@ void ImageRepresentation::GenerationLoop()
         thread_sobel.join();
     }
     has_terminated = true;
-    // std::cout<<"IR "<<is_left_<<" is no longer running!"<<std::endl;
 }
 
 void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &ptr_e, int distance, double external_t)

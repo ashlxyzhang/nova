@@ -167,7 +167,6 @@ namespace nova {
             }
             case(SlamConfigFiles::Mapping):
             {
-                std::cout<<"mapping set!"<<file_path<<std::endl;
                 Mapping_yaml_path = file_path;
                 break;
             }

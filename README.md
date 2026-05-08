@@ -50,6 +50,8 @@ brew install pkg-config
 
    Available presets: `debug`, `release`, `packaging`
 
+   Note that it can takes several hours for vcpkg to install everything the first time `cmake --preset release` is run.
+
 ## Packaging
 
 To build a redistributable (`.dmg` on macOS, `.tar.gz` on Linux, `.zip` on Windows):
@@ -139,15 +141,15 @@ This is the 3rd phase of NOVA. Our work would not have been possible wihtout the
 - Ability to change camera bias settings
   - Requested by several people at the NICE conference
 - Ability to change background color for 3D visualizer
-- Adding IMU support
+- IMU support
   - NOVA currently handles reading in event and frame data. iniVation cameras and aedat4 files allow storage of other types of data like IMU data. A future implementation could look into handling the visualization of this IMU data
 - Fix packaging errors
-  - We could only confirm that packaging works for MacOS. Cleaning up some errors to also get it working on Windows would be great
+  - We could only confirm that packaging works for MacOS. Cleaning up some errors to also get it working on Windows/Linux would be great
 
 ### 3D Reconstruction
 - Visualizing some of the intermediate cv::Mats
   - reprojMap_left in RegProblemSolverLM.cpp especially could look good
-- Changing pose visualization to also show rotation 
+- Changing pose visualization to also show rotation
   - Currently it only connects the location of each pose. Adding in support to show the x/y/z axes for each pose could show the camera's rotation
 - Ability to change the colors used in the 3D reconstruction
   - Would help people who are colorblind
@@ -157,7 +159,7 @@ This is the 3rd phase of NOVA. Our work would not have been possible wihtout the
   - Currently, 3D reconstruction takes over the 3D visualizer window. Giving it its own window would allow users to see both at the same time
 - Add API calls to access the 3D reconstruction features
 - Support for monocular 3D reconstruction
-  - This would be a lot of work and is not a high priority
+  - This would take a lot of work and is not a high priority
 
 <!--
 # NOVA PHASE 2

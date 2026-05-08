@@ -195,7 +195,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
         // check system status
         if (getSystemStatus() == SystemStatus::TERMINATE)
         {
-            std::cout << "The Mapping node is terminated manually..." << std::endl;
+            // std::cout << "The Mapping node is terminated manually..." << std::endl;
             break;
         }
 

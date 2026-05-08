@@ -198,7 +198,6 @@ void esvo2_Tracking::TrackingLoop()
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
     has_terminated = true;
-    // std::cout<<"Tracking is no longer running!"<<std::endl;
 }
 
 bool esvo2_Tracking::refDataTransferring()
@@ -489,7 +488,7 @@ bool esvo2_Tracking::getPoseAt(const timePoint &t, esvo2_core::Transformation &T
     std::string *err_msg = new std::string();
     if (!tf_->canTransform(world_frame_id_, source_frame, t, err_msg))
     {
-        std::cout<<"tracking WARNING:" << timePointToSec(t) << " : " << *err_msg<<
+        std::cerr<<"tracking WARNING:" << timePointToSec(t) << " : " << *err_msg<<
         " Are in esvo2_Tracking.cpp getPoseAt()"<<std::endl;
         delete err_msg;
         return false;
