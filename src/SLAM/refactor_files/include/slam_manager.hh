@@ -129,10 +129,10 @@ class SlamManager
 
         //! Modules (uses unique_ptr for RAII, prevents accidental copies and double deletes, and allows
         //! for modules to hold references to one another)
-        std::unique_ptr<image_representation::ImageRepresentation> image_representation_left;
-        std::unique_ptr<image_representation::ImageRepresentation> image_representation_right;
-        std::unique_ptr<esvo2_core::esvo2_Mapping> mapping;
-        std::unique_ptr<esvo2_core::esvo2_Tracking> tracking;
+        std::unique_ptr<image_representation::ImageRepresentation> image_representation_left = nullptr;
+        std::unique_ptr<image_representation::ImageRepresentation> image_representation_right = nullptr;
+        std::unique_ptr<esvo2_core::esvo2_Mapping> mapping = nullptr;
+        std::unique_ptr<esvo2_core::esvo2_Tracking> tracking = nullptr;
 
         // For calibration
         SlamConfigFiles current_config_file_type;
@@ -149,12 +149,9 @@ class SlamManager
         YAML::Node _config;
 
         // For sending events
-        timePoint zero_absolute_timestamp;
-        // double last_processed_event_time_left = 0;
-        // double last_processed_event_time_right = 0;
+        const timePoint zero_absolute_timestamp = timePoint(std::chrono::steady_clock::duration::zero());;
         std::size_t last_processed_event_idx_left = 0;
         std::size_t last_processed_event_idx_right = 0;
-        bool firstEventBatch = true;
         Scrubber *left_scrubber = nullptr;
         Scrubber *right_scrubber = nullptr;
         EventData *left_eventdata = nullptr;

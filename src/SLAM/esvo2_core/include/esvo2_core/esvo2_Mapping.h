@@ -116,6 +116,8 @@ class esvo2_Mapping
         void processIMU(double t, double dt, const Eigen::Vector3d &linear_acceleration,
                         const Eigen::Vector3d &angular_velocity);
 
+        bool getHasTerminated() { return has_terminated;}
+
         /************************ member variables ************************/
         bool bpoints_from_AA_; // must be public so slam_manager can access it
     private:
@@ -131,6 +133,7 @@ class esvo2_Mapping
 
         // Running variable
         std::atomic<bool> &is_running;
+        bool has_terminated = false;
 
         // configuration variables struct
         YAML::Node config_;
@@ -150,7 +153,7 @@ class esvo2_Mapping
         EventQueue events_left_, events_right_;
         TimeSurfaceHistory TS_history_;
         constStampedTimeSurfaceObs *TS_obs_ptr_;
-        std::set<timePoint> currProcessingTSTimes;
+        std::multiset<timePoint> currProcessingTSTimes;
         StampTransformationMap st_map_;
         std::shared_ptr<esvo2_core::Transformer> tf_;
         std::size_t TS_id_;

@@ -68,6 +68,8 @@ class ImageRepresentation
         {
             return reference_time < esvo2_core::timePointToSec(e.timestamp);
         }
+        
+        bool getHasTerminated() { return has_terminated;}
 
         // callbacks
         void eventsCallback(const std::shared_ptr<esvo2_core::EventArray> &msg);
@@ -82,6 +84,7 @@ class ImageRepresentation
 
         // Running variable
         std::atomic<bool> &is_running;
+        bool has_terminated = false;
 
         // configuration variables struct
         YAML::Node config_;
@@ -89,7 +92,7 @@ class ImageRepresentation
         // core
         void init(int width, int height);
         // Support: TS, AA, negative_TS, negative_TS_dx, negative_TS_dy
-        void createImageRepresentationAtTime(const timePoint &external_sync_time);
+        void createImageRepresentationAtTime();
         void GenerationLoop();
 
        

@@ -117,7 +117,7 @@ Zoom in/out by scrolling.
 Use w/a/s/d/q/e to move forward/left/back/right/up/down respectively.
 
 ### Additional notes
-We ran our implementation on a scene from the [DSEC dataset](https://dsec.ifi.uzh.ch/dsec-datasets/download/). The dataset does not provide files in the format NOVA uses, so we made a small python program to convert from the DSEC h5 to .dat files. This program and instruction for running it can be found at: src/SLAM/refactor_files/unused/h5_to_dat.py.
+We ran our implementation on a scene from the [DSEC dataset](https://dsec.ifi.uzh.ch/dsec-datasets/download/). The dataset does not provide files in the format NOVA uses, so we made a small python program to convert from the DSEC .h5 to .dat files. This program and instruction for running it can be found at: src/SLAM/refactor_files/unused/h5_to_dat.py.
 
 
 ## References
@@ -130,6 +130,35 @@ We also cloned and used [Minkindr](https://github.com/ethz-asl/minkindr) in the 
 We adapted some code from ROS Noetic in order to implement the 3D reconstruction. A link to the file we adapted can be found [here](https://github.com/ros/ros_comm/blob/noetic-devel/utilities/message_filters/include/message_filters/sync_policies/approximate_time.h).
 
 This is the 3rd phase of NOVA. Our work would not have been possible wihtout the work of [Phase 1](https://github.com/andrewleachtx/nova) and [Phase 2](https://github.com/Utsawb/nova?tab=readme-ov-file).
+
+## Future Work
+### General
+- Support for showing frame data from traditional cameras
+- Per-pixel statistics in 3D Visualizer
+  - Such a feature could allow the user to click on event particles in the 3D Visualizer to get a summary of events at that pixel
+- Ability to change camera bias settings
+  - Requested by several people at the NICE conference
+- Ability to change background color for 3D visualizer
+- Adding IMU support
+  - NOVA currently handles reading in event and frame data. iniVation cameras and aedat4 files allow storage of other types of data like IMU data. A future implementation could look into handling the visualization of this IMU data
+- Fix packaging errors
+  - We could only confirm that packaging works for MacOS. Cleaning up some errors to also get it working on Windows would be great
+
+### 3D Reconstruction
+- Visualizing some of the intermediate cv::Mats
+  - reprojMap_left in RegProblemSolverLM.cpp especially could look good
+- Changing pose visualization to also show rotation 
+  - Currently it only connects the location of each pose. Adding in support to show the x/y/z axes for each pose could show the camera's rotation
+- Ability to change the colors used in the 3D reconstruction
+  - Would help people who are colorblind
+- Better system for loading the configuration files
+  - Current system is clunky and does not explain errors well 
+- Giving 3D reconstruction its own display window
+  - Currently, 3D reconstruction takes over the 3D visualizer window. Giving it its own window would allow users to see both at the same time
+- Add API calls to access the 3D reconstruction features
+- Support for monocular 3D reconstruction
+  - This would be a lot of work and is not a high priority
+
 <!--
 # NOVA PHASE 2
 Neuromorphic Optics and Visualization Application.

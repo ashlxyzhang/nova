@@ -197,6 +197,7 @@ void esvo2_Tracking::TrackingLoop()
         next_wake_up_time += interval;
         std::this_thread::sleep_until(next_wake_up_time);
     } // while
+    has_terminated = true;
     // std::cout<<"Tracking is no longer running!"<<std::endl;
 }
 

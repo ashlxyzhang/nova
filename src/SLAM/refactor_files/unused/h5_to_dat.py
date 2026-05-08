@@ -8,13 +8,16 @@ from numba import jit
 import sys
 
 # INSTRUCTIONS
-# Modified from: https://github.com/uzh-rpg/DSEC/blob/main/scripts/utils/eventslicer.py
-# This is AI generated with a few modifications so yeah
-# It takes a while to convert. The .dat files are turbo gigantic too, but they work for NOVA so whatever
-# Follow step 2 here: https://github.com/uzh-rpg/DSEC#install
-# I don't think you need the 'only for dataset loading' or 'only for visualilzation in the dataset loading' but I forget.
-# DOES NOT WORK ON WINDOWS (just use WSL) because h5py is not supported on windows :C
-
+# Download DSEC .h5 files here: https://dsec.ifi.uzh.ch/dsec-datasets/download/
+# This code is AI generated with a few changes. It uses parts of: https://github.com/uzh-rpg/DSEC/blob/main/scripts/utils/eventslicer.py
+# The program takes a while to convert. The output .dat files are very big (multiple gigabytes), but they will work for NOVA
+# DOES NOT WORK ON WINDOWS (just use WSL) because "h5py" package is not supported on windows
+# The code is not tested on mac, but it should work
+# If you don't have conda, here are some instructions for installing on WSL: https://dev.to/sfpear/miniconda-in-wsl-3642
+# Follow step 2 at this link to set up the conda environment: https://github.com/uzh-rpg/DSEC#install
+#   You don't need the 'only for dataset loading' or 'only for visualilzation in the dataset loading'.
+# Run the code with `python3 h5_to_dat.py "input_path.h5" "output_path.dat"`
+#   Example: python3 h5_to_dat.py "/mnt/c/Users/Jeff/Downloads/zurich_city_04_a_events_left/events.h5" "./desc_zurich_city_04_a_left.dat"
 
 # The EventSlicer class from the provided context [3] is included here.
 # It is used to efficiently read chunks of events from the DSEC H5 file.

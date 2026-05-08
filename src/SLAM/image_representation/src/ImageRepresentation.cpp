@@ -92,7 +92,7 @@ void ImageRepresentation::GenerationLoop()
     timePoint next_wake_up_time = std::chrono::steady_clock::now();
 
     while (is_running) {
-        createImageRepresentationAtTime(std::chrono::steady_clock::now());
+        createImageRepresentationAtTime();
         next_wake_up_time += interval;
         std::this_thread::sleep_until(next_wake_up_time);
     }
@@ -100,7 +100,7 @@ void ImageRepresentation::GenerationLoop()
     {
         thread_sobel.join();
     }
-
+    has_terminated = true;
     // std::cout<<"IR "<<is_left_<<" is no longer running!"<<std::endl;
 }
 
@@ -199,7 +199,7 @@ void ImageRepresentation::AA_thread(std::vector<esvo2_core::Event>::iterator &pt
     // cv::waitKey(10);
 }
 
-void ImageRepresentation::createImageRepresentationAtTime(const timePoint &_external_sync_time)
+void ImageRepresentation::createImageRepresentationAtTime()
 {
     if (!bcreat_)
         return;

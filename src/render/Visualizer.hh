@@ -1238,7 +1238,6 @@ class Visualizer
 
         void reset_camera_after_slam()
         {
-            std::cout<<"here?"<<std::endl;
             camera.setOrbitCenter(glm::vec3(0,0,0));
             camera.setYawAndPitch(0, 0);
             camera.setOrbitDistance(5);

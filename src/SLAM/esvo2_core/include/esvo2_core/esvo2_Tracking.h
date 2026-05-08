@@ -105,6 +105,8 @@ class esvo2_Tracking
             return answer;
         }
 
+         bool getHasTerminated() { return has_terminated;}
+
     private:
         //queues
         DataPassingDeque<esvo2_core::PoseStamped>& stamped_pose_Track_to_Map_;
@@ -112,6 +114,7 @@ class esvo2_Tracking
 
         // Running variable
         std::atomic<bool> &is_running;
+        bool has_terminated = false;
 
         // configuration variables struct
         YAML::Node config_;
@@ -143,7 +146,7 @@ class esvo2_Tracking
         // online data
         EventQueue events_left_;
         TimeSurfaceHistory TS_history_;
-        std::set<timePoint> currProcessingTSTimes;
+        std::multiset<timePoint> currProcessingTSTimes;
         size_t TS_id_;
         std::shared_ptr<esvo2_core::Transformer> tf_;
         std::map<timePoint, pcl::PointCloud<pcl::PointXYZRGBL>::Ptr> refPCMap_;

@@ -154,8 +154,8 @@ bool RegProblemSolverLM::solve_numerical()
       }
 
       // VIZ PUBLISH -> not publishing anything right now
-      std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
-      *reprojected_map_left = reprojMap_left;
+      // std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
+      // *reprojected_map_left = reprojMap_left;
       // timestamp is numDiff_regProblemPtr_->cur_->t_;
     }
     /*************************** Visualization ************************/
@@ -231,11 +231,11 @@ bool RegProblemSolverLM::solve_analytical()
     }
 
     // VIZ PUBLISH -> not publishing anything right now
-    std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
-    *reprojected_map_left = reprojMap_left;
+    // std::shared_ptr<cv::Mat> reprojected_map_left = std::make_shared<cv::Mat>();
+    // *reprojected_map_left = reprojMap_left;
     // cv::imshow("reproj map left", reprojMap_left);
     // cv::waitKey(10);
-      // timestamp is numDiff_regProblemPtr_->cur_->t_;
+    // timestamp is numDiff_regProblemPtr_->cur_->t_;
   }
   /*************************** Visualization ************************/
 

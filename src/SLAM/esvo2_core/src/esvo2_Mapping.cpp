@@ -195,7 +195,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
         // check system status
         if (getSystemStatus() == SystemStatus::TERMINATE)
         {
-            // std::cout << "The Mapping node is terminated manually..." << std::endl;
+            std::cout << "The Mapping node is terminated manually..." << std::endl;
             break;
         }
 
@@ -263,6 +263,7 @@ void esvo2_Mapping::MappingLoop(std::promise<void> prom_mapping, std::future<voi
         next_wake_up_time += interval;
         std::this_thread::sleep_until(next_wake_up_time);
     }
+    has_terminated = true;
     // std::cout << "Mapping is no longer running!" << std::endl;
 }
 
@@ -1070,19 +1071,10 @@ void esvo2_Mapping::publishMappingResults(DepthMap::Ptr depthMapPtr, Transformat
     //      << "  dqvDepthPoints.size=" << dqvDepthPoints_.size());
     cv::Mat stdVarImage, ageImage, costImage, eventImage, confidenceMap, invDepthImage_rel;
 
-    try{
-        // invDepthImage = TS_obs_ptr_->second.img_left_.clone();
-        // visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
-        //                      stdVar_vis_threshold_, age_vis_threshold_);
-        // VIZ PUBLISH -> not publishing anything right now
-        // Skip publishing the inv depth map for now
-        publishImage(invDepthImage, t);
-    }
-    catch (...){
-        std::cerr<<"skipping publishing invDepth because TS_obs_ptr_->second.img_left is corrupted??? Prob from being erased..."<<std::endl;
-        std::cerr<<"Cols/rows/empty: "<<TS_obs_ptr_->second.img_left_.cols<<" "<<TS_obs_ptr_->second.img_left_.rows<<" "<<TS_obs_ptr_->second.img_left_.empty()<<std::endl;
-    }
-   
+    // VIZ PUBLISH -> not publishing anything right now
+    // visualizor_.plot_map(depthMapPtr, tools::InvDepthMap, invDepthImage, invDepth_max_range_, invDepth_min_range_,
+    //                      stdVar_vis_threshold_, age_vis_threshold_);
+    // publishImage(invDepthImage, t);
 
     if (getSystemStatus() == SystemStatus::INITIALIZATION)
     {

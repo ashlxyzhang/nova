@@ -60,6 +60,32 @@ namespace nova {
         mapping_running = true;
         tracking_running = true;
 
+        // Making sure all modules have finished. Could probably use condition variables but whatever
+        while(true)
+        {
+            if(image_representation_left != nullptr && !image_representation_left->getHasTerminated())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            if(image_representation_right != nullptr && !image_representation_right->getHasTerminated())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            if(mapping != nullptr && !mapping->getHasTerminated())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            if(tracking != nullptr && !tracking->getHasTerminated())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            break;
+        }
+
         // The module's constructors create and detach a new thread that manages their respective processes
         image_representation_left = std::make_unique<image_representation::ImageRepresentation>(
                 image_representation_left_running, yaml_IR_Left_config, left_camera_yaml_path, 
@@ -109,21 +135,9 @@ namespace nova {
         yaml_Track_config.reset();
         yaml_Map_config.reset();
 
-        // Queues don't need to be reset because will be reassigned in operator= in startSlam.
-        // Stall to give time for the modules to terminate?
-        // std::this_thread::sleep_for(200ms);
+        // Queues and modules don't need to be reset because will be reassigned in operator= in startSlam.
 
-        // Got lots of issues due to race conditions when did the below reset, so are not doing this anymore.
-        // The shared pointers get reset anyway in startSlam when remaking the modules, so it is fine.
-        
-        // Reset (deleting) all of the module's unique pointers
-        // image_representation_left.reset(nullptr);
-        // image_representation_right.reset(nullptr);
-        // mapping.reset(nullptr);
-        // tracking.reset(nullptr);
-        
         // Resetting remaining variables
-        firstEventBatch = true;
         left_scrubber = nullptr;
         right_scrubber = nullptr;
         left_eventdata = nullptr;
@@ -203,7 +217,7 @@ namespace nova {
     {
         // If SLAM is not running, just return
         if(!image_representation_left_running)
-        return;
+            return;
         
         std::size_t& last_processed_event_idx = is_left ? last_processed_event_idx_left : last_processed_event_idx_right;
         const glm::vec2 frame_dims = event_data.get_camera_event_resolution();
@@ -217,21 +231,6 @@ namespace nova {
         {
             const glm::vec4* data_ptr = event_data.get_evt_vector_ref().data() + current_lower_index;
             event_data.lock_data_vectors();
-
-            if(firstEventBatch)
-            {
-                // Are just getting some constant timestep based on current time to add to everything. 
-                // It doesn't super matter and is probably not needed.
-                timePoint now = std::chrono::steady_clock::now();
-                // Casting end timestamp as a duration
-                // https://docs.inivation.com/software/introduction.html: "timestamp represents the time of the start of exposure of the 
-                // frame. It is represented as a Unix Timestamp in **microseconds**. Type: int64"
-                // Do nanoseconds of (microseconds * 1000) so get higher precision
-                std::chrono::nanoseconds end_duration(static_cast<long long>((data_ptr + (points_buffer_size - 1))->z * 1000));
-                zero_absolute_timestamp = now - end_duration;
-                firstEventBatch = false;
-            }
-
             const double duration_threshold = 1.0/1000.0;
             double curr_lower_bound_timestamp = data_ptr->z;
             double upper_bound_timestamp = curr_lower_bound_timestamp + duration_threshold;
@@ -277,6 +276,9 @@ namespace nova {
                 esvo2_core::Event evt;
                 evt.x = data_ptr[index].x;
                 evt.y = data_ptr[index].y;
+                // https://docs.inivation.com/software/introduction.html: "timestamp represents the time of the start of exposure of the 
+                // frame. It is represented as a Unix Timestamp in **microseconds**. Type: int64"
+                // Do nanoseconds of (microseconds * 1000) so get higher precision
                 evt.timestamp = std::chrono::nanoseconds(static_cast<long long>(data_ptr[index].z * 1000)) + zero_absolute_timestamp;
                 evt.polarity = data_ptr[index].w;
                 // Adding the event to the array
