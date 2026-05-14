@@ -11,6 +11,22 @@ NOVA is a visualization platform with support for 2D and 3D visualization of dat
 
 Jack Lewicki, Ryan O'Mullan, Ashley Zhang, Cole Greinke, and Neil Kodali
 
+## Citation
+Andrew Lin, Daniel Querrey, Eric McGonagle, John Langs, Nai Yun Wu, John Ho, Nick Almeter, Matthew Fisher, Utsawb Lamichhane, Praket Desai, David Mascarenas, Tracy Hammond, “Late breaking news: NOVA: Real-Time Visualization and Streaming for Neuromorphic Event Cameras,” NICE 2026, Atlanta, GA. 
+
+---
+
+Late breaking news: NOVA: Real-Time Visualization and Streaming for Neuromorphic Event Cameras
+
+* [Presentation PDF](https://flagship.kip.uni-heidelberg.de/jss/HBPm?m=displayPresentation&mI=282&mEID=10228)
+* [Talk Video](https://flagship.kip.uni-heidelberg.de/video/meeting_282_video_10228.mp4)
+* [Abstract](https://flagship.kip.uni-heidelberg.de/jss/HBPm?mI=282&m=showAgenda&withLength=Y&showAbstract=10228#10228)
+
+Andrew Lin, Daniel Querrey, Eric McGonagle, John Langs, Nai Yun Wu, John Ho, Nick Almeter, Matthew Fisher, Utsawb Lamichhane, Praket Desai, David Mascarenas, Tracy Hammond; Texas A&M University & Los Alamos
+
+* [NICE Conference Series](https://flagship.kip.uni-heidelberg.de/jss/HBPm?mI=282&m=showAgenda&withLength=Y)
+---
+
 ## Building from Source
 
 ### Prerequisites
